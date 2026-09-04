@@ -159,6 +159,9 @@
   .shift-note{color:#94808A;font-size:12px;}
   .noshift{color:#94808A;font-size:12px;}
   .mini-del{margin-left:auto;background:transparent;border:none;color:#C0392B;cursor:pointer;}
+  .acc-actions{margin-left:auto;display:flex;gap:10px;align-items:center;}
+  .acc-actions .del{margin-left:0;background:transparent;border:none;color:#C0392B;cursor:pointer;font-size:15px;}
+  .mini-key{background:transparent;border:none;color:#C9788F;cursor:pointer;font-size:15px;}
 
   @media (min-width:700px){
     .top{max-width:620px;padding-bottom:56px;}
@@ -185,7 +188,7 @@
 const {useState,useEffect,useRef,useMemo} = React;
 
 /* ============ 保存（この端末のブラウザに保存＝localStorage） ============ */
-const LS = "mizuho_app_v2";
+const LS = "mizuho_app_v3";
 const load = () => { try{ const r=localStorage.getItem(LS); return r?JSON.parse(r):null; }catch{return null;} };
 const save = (d) => { try{ localStorage.setItem(LS, JSON.stringify(d)); }catch(e){ console.error(e); } };
 async function sha256(t){
@@ -203,12 +206,23 @@ function mondayOf(d){ const x=new Date(d); const day=(x.getDay()+6)%7; x.setDate
 function addDays(d,n){ const x=new Date(d); x.setDate(x.getDate()+n); return x; }
 
 /* ============ 花びら ============ */
+const MONTHS=[
+  {n:"椿",       c:["#E79AB0","#FBE9EE","#FFFFFF"], k:"petal"},
+  {n:"梅",       c:["#F5C6D6","#FADCE4","#FFFFFF"], k:"petal"},
+  {n:"桃と菜の花",c:["#F7C6D3","#F7E3A1","#FADCE4"], k:"petal"},
+  {n:"桜",       c:["#F7C6D3","#FADCE4","#F0AEC2"], k:"petal"},
+  {n:"藤",       c:["#D7B6E0","#EFC6DE","#F5D3DC"], k:"petal"},
+  {n:"紫陽花",   c:["#B9C7E8","#D7B6E0","#EFB6C6"], k:"petal"},
+  {n:"朝顔",     c:["#AFC8EE","#EFB6C6","#FDE7EC"], k:"petal"},
+  {n:"向日葵",   c:["#F6C85F","#F3A85A","#FBE1B0"], k:"petal"},
+  {n:"コスモス", c:["#EFA6C0","#F5D3DC","#E79AB0"], k:"petal"},
+  {n:"紅葉",     c:["#E86A3A","#E7A13A","#D64545"], k:"leaf"},
+  {n:"銀杏と紅葉",c:["#EBC13A","#E88A3A","#E7A13A"], k:"leaf"},
+  {n:"山茶花",   c:["#D6455E","#E79AB0","#FFFFFF"], k:"petal"},
+];
 function seasonPalette(){
-  const m=new Date().getMonth()+1;
-  if(m>=3&&m<=5) return {name:"春・桜",petals:["#F7C6D3","#FADCE4","#F0AEC2"]};
-  if(m>=6&&m<=8) return {name:"夏・あさがお",petals:["#F3C9D6","#CDE0F1","#FDE7EC"]};
-  if(m>=9&&m<=11) return {name:"秋・こすもす",petals:["#EFB6C6","#E7C39B","#F5D3DC"]};
-  return {name:"冬・つばき",petals:["#E79AB0","#FBE9EE","#FFFFFF"]};
+  const i=new Date().getMonth(); const e=MONTHS[i];
+  return {name:`${i+1}月・${e.n}`, petals:e.c, kind:e.k};
 }
 function Petals({season}){
   const items=useMemo(()=>Array.from({length:18}).map((_,i)=>({
@@ -217,6 +231,7 @@ function Petals({season}){
   })),[season]);
   return <div className="petal-field" aria-hidden="true">{items.map(p=>(
     <span key={p.id} className="petal" style={{left:p.left+"%",width:p.size,height:p.size*0.72,background:p.color,
+      borderRadius:(season.kind==="leaf"?"0% 100% 35% 100%":"80% 10% 80% 10%"),
       animationDuration:p.dur+"s",animationDelay:p.delay+"s","--sway":p.sway+"px","--rot":p.rot+"deg"}}/>
   ))}</div>;
 }
@@ -317,8 +332,8 @@ function App(){
   useEffect(()=>{(async()=>{
     let d=load();
     if(!d){
-      const master=await sha256("mizuho2025"); const demo=await sha256("1234");
-      d={accounts:[{id:uid(),name:"管理者デモ",hash:demo,isAdmin:true},{id:uid(),name:"職員デモ",hash:demo,isAdmin:false}],
+      const master=await sha256("mizuho2025");
+      d={accounts:[{id:uid(),name:"松田 憲児",hash:"172f985331d247777b4bb3cfafc9be78dbd6160c7a037d3923debb4f1640c249",isAdmin:true},{id:uid(),name:"棚瀬 順子",hash:"09f9da865551fe3adcca5dbee05dc43fc474027a0a179c5af00e834ffe1960df",isAdmin:true}],
         master, hotaruUrl:"", philosophy:"", shifts:[],
         news:[{id:uid(),date:today(),title:"アプリの試作版ができました",body:"画面構成を確認できます。"}],
         materials:[
@@ -657,6 +672,8 @@ function AdminPanel({data,persist}){
   const [name,setName]=useState(""); const [p1,setP1]=useState(""); const [p2,setP2]=useState("");
   const [isAdmin,setIsAdmin]=useState(false); const [msg,setMsg]=useState("");
   const [hotaru,setHotaru]=useState(data.hotaruUrl||""); const [phil,setPhil]=useState(data.philosophy||"");
+  const [pwFor,setPwFor]=useState(null); const [np1,setNp1]=useState(""); const [np2,setNp2]=useState("");
+  const [m1,setM1]=useState(""); const [m2,setM2]=useState("");
   const add=async()=>{
     if(!name.trim())return setMsg("お名前を入力してください。");
     if(p1.length<4)return setMsg("パスワードは4文字以上にしてください。");
@@ -668,13 +685,28 @@ function AdminPanel({data,persist}){
   const remove=(id)=>{ if(!confirm("このアカウントを削除しますか？"))return; persist({...data,accounts:data.accounts.filter(a=>a.id!==id)}); };
   const saveHotaru=()=>{persist({...data,hotaruUrl:hotaru.trim()});setMsg("連携アプリのURLを保存しました。");};
   const savePhil=()=>{persist({...data,philosophy:phil});setMsg("ほたる理念を保存しました。AI相談でも参考にされます。");};
+  const changePw=async()=>{
+    if(np1.length<4)return setMsg("パスワードは4文字以上にしてください。");
+    if(np1!==np2)return setMsg("パスワードが一致しません。");
+    const hash=await sha256(np1);
+    persist({...data,accounts:data.accounts.map(a=>a.id===pwFor.id?{...a,hash}:a)});
+    const nm=pwFor.name; setPwFor(null);setNp1("");setNp2("");setMsg(`「${nm}」さんのパスワードを変更しました。`);
+  };
+  const saveMaster=async()=>{
+    if(m1.length<4)return setMsg("登録用パスワードは4文字以上にしてください。");
+    if(m1!==m2)return setMsg("パスワードが一致しません。");
+    const master=await sha256(m1); persist({...data,master}); setM1("");setM2("");setMsg("管理者登録用パスワードを変更しました。");
+  };
   return <Section title="管理者パネル" note="アカウントの登録・削除、理念や連携アプリの設定ができます。">
     <div className="grid2">
       <div><h3 className="blk">登録済みのアカウント</h3>
         <div className="acc-list">{data.accounts.map(a=>(
           <div key={a.id} className="acc"><span className="avatar sm">{a.name.slice(0,1)}</span>
             <span className="acc-nm">{a.name}{a.isAdmin&&<span className="tag">管理者</span>}</span>
-            <button className="del" onClick={()=>remove(a.id)}>🗑</button></div>))}</div></div>
+            <span className="acc-actions">
+              <button className="mini-key" onClick={()=>{setPwFor(a);setNp1("");setNp2("");}} title="パスワード変更">🔑</button>
+              <button className="del" onClick={()=>remove(a.id)} title="削除">🗑</button>
+            </span></div>))}</div></div>
       <div><h3 className="blk">＋ 新しく登録する</h3>
         <Field label="お名前" value={name} onChange={e=>setName(e.target.value)}/>
         <Field label="パスワード" type="password" value={p1} onChange={e=>setP1(e.target.value)}/>
@@ -688,7 +720,16 @@ function AdminPanel({data,persist}){
     <h3 className="blk">🔗 連携アプリ（ほたる理念）</h3>
     <Field label="ほたる理念アプリのURL" placeholder="https://…" value={hotaru} onChange={e=>setHotaru(e.target.value)}/>
     <div className="row-end"><Btn kind="ghost2" onClick={saveHotaru}>URLを保存</Btn></div>
+    <h3 className="blk">🔐 管理者登録用パスワードの変更</h3>
+    <Field label="新しい登録用パスワード" type="password" value={m1} onChange={e=>setM1(e.target.value)}/>
+    <Field label="もう一度" type="password" value={m2} onChange={e=>setM2(e.target.value)}/>
+    <div className="row-end"><Btn kind="ghost2" onClick={saveMaster}>変更する</Btn></div>
     {msg&&<p className="ok">{msg}</p>}
+    {pwFor&&<Modal title={`${pwFor.name} さんのパスワード変更`} tint="#C9788F" onClose={()=>{setPwFor(null);setNp1("");setNp2("");}}>
+      <Field label="新しいパスワード" type="password" value={np1} autoFocus onChange={e=>setNp1(e.target.value)}/>
+      <Field label="新しいパスワード（もう一度）" type="password" value={np2} onChange={e=>setNp2(e.target.value)}/>
+      <div className="row-end"><Btn onClick={changePw}>変更する</Btn></div>
+    </Modal>}
   </Section>;
 }
 
