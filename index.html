@@ -191,6 +191,11 @@
   .nm-wrap{display:flex;flex-direction:column;min-width:0;flex:1;}
   .affil{font-size:10px;color:#94808A;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .affil-inline{font-size:10px;color:#94808A;margin-left:6px;font-weight:400;}
+  .acc{align-items:flex-start;}
+  .acc-body{flex:1;min-width:0;}
+  .acc-line1{display:flex;align-items:center;gap:8px;}
+  .acc-line1 .acc-nm{flex:1;}
+  .affil-sel{margin-top:6px;width:100%;font-size:12px;padding:6px 8px;border:1px solid #F0D3DB;border-radius:8px;background:#FCF4F5;color:#5A4A50;}
 
   @media (min-width:700px){
     .top{max-width:620px;padding-bottom:56px;}
@@ -563,10 +568,10 @@ function Section({title,note,children}){return <section><h2 className="sec-title
 
 const RLABEL=(r)=>({s1:"支援1",s2:"支援2",common:"共通",user:"利用者"}[r]||r);
 function TimelineEdit({data,persist,date}){
-  const [role,setRole]=useState("s1"); const [start,setStart]=useState("09:30"); const [end,setEnd]=useState("10:30");
+  const [role,setRole]=useState("s1"); const [start,setStart]=useState("15:30"); const [end,setEnd]=useState("16:30");
   const [title,setTitle]=useState(""); const [detail,setDetail]=useState(""); const [editId,setEditId]=useState(null); const [msg,setMsg]=useState("");
   const list=data.timeline.filter(b=>b.date===date).sort((a,b)=>a.start.localeCompare(b.start));
-  const reset=()=>{setRole("s1");setStart("09:30");setEnd("10:30");setTitle("");setDetail("");setEditId(null);};
+  const reset=()=>{setRole("s1");setStart("15:30");setEnd("16:30");setTitle("");setDetail("");setEditId(null);};
   const submit=()=>{
     if(!title.trim())return setMsg("業務のタイトルを入力してください。");
     if(toMin(end)<=toMin(start))return setMsg("終了は開始より後にしてください。");
@@ -601,10 +606,11 @@ function TimelineEdit({data,persist,date}){
   </div>;
 }
 function Schedule({me,data,persist}){
-  const DAY_START=8*60, DAY_END=18*60, TOTAL=DAY_END-DAY_START, HEAD=42, AXIS=44, COL=106;
-  const [mode,setMode]=useState("overview"); const [date,setDate]=useState(iso(new Date()));
+  const DAY_START=15*60+30, DAY_END=33*60+30, TOTAL=DAY_END-DAY_START, HEAD=42, AXIS=46, COL=106;
+  const axisMin=(t)=>{ const m=toMin(t); return m<DAY_START ? m+1440 : m; };
+  const [mode,setMode]=useState("overview"); const [date,setDate]=useState(()=>{const n=new Date();return (n.getHours()*60+n.getMinutes())<(15*60+30)?iso(addDays(n,-1)):iso(n);});
   const [edit,setEdit]=useState(false); const [now,setNow]=useState(new Date()); const [sel,setSel]=useState(null);
-  const scrollRef=useRef(null); const ppm= mode==="overview"?0.78:8;
+  const scrollRef=useRef(null); const ppm= mode==="overview"?0.5:8;
   useEffect(()=>{const t=setInterval(()=>setNow(new Date()),30000);return()=>clearInterval(t);},[]);
   const blocks=data.timeline.filter(b=>b.date===date);
   const dayShifts=(data.shifts||[]).filter(s=>s.date===date);
@@ -613,12 +619,14 @@ function Schedule({me,data,persist}){
   const cols=[{key:"s1",label:"支援1",name:nameA},{key:"s2",label:"支援2",name:nameB},{key:"user",label:"利用者",name:""}];
   const colX=(k)=> k==="s2"?AXIS+COL : k==="user"?AXIS+COL*2 : AXIS;
   const COLORS={s1:"#F6D4DD",s2:"#CDE0F1",user:"#D7EAD0",common:"#FBE1B0"};
-  const nm=now.getHours()*60+now.getMinutes(); const isToday=date===iso(now);
-  const showNow=isToday&&nm>=DAY_START&&nm<=DAY_END; const nowTop=(nm-DAY_START)*ppm;
-  useEffect(()=>{ if(mode==="detail"&&scrollRef.current){ const pos=(nm-DAY_START)*ppm; scrollRef.current.scrollTop=Math.max(0,pos-scrollRef.current.clientHeight/2); } },[mode,date,now,ppm]);
-  const hours=[]; for(let h=8;h<=18;h++) hours.push(h);
+  const rawNow=now.getHours()*60+now.getMinutes();
+  let bizDate=null, nmAxis=null;
+  if(rawNow>=DAY_START){ bizDate=iso(now); nmAxis=rawNow; } else if(rawNow<=DAY_END-1440){ bizDate=iso(addDays(now,-1)); nmAxis=rawNow+1440; }
+  const showNow= bizDate===date && nmAxis!==null; const nowTop= showNow?(nmAxis-DAY_START)*ppm:0;
+  useEffect(()=>{ if(mode==="detail"&&scrollRef.current){ const pos=((nmAxis!=null?nmAxis:rawNow)-DAY_START)*ppm; scrollRef.current.scrollTop=Math.max(0,pos-scrollRef.current.clientHeight/2); } },[mode,date,now,ppm]);
+  const marks=[]; for(let m=Math.ceil(DAY_START/60)*60; m<=DAY_END; m+=60){ marks.push({m, label:(Math.floor(m/60)%24)+":00"}); }
   const W=AXIS+3*COL;
-  return <Section title="タイムスケジュール" note="縦＝時間、横＝支援1・支援2・利用者。シフトで夜勤A/Bを決めると担当者名が入ります。管理者は「編集」で予定を登録します。">
+  return <Section title="タイムスケジュール" note="業務時間は15:30〜翌9:30。縦＝時間、横＝支援1・支援2・利用者。シフトで夜勤A/Bを決めると担当者名が入ります。管理者は「編集」で予定を登録します。">
     <div className="tl-toolbar">
       <div className="tl-modes">
         <button className={"seg "+(mode==="overview"?"on":"")} onClick={()=>setMode("overview")}>全体</button>
@@ -641,15 +649,15 @@ function Schedule({me,data,persist}){
             <span className="ch-role">{c.label}</span>{c.name&&<span className="ch-name">{c.name}</span>}</div>)}
         </div>
         <div className="tl-body" style={{position:"relative",height:TOTAL*ppm,width:W}}>
-          {hours.map(h=>{const y=(h*60-DAY_START)*ppm;return <div key={h}>
-            <div className="tl-hline" style={{top:y}}/><div className="tl-hlabel" style={{top:y-7,width:AXIS}}>{h}:00</div></div>;})}
+          {marks.map(mk=>{const y=(mk.m-DAY_START)*ppm;return <div key={mk.m}>
+            <div className="tl-hline" style={{top:y}}/><div className="tl-hlabel" style={{top:y-7,width:AXIS}}>{mk.label}</div></div>;})}
           {["s1","s2","user"].map(rk=>blocks.filter(b=>b.role===rk).map(b=>{
-            const top=(toMin(b.start)-DAY_START)*ppm, hgt=Math.max(16,(toMin(b.end)-toMin(b.start))*ppm);
+            const top=(axisMin(b.start)-DAY_START)*ppm, hgt=Math.max(16,(axisMin(b.end)-axisMin(b.start))*ppm);
             return <button key={b.id} className="tl-block" onClick={()=>setSel(b)} style={{left:colX(rk)+3,width:COL-6,top,height:hgt,background:COLORS[rk]}}>
               <b>{b.title}</b><span>{b.start}–{b.end}</span></button>;
           }))}
           {blocks.filter(b=>b.role==="common").map(b=>{
-            const top=(toMin(b.start)-DAY_START)*ppm, hgt=Math.max(16,(toMin(b.end)-toMin(b.start))*ppm);
+            const top=(axisMin(b.start)-DAY_START)*ppm, hgt=Math.max(16,(axisMin(b.end)-axisMin(b.start))*ppm);
             return <button key={b.id} className="tl-block" onClick={()=>setSel(b)} style={{left:AXIS+3,width:COL*2-6,top,height:hgt,background:COLORS.common}}>
               <b>共通　{b.title}</b><span>{b.start}–{b.end}</span></button>;
           })}
@@ -701,7 +709,7 @@ function UsersView(){
 function Shifts({me,data,persist}){
   const [weekStart,setWeekStart]=useState(()=>mondayOf(new Date()));
   const [open,setOpen]=useState(false);
-  const [form,setForm]=useState({date:iso(new Date()),name:"",role:"A",start:"09:30",end:"15:30",note:""});
+  const [form,setForm]=useState({date:iso(new Date()),name:"",role:"A",start:"15:30",end:"09:30",note:""});
   const days=Array.from({length:7}).map((_,i)=>addDays(weekStart,i));
   const label=`${weekStart.getMonth()+1}/${weekStart.getDate()} 〜 ${addDays(weekStart,6).getMonth()+1}/${addDays(weekStart,6).getDate()}`;
   const add=()=>{
@@ -718,7 +726,7 @@ function Shifts({me,data,persist}){
     </div>
     <div className="row-between" style={{marginBottom:10}}>
       <button className="link-btn" onClick={()=>setWeekStart(mondayOf(new Date()))}>今週に戻る</button>
-      {me.isAdmin&&<Btn onClick={()=>{setForm({date:iso(days[0]),name:"",role:"A",start:"09:30",end:"15:30",note:""});setOpen(true);}}>＋ シフトを追加</Btn>}
+      {me.isAdmin&&<Btn onClick={()=>{setForm({date:iso(days[0]),name:"",role:"A",start:"15:30",end:"09:30",note:""});setOpen(true);}}>＋ シフトを追加</Btn>}
     </div>
     {days.map(d=>{
       const key=iso(d); const list=data.shifts.filter(s=>s.date===key).sort((a,b)=>a.start.localeCompare(b.start));
@@ -860,6 +868,7 @@ function AdminPanel({data,persist}){
     setName("");setP1("");setP2("");setIsAdmin(false);setAffil("専属");setMsg("追加しました。");
   };
   const remove=(id)=>{ if(!confirm("このアカウントを削除しますか？"))return; persist({...data,accounts:data.accounts.filter(a=>a.id!==id)}); };
+  const setAff=(id,affiliation)=>persist({...data,accounts:data.accounts.map(a=>a.id===id?{...a,affiliation}:a)});
   const saveHotaru=()=>{persist({...data,hotaruUrl:hotaru.trim()});setMsg("連携アプリのURLを保存しました。");};
   const savePhil=()=>{persist({...data,philosophy:phil});setMsg("ほたる理念を保存しました。AI相談でも参考にされます。");};
   const changePw=async()=>{
@@ -879,11 +888,18 @@ function AdminPanel({data,persist}){
       <div><h3 className="blk">登録済みのアカウント</h3>
         <div className="acc-list">{data.accounts.map(a=>(
           <div key={a.id} className="acc"><span className="avatar sm">{a.name.slice(0,1)}</span>
-            <span className="acc-nm">{a.name}{a.isAdmin&&<span className="tag">管理者</span>}<span className="affil-inline">{a.affiliation&&a.affiliation!=="専属"?a.affiliation:"専属"}</span></span>
-            <span className="acc-actions">
-              <button className="mini-key" onClick={()=>{setPwFor(a);setNp1("");setNp2("");}} title="パスワード変更">🔑</button>
-              <button className="del" onClick={()=>remove(a.id)} title="削除">🗑</button>
-            </span></div>))}</div></div>
+            <div className="acc-body">
+              <div className="acc-line1">
+                <span className="acc-nm">{a.name}{a.isAdmin&&<span className="tag">管理者</span>}</span>
+                <span className="acc-actions">
+                  <button className="mini-key" onClick={()=>{setPwFor(a);setNp1("");setNp2("");}} title="パスワード変更">🔑</button>
+                  <button className="del" onClick={()=>remove(a.id)} title="削除">🗑</button>
+                </span>
+              </div>
+              <select className="affil-sel" value={a.affiliation||"専属"} onChange={e=>setAff(a.id,e.target.value)}>
+                {AFFILIATIONS.map(o=><option key={o.v} value={o.v}>{o.label}</option>)}
+              </select>
+            </div></div>))}</div></div>
       <div><h3 className="blk">＋ 新しく登録する</h3>
         <Field label="お名前" value={name} onChange={e=>setName(e.target.value)}/>
         <label className="field"><span>所属（応援元）</span>
