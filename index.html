@@ -227,8 +227,8 @@ const load = () => { try{ const r=localStorage.getItem(LS); return r?JSON.parse(
 const save = (d) => { try{ localStorage.setItem(LS, JSON.stringify(d)); }catch(e){ console.error(e); } };
 
 /* ===== 共有データベース（Supabase）：下の2つに値を入れると全員で共有されます ===== */
-const SUPABASE_URL = ""; // 例: https://xxxx.supabase.co
-const SUPABASE_KEY = ""; // anon public key
+const SUPABASE_URL = "https://cxagugepnwivmestnnqk.supabase.co"; // 例: https://xxxx.supabase.co
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN4YWd1Z2Vwbndpdm1lc3RubnFrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg1NDA2NTgsImV4cCI6MjEwNDExNjY1OH0.VCxIn0xKZiaR7sqAiiJVER8Fs4HmTylfPChFQWy6_g0"; // anon public key
 const SB_ON = SUPABASE_URL.length>10 && SUPABASE_KEY.length>10;
 const sbHead = ()=>({ "apikey":SUPABASE_KEY, "Authorization":"Bearer "+SUPABASE_KEY, "Content-Type":"application/json" });
 async function sbGet(){ const r=await fetch(`${SUPABASE_URL}/rest/v1/app_state?id=eq.1&select=data,updated_at`,{headers:sbHead()}); if(!r.ok) throw new Error("sbGet "+r.status); const j=await r.json(); return (j&&j[0])?j[0]:null; }
