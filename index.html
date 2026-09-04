@@ -198,6 +198,20 @@ async function sha256(t){
 }
 const uid=()=>Math.random().toString(36).slice(2,9);
 const today=()=>{const d=new Date();return `${d.getFullYear()}.${d.getMonth()+1}.${d.getDate()}`;};
+const SEED_STAFF=[
+  {name:"宇野 晶子",hash:"dd1492fb13d56a4f2d3b5892b075f63415516dc935b7cf9dedb6d80437ab02e3"},
+  {name:"石原 進二",hash:"aef57d56934ad301e1dcc839c8e041763eaab7d1721290215304afdfb6e618e2"},
+  {name:"横山 広希",hash:"b35ed441e66fdc10783ae87c42a41a0d4d597ddddecc99e4c5371b42ee1052d3"},
+  {name:"舩戸 悦子",hash:"110bbc3bbb69fb07c4e7437ee92e07c681ab1d86e8a995124d0f1602976396f0"},
+  {name:"野村 涼子",hash:"f5ec67f33aecf0b019c63ae8c64980bc8896be9c3e382a68cdd9341305fd9548"},
+  {name:"高島 幸菜",hash:"41534d1d5955868148298689c4a3fa14a6309d9f8d91926434374e293104ecab"},
+  {name:"高島 潤",hash:"d667408bb52b1c8768ffbf72381022273c5b40c6629d0ddd10db72c654834d69"},
+  {name:"山口 真輝",hash:"efecd363c014add48bcc617ee1e317842138e49ce8022aee1fb9e99287ef4d34"},
+  {name:"上原 司",hash:"e946e2d49cd05cbc57389b39cca74a4aa89ce5262623181895175d1ca6ae4b9c"},
+  {name:"岡田 好弘",hash:"fcecd9db197c32ff32966b39ed0aaad8696640451559ae47324829355a04563f"},
+  {name:"西川 恵",hash:"042b3c425df3b34a20d5816aeddd6afc025da2f804f89e28abf32c15d89b79b5"}
+];
+
 
 /* ============ 日付ユーティリティ（シフト用） ============ */
 const WD=["日","月","火","水","木","金","土"];
@@ -344,6 +358,11 @@ function App(){
     }
     // 旧データの補完
     d.shifts=d.shifts||[]; d.philosophy=d.philosophy||""; d.materials=d.materials||[]; d.news=d.news||[]; d.hotaruUrl=d.hotaruUrl||"";
+    if(localStorage.getItem("mizuho_staff_seeded")!=="1"){
+      const have=new Set(d.accounts.map(a=>a.name));
+      SEED_STAFF.forEach(s=>{ if(!have.has(s.name)) d.accounts.push({id:uid(),name:s.name,hash:s.hash,isAdmin:false}); });
+      localStorage.setItem("mizuho_staff_seeded","1"); save(d);
+    }
     setData(d);
     const standalone=(window.matchMedia&&window.matchMedia("(display-mode: standalone)").matches)||window.navigator.standalone===true;
     if(!standalone && !localStorage.getItem("mizuho_install_done")) setShowInstall(true);
