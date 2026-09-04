@@ -162,6 +162,35 @@
   .acc-actions{margin-left:auto;display:flex;gap:10px;align-items:center;}
   .acc-actions .del{margin-left:0;background:transparent;border:none;color:#C0392B;cursor:pointer;font-size:15px;}
   .mini-key{background:transparent;border:none;color:#C9788F;cursor:pointer;font-size:15px;}
+  .tl-toolbar{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;flex-wrap:wrap;}
+  .tl-modes{display:inline-flex;border:1px solid #F0D3DB;border-radius:999px;overflow:hidden;}
+  .seg{border:none;background:#fff;color:#94808A;padding:8px 14px;font-size:13px;font-weight:700;cursor:pointer;}
+  .seg.on{background:#E79AB0;color:#fff;}
+  .seg+.seg{border-left:1px solid #F0D3DB;}
+  .tl-datenav{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+  .tl-datenav b{color:#C9788F;font-size:14px;}
+  .tl-scroll{overflow:auto;border:1px solid #F0D3DB;border-radius:14px;background:#fff;-webkit-overflow-scrolling:touch;}
+  .tl-inner{position:relative;}
+  .tl-head{display:flex;position:sticky;top:0;z-index:3;background:#FBEAEE;border-bottom:1px solid #F0D3DB;}
+  .tl-corner{flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:11px;color:#C9788F;font-weight:700;border-right:1px solid #F0D3DB;}
+  .tl-colhead{flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#5A4A50;border-right:1px solid #F0D3DB;padding:0 4px;text-align:center;line-height:1.2;}
+  .tl-colhead.empty{color:#94808A;font-weight:400;}
+  .tl-hline{position:absolute;left:0;right:0;border-top:1px solid #F3E3E8;}
+  .tl-hlabel{position:absolute;left:0;font-size:10px;color:#B79AA4;text-align:right;padding-right:5px;}
+  .tl-block{position:absolute;border:none;border-radius:8px;padding:4px 6px;text-align:left;overflow:hidden;cursor:pointer;display:flex;flex-direction:column;gap:2px;box-shadow:0 1px 3px rgba(0,0,0,.08);}
+  .tl-block b{font-size:11.5px;color:#5A4A50;line-height:1.2;}
+  .tl-block span{font-size:9.5px;color:#7A6A70;}
+  .tl-now{position:absolute;left:0;right:0;border-top:2px solid #E4577A;z-index:2;}
+  .tl-nowdot{position:absolute;width:9px;height:9px;border-radius:50%;background:#E4577A;z-index:2;}
+  .tl-editpanel{background:#FFF6F8;border:1px solid #F0D3DB;border-radius:14px;padding:14px;margin-bottom:12px;}
+  .tl-erow{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #F0D3DB;border-radius:10px;padding:6px 8px;margin-bottom:6px;font-size:13px;}
+  .tl-erow-main{flex:1;}
+  .tl-colhead{flex-direction:column;justify-content:center;gap:1px;}
+  .ch-role{font-size:10px;color:#94808A;line-height:1.1;}
+  .ch-name{font-size:12px;font-weight:700;color:#5A4A50;line-height:1.15;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;}
+  .nm-wrap{display:flex;flex-direction:column;min-width:0;flex:1;}
+  .affil{font-size:10px;color:#94808A;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .affil-inline{font-size:10px;color:#94808A;margin-left:6px;font-weight:400;}
 
   @media (min-width:700px){
     .top{max-width:620px;padding-bottom:56px;}
@@ -191,6 +220,25 @@ const {useState,useEffect,useRef,useMemo} = React;
 const LS = "mizuho_app_v3";
 const load = () => { try{ const r=localStorage.getItem(LS); return r?JSON.parse(r):null; }catch{return null;} };
 const save = (d) => { try{ localStorage.setItem(LS, JSON.stringify(d)); }catch(e){ console.error(e); } };
+
+/* ===== 共有データベース（Supabase）：下の2つに値を入れると全員で共有されます ===== */
+const SUPABASE_URL = ""; // 例: https://xxxx.supabase.co
+const SUPABASE_KEY = ""; // anon public key
+const SB_ON = SUPABASE_URL.length>10 && SUPABASE_KEY.length>10;
+const sbHead = ()=>({ "apikey":SUPABASE_KEY, "Authorization":"Bearer "+SUPABASE_KEY, "Content-Type":"application/json" });
+async function sbGet(){ const r=await fetch(`${SUPABASE_URL}/rest/v1/app_state?id=eq.1&select=data,updated_at`,{headers:sbHead()}); if(!r.ok) throw new Error("sbGet "+r.status); const j=await r.json(); return (j&&j[0])?j[0]:null; }
+async function sbSave(data,ts){ const body=JSON.stringify({id:1,data,updated_at:ts||new Date().toISOString()}); await fetch(`${SUPABASE_URL}/rest/v1/app_state`,{method:"POST",headers:{...sbHead(),"Prefer":"resolution=merge-duplicates,return=minimal"},body}); }
+
+/* 所属（応援元）とタイムライン/シフトの役割 */
+const AFFILIATIONS=[
+  {v:"専属", label:"専属（ふれあいホームみずほ）"},
+  {v:"ほたるの里瑞穂", label:"ほたるの里瑞穂"},
+  {v:"ほたるの杜岐阜県庁南", label:"ほたるの杜岐阜県庁南"},
+  {v:"ほたるの杜サン神戸", label:"ほたるの杜サン神戸"},
+  {v:"ほたるの園岐阜県庁南", label:"ほたるの園岐阜県庁南"},
+];
+const TL_ROLES=[{v:"s1",label:"支援1"},{v:"s2",label:"支援2"},{v:"common",label:"共通（支援1・2）"},{v:"user",label:"利用者さん"}];
+const SHIFT_ROLES=[{v:"A",label:"夜勤A（支援1）"},{v:"B",label:"夜勤B（支援2）"},{v:"day",label:"日勤"},{v:"other",label:"その他"}];
 async function sha256(t){
   try{ const b=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(t));
     return Array.from(new Uint8Array(b)).map(x=>x.toString(16).padStart(2,"0")).join(""); }
@@ -218,6 +266,8 @@ const WD=["日","月","火","水","木","金","土"];
 const iso=(d)=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
 function mondayOf(d){ const x=new Date(d); const day=(x.getDay()+6)%7; x.setDate(x.getDate()-day); x.setHours(0,0,0,0); return x; }
 function addDays(d,n){ const x=new Date(d); x.setDate(x.getDate()+n); return x; }
+const toMin=(t)=>{const p=(t||"0:0").split(":");return (+p[0])*60+(+p[1]);};
+const fmtDate=(s)=>{const d=new Date(s+"T00:00:00");return `${d.getMonth()+1}月${d.getDate()}日（${WD[d.getDay()]}）`;};
 
 /* ============ 花びら ============ */
 const MONTHS=[
@@ -342,13 +392,14 @@ function App(){
   const [adminReg,setAdminReg]=useState(false);
   const [hotaruOpen,setHotaruOpen]=useState(false);
   const [showInstall,setShowInstall]=useState(false);
+  const tsRef=useRef(null);
 
   useEffect(()=>{(async()=>{
     let d=load();
     if(!d){
       const master=await sha256("mizuho2025");
       d={accounts:[{id:uid(),name:"松田 憲児",hash:"172f985331d247777b4bb3cfafc9be78dbd6160c7a037d3923debb4f1640c249",isAdmin:true},{id:uid(),name:"棚瀬 順子",hash:"09f9da865551fe3adcca5dbee05dc43fc474027a0a179c5af00e834ffe1960df",isAdmin:true}],
-        master, hotaruUrl:"", philosophy:"", shifts:[],
+        master, hotaruUrl:"", philosophy:"", shifts:[], timeline:[],
         news:[{id:uid(),date:today(),title:"アプリの試作版ができました",body:"画面構成を確認できます。"}],
         materials:[
           {id:uid(),date:today(),title:"意思決定支援ガイドラインの要点",category:"意思決定支援",source:"厚労省ガイドライン",body:"意思決定支援は「意思形成→意思表明→意思実現」の3段階。支援者が代理で決めるのではなく、ご本人の希望を中心に据える。"},
@@ -357,20 +408,25 @@ function App(){
       save(d);
     }
     // 旧データの補完
-    d.shifts=d.shifts||[]; d.philosophy=d.philosophy||""; d.materials=d.materials||[]; d.news=d.news||[]; d.hotaruUrl=d.hotaruUrl||"";
+    d.shifts=d.shifts||[]; d.philosophy=d.philosophy||""; d.materials=d.materials||[]; d.news=d.news||[]; d.hotaruUrl=d.hotaruUrl||""; d.timeline=d.timeline||[];
     if(localStorage.getItem("mizuho_staff_seeded")!=="1"){
       const have=new Set(d.accounts.map(a=>a.name));
       SEED_STAFF.forEach(s=>{ if(!have.has(s.name)) d.accounts.push({id:uid(),name:s.name,hash:s.hash,isAdmin:false}); });
       localStorage.setItem("mizuho_staff_seeded","1"); save(d);
     }
+    try{ const ses=JSON.parse(localStorage.getItem("mizuho_session")||"null");
+      if(ses&&ses.exp>Date.now()){ const acc=d.accounts.find(a=>a.id===ses.id); if(acc) setMe(acc); } }catch(e){}
     setData(d);
     const standalone=(window.matchMedia&&window.matchMedia("(display-mode: standalone)").matches)||window.navigator.standalone===true;
     if(!standalone && !localStorage.getItem("mizuho_install_done")) setShowInstall(true);
+    if(SB_ON){ try{ const row=await sbGet(); if(row&&row.data&&Object.keys(row.data).length>0){ tsRef.current=row.updated_at||null; setData(row.data); } else { const ts=new Date().toISOString(); tsRef.current=ts; await sbSave(d,ts); } }catch(e){console.error("sb init",e);} }
   })();},[]);
+  useEffect(()=>{ if(!SB_ON) return; const iv=setInterval(async()=>{ try{ const row=await sbGet(); if(row&&row.updated_at&&row.updated_at!==tsRef.current){ tsRef.current=row.updated_at; if(row.data&&Object.keys(row.data).length>0) setData(row.data); } }catch(e){} },12000); return ()=>clearInterval(iv); },[]);
 
-  const persist=(next)=>{setData(next);save(next);};
+  const persist=(next)=>{ setData(next); save(next); if(SB_ON){ const ts=new Date().toISOString(); tsRef.current=ts; sbSave(next,ts).catch(()=>{}); } };
+  const logout=()=>{localStorage.removeItem("mizuho_session");setMe(null);};
   const doLogin=async()=>{const h=await sha256(pw);
-    if(login&&h===login.hash){setMe(login);setLogin(null);setPw("");setErr("");setTab("schedule");}
+    if(login&&h===login.hash){localStorage.setItem("mizuho_session",JSON.stringify({id:login.id,exp:Date.now()+86400000}));setMe(login);setLogin(null);setPw("");setErr("");setTab("schedule");}
     else setErr("パスワードが違います。");};
   const dismissInstall=(never)=>{if(never)localStorage.setItem("mizuho_install_done","1");setShowInstall(false);};
 
@@ -379,7 +435,7 @@ function App(){
   return <div>
     {showInstall && <InstallPrompt onNever={()=>dismissInstall(true)} onLater={()=>dismissInstall(false)}/>}
     {me
-      ? <Inside me={me} data={data} tab={tab} setTab={setTab} onLogout={()=>setMe(null)} persist={persist}/>
+      ? <Inside me={me} data={data} tab={tab} setTab={setTab} onLogout={logout} persist={persist}/>
       : <Top data={data} season={season} onPick={a=>{setLogin(a);setErr("");}} onAdminReg={()=>setAdminReg(true)} onHotaru={()=>setHotaruOpen(true)}/>}
 
     {login && <Modal title={`${login.name} さん  ―  パスワード`} onClose={()=>{setLogin(null);setPw("");setErr("");}}>
@@ -422,7 +478,8 @@ function Top({data,season,onPick,onAdminReg,onHotaru}){
       <div className="name-grid">
         {data.accounts.map(a=>(
           <button key={a.id} className="name-chip" onClick={()=>onPick(a)}>
-            <span className="avatar">{a.name.slice(0,1)}</span><span className="nm">{a.name}</span>
+            <span className="avatar">{a.name.slice(0,1)}</span>
+            <span className="nm-wrap"><span className="nm">{a.name}</span><span className="affil">{a.affiliation&&a.affiliation!=="専属"?a.affiliation:"専属"}</span></span>
             {a.isAdmin&&<span className="tag">管理者</span>}
           </button>))}
       </div>
@@ -490,7 +547,7 @@ function Inside({me,data,tab,setTab,onLogout,persist}){
     <nav className="tabs">{tabs.map(t=>(
       <button key={t.id} className={"tab "+(tab===t.id?"on":"")} onClick={()=>setTab(t.id)}>{t.label}</button>))}</nav>
     <main className="ins-body">
-      {tab==="schedule"&&<Schedule/>}
+      {tab==="schedule"&&<Schedule me={me} data={data} persist={persist}/>}
       {tab==="shifts"&&<Shifts me={me} data={data} persist={persist}/>}
       {tab==="work"&&<Work/>}
       {tab==="traits"&&<Traits/>}
@@ -504,10 +561,107 @@ function Inside({me,data,tab,setTab,onLogout,persist}){
 }
 function Section({title,note,children}){return <section><h2 className="sec-title">{title}</h2>{note&&<p className="sec-note">{note}</p>}{children}</section>;}
 
-function Schedule(){
-  const rows=[["9:30","送迎・到着、健康チェック（体温・表情・様子）"],["10:00","朝の会（今日の予定を一緒に確認）"],["10:30","生活訓練プログラム（調理・掃除・買い物など）"],["12:00","昼食・休憩"],["13:30","個別活動／グループ活動"],["15:00","振り返り・記録"],["15:30","送迎・お見送り"]];
-  return <Section title="タイムスケジュール" note="一日の流れの例です。曜日ごとの予定は今後編集できるようにします。">
-    <table className="tbl"><tbody>{rows.map(([t,a])=>(<tr key={t}><th>{t}</th><td>{a}</td></tr>))}</tbody></table></Section>;
+const RLABEL=(r)=>({s1:"支援1",s2:"支援2",common:"共通",user:"利用者"}[r]||r);
+function TimelineEdit({data,persist,date}){
+  const [role,setRole]=useState("s1"); const [start,setStart]=useState("09:30"); const [end,setEnd]=useState("10:30");
+  const [title,setTitle]=useState(""); const [detail,setDetail]=useState(""); const [editId,setEditId]=useState(null); const [msg,setMsg]=useState("");
+  const list=data.timeline.filter(b=>b.date===date).sort((a,b)=>a.start.localeCompare(b.start));
+  const reset=()=>{setRole("s1");setStart("09:30");setEnd("10:30");setTitle("");setDetail("");setEditId(null);};
+  const submit=()=>{
+    if(!title.trim())return setMsg("業務のタイトルを入力してください。");
+    if(toMin(end)<=toMin(start))return setMsg("終了は開始より後にしてください。");
+    if(editId){ persist({...data,timeline:data.timeline.map(b=>b.id===editId?{...b,role,start,end,title:title.trim(),detail:detail.trim()}:b)}); setMsg("更新しました。"); }
+    else{ persist({...data,timeline:[...data.timeline,{id:uid(),date,role,start,end,title:title.trim(),detail:detail.trim()}]}); setMsg("追加しました。"); }
+    reset();
+  };
+  const editOne=(b)=>{setEditId(b.id);setRole(b.role||"s1");setStart(b.start);setEnd(b.end);setTitle(b.title);setDetail(b.detail||"");setMsg("");};
+  const del=(id)=>{ if(!confirm("この予定を削除しますか？"))return; persist({...data,timeline:data.timeline.filter(b=>b.id!==id)}); if(editId===id) reset(); };
+  return <div className="tl-editpanel">
+    <h3 className="blk">✏️ {fmtDate(date)} の予定を{editId?"編集":"追加"}</h3>
+    <label className="field"><span>誰に対する業務ですか？</span>
+      <select value={role} onChange={e=>setRole(e.target.value)}>
+        {TL_ROLES.map(r=><option key={r.v} value={r.v}>{r.label}</option>)}
+      </select></label>
+    <div className="row-between">
+      <label className="field" style={{flex:1}}><span>開始</span><input type="time" value={start} onChange={e=>setStart(e.target.value)}/></label>
+      <label className="field" style={{flex:1}}><span>終了</span><input type="time" value={end} onChange={e=>setEnd(e.target.value)}/></label>
+    </div>
+    <Field label="業務のタイトル" value={title} onChange={e=>setTitle(e.target.value)} placeholder="例：調理サポート"/>
+    <Area label="詳細（任意）" rows={3} value={detail} onChange={e=>setDetail(e.target.value)} placeholder="具体的な支援内容や注意点"/>
+    <div className="row-end">{editId&&<Btn kind="ghost2" onClick={reset}>新規に戻す</Btn>}<Btn onClick={submit}>{editId?"更新する":"追加する"}</Btn></div>
+    {msg&&<p className="ok">{msg}</p>}
+    <h3 className="blk">この日の予定一覧</h3>
+    {list.length===0&&<p className="tiny">まだありません。</p>}
+    {list.map(b=>(<div key={b.id} className="tl-erow">
+      <span className="shift-time">{b.start}–{b.end}</span>
+      <span className="tl-erow-main"><b>{RLABEL(b.role)}</b> {b.title}</span>
+      <button className="mini-key" onClick={()=>editOne(b)} title="編集">✏️</button>
+      <button className="del" onClick={()=>del(b.id)} title="削除">🗑</button>
+    </div>))}
+  </div>;
+}
+function Schedule({me,data,persist}){
+  const DAY_START=8*60, DAY_END=18*60, TOTAL=DAY_END-DAY_START, HEAD=42, AXIS=44, COL=106;
+  const [mode,setMode]=useState("overview"); const [date,setDate]=useState(iso(new Date()));
+  const [edit,setEdit]=useState(false); const [now,setNow]=useState(new Date()); const [sel,setSel]=useState(null);
+  const scrollRef=useRef(null); const ppm= mode==="overview"?0.78:8;
+  useEffect(()=>{const t=setInterval(()=>setNow(new Date()),30000);return()=>clearInterval(t);},[]);
+  const blocks=data.timeline.filter(b=>b.date===date);
+  const dayShifts=(data.shifts||[]).filter(s=>s.date===date);
+  const nameA=(dayShifts.find(s=>s.role==="A")||{}).name||"";
+  const nameB=(dayShifts.find(s=>s.role==="B")||{}).name||"";
+  const cols=[{key:"s1",label:"支援1",name:nameA},{key:"s2",label:"支援2",name:nameB},{key:"user",label:"利用者",name:""}];
+  const colX=(k)=> k==="s2"?AXIS+COL : k==="user"?AXIS+COL*2 : AXIS;
+  const COLORS={s1:"#F6D4DD",s2:"#CDE0F1",user:"#D7EAD0",common:"#FBE1B0"};
+  const nm=now.getHours()*60+now.getMinutes(); const isToday=date===iso(now);
+  const showNow=isToday&&nm>=DAY_START&&nm<=DAY_END; const nowTop=(nm-DAY_START)*ppm;
+  useEffect(()=>{ if(mode==="detail"&&scrollRef.current){ const pos=(nm-DAY_START)*ppm; scrollRef.current.scrollTop=Math.max(0,pos-scrollRef.current.clientHeight/2); } },[mode,date,now,ppm]);
+  const hours=[]; for(let h=8;h<=18;h++) hours.push(h);
+  const W=AXIS+3*COL;
+  return <Section title="タイムスケジュール" note="縦＝時間、横＝支援1・支援2・利用者。シフトで夜勤A/Bを決めると担当者名が入ります。管理者は「編集」で予定を登録します。">
+    <div className="tl-toolbar">
+      <div className="tl-modes">
+        <button className={"seg "+(mode==="overview"?"on":"")} onClick={()=>setMode("overview")}>全体</button>
+        <button className={"seg "+(mode==="detail"?"on":"")} onClick={()=>setMode("detail")}>60分</button>
+        <button className="seg" onClick={()=>{setMode("detail");setNow(new Date());}}>今へ</button>
+      </div>
+      {me.isAdmin&&<button className={"btn "+(edit?"primary":"ghost2")} onClick={()=>setEdit(!edit)}>{edit?"閉じる":"編集"}</button>}
+    </div>
+    <div className="tl-datenav">
+      <button className="link-btn" onClick={()=>setDate(iso(addDays(new Date(date+"T00:00:00"),-1)))}>‹ 前日</button>
+      <b>{fmtDate(date)}</b>
+      <button className="link-btn" onClick={()=>setDate(iso(addDays(new Date(date+"T00:00:00"),1)))}>翌日 ›</button>
+    </div>
+    {edit&&me.isAdmin&&<TimelineEdit data={data} persist={persist} date={date}/>}
+    <div className="tl-scroll" ref={scrollRef} style={{height: mode==="overview"?(TOTAL*ppm+HEAD+8):"64vh"}}>
+      <div className="tl-inner" style={{width:W}}>
+        <div className="tl-head" style={{height:HEAD,width:W}}>
+          <div className="tl-corner" style={{width:AXIS}}>時刻</div>
+          {cols.map(c=><div key={c.key} className="tl-colhead" style={{width:COL}}>
+            <span className="ch-role">{c.label}</span>{c.name&&<span className="ch-name">{c.name}</span>}</div>)}
+        </div>
+        <div className="tl-body" style={{position:"relative",height:TOTAL*ppm,width:W}}>
+          {hours.map(h=>{const y=(h*60-DAY_START)*ppm;return <div key={h}>
+            <div className="tl-hline" style={{top:y}}/><div className="tl-hlabel" style={{top:y-7,width:AXIS}}>{h}:00</div></div>;})}
+          {["s1","s2","user"].map(rk=>blocks.filter(b=>b.role===rk).map(b=>{
+            const top=(toMin(b.start)-DAY_START)*ppm, hgt=Math.max(16,(toMin(b.end)-toMin(b.start))*ppm);
+            return <button key={b.id} className="tl-block" onClick={()=>setSel(b)} style={{left:colX(rk)+3,width:COL-6,top,height:hgt,background:COLORS[rk]}}>
+              <b>{b.title}</b><span>{b.start}–{b.end}</span></button>;
+          }))}
+          {blocks.filter(b=>b.role==="common").map(b=>{
+            const top=(toMin(b.start)-DAY_START)*ppm, hgt=Math.max(16,(toMin(b.end)-toMin(b.start))*ppm);
+            return <button key={b.id} className="tl-block" onClick={()=>setSel(b)} style={{left:AXIS+3,width:COL*2-6,top,height:hgt,background:COLORS.common}}>
+              <b>共通　{b.title}</b><span>{b.start}–{b.end}</span></button>;
+          })}
+          {showNow&&<><div className="tl-now" style={{top:nowTop}}/><div className="tl-nowdot" style={{top:nowTop-4,left:AXIS-4}}/></>}
+        </div>
+      </div>
+    </div>
+    {sel&&<Modal title={sel.title} tint="#C9788F" onClose={()=>setSel(null)}>
+      <p className="hint">🕒 {RLABEL(sel.role)}　{sel.start}–{sel.end}</p>
+      {sel.detail?<p style={{whiteSpace:"pre-wrap",fontSize:14,lineHeight:1.8}}>{sel.detail}</p>:<p className="tiny">詳細は未入力です。</p>}
+    </Modal>}
+  </Section>;
 }
 function Work(){
   const items=[
@@ -547,7 +701,7 @@ function UsersView(){
 function Shifts({me,data,persist}){
   const [weekStart,setWeekStart]=useState(()=>mondayOf(new Date()));
   const [open,setOpen]=useState(false);
-  const [form,setForm]=useState({date:iso(new Date()),name:"",start:"09:30",end:"15:30",note:""});
+  const [form,setForm]=useState({date:iso(new Date()),name:"",role:"A",start:"09:30",end:"15:30",note:""});
   const days=Array.from({length:7}).map((_,i)=>addDays(weekStart,i));
   const label=`${weekStart.getMonth()+1}/${weekStart.getDate()} 〜 ${addDays(weekStart,6).getMonth()+1}/${addDays(weekStart,6).getDate()}`;
   const add=()=>{
@@ -564,7 +718,7 @@ function Shifts({me,data,persist}){
     </div>
     <div className="row-between" style={{marginBottom:10}}>
       <button className="link-btn" onClick={()=>setWeekStart(mondayOf(new Date()))}>今週に戻る</button>
-      {me.isAdmin&&<Btn onClick={()=>{setForm({date:iso(days[0]),name:"",start:"09:30",end:"15:30",note:""});setOpen(true);}}>＋ シフトを追加</Btn>}
+      {me.isAdmin&&<Btn onClick={()=>{setForm({date:iso(days[0]),name:"",role:"A",start:"09:30",end:"15:30",note:""});setOpen(true);}}>＋ シフトを追加</Btn>}
     </div>
     {days.map(d=>{
       const key=iso(d); const list=data.shifts.filter(s=>s.date===key).sort((a,b)=>a.start.localeCompare(b.start));
@@ -573,7 +727,7 @@ function Shifts({me,data,persist}){
         <div className="day-head"><span className={cls}>{d.getMonth()+1}/{d.getDate()}（{WD[wd]}）</span></div>
         {list.length===0?<div className="noshift">予定なし</div>:list.map(s=>(
           <div key={s.id} className="shift-item">
-            <span className="shift-time">{s.start}–{s.end}</span><span>{s.name}</span>
+            <span className="shift-time">{s.start}–{s.end}</span>{s.role&&<span className="chip">{({A:"夜勤A",B:"夜勤B",day:"日勤",other:"その他"})[s.role]||""}</span>}<span>{s.name}</span>
             {s.note&&<span className="shift-note">{s.note}</span>}
             {me.isAdmin&&<button className="mini-del" onClick={()=>remove(s.id)}>🗑</button>}
           </div>))}
@@ -585,6 +739,10 @@ function Shifts({me,data,persist}){
         <select value={form.name} onChange={e=>setForm({...form,name:e.target.value})}>
           <option value="">選択してください</option>
           {data.accounts.map(a=><option key={a.id} value={a.name}>{a.name}</option>)}
+        </select></label>
+      <label className="field"><span>担当（役割）</span>
+        <select value={form.role} onChange={e=>setForm({...form,role:e.target.value})}>
+          {SHIFT_ROLES.map(r=><option key={r.v} value={r.v}>{r.label}</option>)}
         </select></label>
       <div className="row-between">
         <label className="field" style={{flex:1}}><span>開始</span><input type="time" value={form.start} onChange={e=>setForm({...form,start:e.target.value})}/></label>
@@ -689,7 +847,7 @@ function Consult({data}){
 /* ============================ 管理者パネル ============================ */
 function AdminPanel({data,persist}){
   const [name,setName]=useState(""); const [p1,setP1]=useState(""); const [p2,setP2]=useState("");
-  const [isAdmin,setIsAdmin]=useState(false); const [msg,setMsg]=useState("");
+  const [isAdmin,setIsAdmin]=useState(false); const [msg,setMsg]=useState(""); const [affil,setAffil]=useState("専属");
   const [hotaru,setHotaru]=useState(data.hotaruUrl||""); const [phil,setPhil]=useState(data.philosophy||"");
   const [pwFor,setPwFor]=useState(null); const [np1,setNp1]=useState(""); const [np2,setNp2]=useState("");
   const [m1,setM1]=useState(""); const [m2,setM2]=useState("");
@@ -698,8 +856,8 @@ function AdminPanel({data,persist}){
     if(p1.length<4)return setMsg("パスワードは4文字以上にしてください。");
     if(p1!==p2)return setMsg("パスワードが一致しません。");
     const hash=await sha256(p1);
-    persist({...data,accounts:[...data.accounts,{id:uid(),name:name.trim(),hash,isAdmin}]});
-    setName("");setP1("");setP2("");setIsAdmin(false);setMsg("追加しました。");
+    persist({...data,accounts:[...data.accounts,{id:uid(),name:name.trim(),hash,isAdmin,affiliation:affil}]});
+    setName("");setP1("");setP2("");setIsAdmin(false);setAffil("専属");setMsg("追加しました。");
   };
   const remove=(id)=>{ if(!confirm("このアカウントを削除しますか？"))return; persist({...data,accounts:data.accounts.filter(a=>a.id!==id)}); };
   const saveHotaru=()=>{persist({...data,hotaruUrl:hotaru.trim()});setMsg("連携アプリのURLを保存しました。");};
@@ -721,13 +879,17 @@ function AdminPanel({data,persist}){
       <div><h3 className="blk">登録済みのアカウント</h3>
         <div className="acc-list">{data.accounts.map(a=>(
           <div key={a.id} className="acc"><span className="avatar sm">{a.name.slice(0,1)}</span>
-            <span className="acc-nm">{a.name}{a.isAdmin&&<span className="tag">管理者</span>}</span>
+            <span className="acc-nm">{a.name}{a.isAdmin&&<span className="tag">管理者</span>}<span className="affil-inline">{a.affiliation&&a.affiliation!=="専属"?a.affiliation:"専属"}</span></span>
             <span className="acc-actions">
               <button className="mini-key" onClick={()=>{setPwFor(a);setNp1("");setNp2("");}} title="パスワード変更">🔑</button>
               <button className="del" onClick={()=>remove(a.id)} title="削除">🗑</button>
             </span></div>))}</div></div>
       <div><h3 className="blk">＋ 新しく登録する</h3>
         <Field label="お名前" value={name} onChange={e=>setName(e.target.value)}/>
+        <label className="field"><span>所属（応援元）</span>
+          <select value={affil} onChange={e=>setAffil(e.target.value)}>
+            {AFFILIATIONS.map(a=><option key={a.v} value={a.v}>{a.label}</option>)}
+          </select></label>
         <Field label="パスワード" type="password" value={p1} onChange={e=>setP1(e.target.value)}/>
         <Field label="パスワード（もう一度）" type="password" value={p2} onChange={e=>setP2(e.target.value)}/>
         <label className="check"><input type="checkbox" checked={isAdmin} onChange={e=>setIsAdmin(e.target.checked)}/> この方を管理者にする</label>
