@@ -168,8 +168,10 @@
   .seg.on{background:#E79AB0;color:#fff;}
   .seg+.seg{border-left:1px solid #F0D3DB;}
   .tl-datenav{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+  .tl-zoom{display:inline-flex;gap:6px;}
+  .zbtn{width:34px;height:34px;border-radius:10px;border:1px solid #F0D3DB;background:#fff;color:#C9788F;font-size:18px;font-weight:700;cursor:pointer;line-height:1;}
   .tl-datenav b{color:#C9788F;font-size:14px;}
-  .tl-scroll{overflow:auto;border:1px solid #F0D3DB;border-radius:14px;background:#fff;-webkit-overflow-scrolling:touch;}
+  .tl-scroll{overflow:auto;border:1px solid #F0D3DB;border-radius:14px;background:#fff;-webkit-overflow-scrolling:touch;touch-action:pan-y;}
   .tl-inner{position:relative;}
   .tl-head{display:flex;position:sticky;top:0;z-index:3;background:#FBEAEE;border-bottom:1px solid #F0D3DB;}
   .tl-corner{flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:11px;color:#C9788F;font-weight:700;border-right:1px solid #F0D3DB;}
@@ -526,7 +528,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.9〉</p>
   </div>;
 }
 
@@ -668,7 +670,12 @@ function Schedule({me,data,persist}){
   const axisMin=(t)=>{ const m=toMin(t); return m<DAY_START ? m+1440 : m; };
   const [mode,setMode]=useState("overview"); const [date,setDate]=useState(()=>{const n=new Date();return (n.getHours()*60+n.getMinutes())<(15*60+30)?iso(addDays(n,-1)):iso(n);});
   const [edit,setEdit]=useState(false); const [now,setNow]=useState(new Date()); const [sel,setSel]=useState(null);
-  const scrollRef=useRef(null); const ppm= mode==="overview"?0.5:8;
+  const scrollRef=useRef(null); const [zoom,setZoom]=useState(1); const pinchRef=useRef({d0:0,z0:1,active:false});
+  const ppm=(mode==="overview"?0.5:8)*zoom;
+  const dist=(t)=>Math.hypot(t[0].clientX-t[1].clientX, t[0].clientY-t[1].clientY);
+  const onTS=(e)=>{ if(e.touches.length===2){ pinchRef.current={d0:dist(e.touches), z0:zoom, active:true}; } };
+  const onTM=(e)=>{ if(e.touches.length===2&&pinchRef.current.active){ let z=pinchRef.current.z0*(dist(e.touches)/pinchRef.current.d0); z=Math.max(0.5,Math.min(6,z)); setZoom(z); if(e.cancelable) e.preventDefault(); } };
+  const onTE=(e)=>{ if(e.touches.length<2) pinchRef.current.active=false; };
   useEffect(()=>{const t=setInterval(()=>setNow(new Date()),30000);return()=>clearInterval(t);},[]);
   const blocks=data.timeline||[];
   const dayShifts=(data.shifts||[]).filter(s=>s.date===date);
@@ -684,13 +691,14 @@ function Schedule({me,data,persist}){
   useEffect(()=>{ if(mode==="detail"&&scrollRef.current){ const pos=((nmAxis!=null?nmAxis:rawNow)-DAY_START)*ppm; scrollRef.current.scrollTop=Math.max(0,pos-scrollRef.current.clientHeight/2); } },[mode,date,now,ppm]);
   const marks=[]; for(let m=Math.ceil(DAY_START/60)*60; m<=DAY_END; m+=60){ marks.push({m, label:(Math.floor(m/60)%24)+":00"}); }
   const W=AXIS+3*COL;
-  return <Section title="タイムスケジュール" note="業務時間は15:30〜翌9:30。予定は毎日共通です（日付は担当者名の切替用）。シフトで夜勤A/Bを決めると支援1・支援2に名前が入ります。管理者は「編集」で登録します。">
+  return <Section title="タイムスケジュール" note="業務時間は15:30〜翌9:30。予定は毎日共通です（日付は担当者名の切替用）。重なる予定は自動で横並びに分割。2本指でつまむ、または＋－で時間帯を拡大できます。〈ver.9〉">
     <div className="tl-toolbar">
       <div className="tl-modes">
-        <button className={"seg "+(mode==="overview"?"on":"")} onClick={()=>setMode("overview")}>全体</button>
-        <button className={"seg "+(mode==="detail"?"on":"")} onClick={()=>setMode("detail")}>60分</button>
+        <button className={"seg "+(mode==="overview"?"on":"")} onClick={()=>{setMode("overview");setZoom(1);}}>全体</button>
+        <button className={"seg "+(mode==="detail"?"on":"")} onClick={()=>{setMode("detail");setZoom(1);}}>60分</button>
         <button className="seg" onClick={()=>{setMode("detail");setNow(new Date());}}>今へ</button>
       </div>
+      <div className="tl-zoom"><button className="zbtn" onClick={()=>setZoom(z=>Math.min(6,z*1.3))} aria-label="拡大">＋</button><button className="zbtn" onClick={()=>setZoom(z=>Math.max(0.5,z/1.3))} aria-label="縮小">－</button></div>
       {me.isAdmin&&<button className={"btn "+(edit?"primary":"ghost2")} onClick={()=>setEdit(!edit)}>{edit?"閉じる":"編集"}</button>}
     </div>
     <div className="tl-datenav">
@@ -699,7 +707,7 @@ function Schedule({me,data,persist}){
       <button className="link-btn" onClick={()=>setDate(iso(addDays(new Date(date+"T00:00:00"),1)))}>翌日 ›</button>
     </div>
     {edit&&me.isAdmin&&<TimelineEdit data={data} persist={persist}/>}
-    <div className="tl-scroll" ref={scrollRef} style={{height: mode==="overview"?(TOTAL*ppm+HEAD+8):"64vh"}}>
+    <div className="tl-scroll" ref={scrollRef} onTouchStart={onTS} onTouchMove={onTM} onTouchEnd={onTE} style={{height: mode==="overview"?(TOTAL*ppm+HEAD+8):"64vh"}}>
       <div className="tl-inner" style={{width:W}}>
         <div className="tl-head" style={{height:HEAD,width:W}}>
           <div className="tl-corner" style={{width:AXIS}}>時刻</div>
