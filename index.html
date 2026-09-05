@@ -177,7 +177,7 @@
   .tl-colhead.empty{color:#94808A;font-weight:400;}
   .tl-hline{position:absolute;left:0;right:0;border-top:1px solid #F3E3E8;}
   .tl-hlabel{position:absolute;left:0;font-size:10px;color:#B79AA4;text-align:right;padding-right:5px;}
-  .tl-block{position:absolute;border:none;border-radius:8px;padding:4px 6px;text-align:left;overflow:hidden;cursor:pointer;display:flex;flex-direction:column;gap:2px;box-shadow:0 1px 3px rgba(0,0,0,.08);}
+  .tl-block{position:absolute;border:1px solid rgba(255,255,255,.75);border-radius:8px;padding:4px 6px;text-align:left;overflow:hidden;cursor:pointer;display:flex;flex-direction:column;gap:2px;box-shadow:0 1px 3px rgba(0,0,0,.12);}
   .tl-block b{font-size:11.5px;color:#5A4A50;line-height:1.2;}
   .tl-block span{font-size:9.5px;color:#7A6A70;}
   .tl-now{position:absolute;left:0;right:0;border-top:2px solid #E4577A;z-index:2;}
@@ -598,6 +598,17 @@ function Inside({me,data,tab,setTab,onLogout,persist}){
 }
 function Section({title,note,children}){return <section><h2 className="sec-title">{title}</h2>{note&&<p className="sec-note">{note}</p>}{children}</section>;}
 
+function packLanes(list, am){
+  const arr=list.map(b=>({b,s:am(b.start),e:am(b.end)})).sort((x,y)=>x.s-y.s||x.e-y.e);
+  const laneEnd=[];
+  arr.forEach(it=>{ let lane=laneEnd.findIndex(end=>end<=it.s); if(lane===-1){ lane=laneEnd.length; } laneEnd[lane]=it.e; it.lane=lane; });
+  const clusters=[]; let cur=[], cEnd=-1;
+  arr.forEach(it=>{ if(it.s>=cEnd){ if(cur.length) clusters.push(cur); cur=[]; cEnd=it.e; } else { cEnd=Math.max(cEnd,it.e); } cur.push(it); });
+  if(cur.length) clusters.push(cur);
+  const out=[];
+  clusters.forEach(cl=>{ const lanes=Math.max.apply(null,cl.map(i=>i.lane))+1; cl.forEach(i=>out.push({b:i.b,lane:i.lane,lanes})); });
+  return out;
+}
 function ytOrDrive(url){
   try{ let m;
     if(m=url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/)([\w-]{6,})/)) return "https://www.youtube.com/embed/"+m[1];
@@ -698,14 +709,19 @@ function Schedule({me,data,persist}){
         <div className="tl-body" style={{position:"relative",height:TOTAL*ppm,width:W}}>
           {marks.map(mk=>{const y=(mk.m-DAY_START)*ppm;return <div key={mk.m}>
             <div className="tl-hline" style={{top:y}}/><div className="tl-hlabel" style={{top:y-7,width:AXIS}}>{mk.label}</div></div>;})}
-          {["s1","s2","user"].map(rk=>blocks.filter(b=>b.role===rk).map(b=>{
+          {["s1","s2","user"].map(rk=>{
+            const packed=packLanes(blocks.filter(b=>b.role===rk), axisMin);
+            return packed.map(({b,lane,lanes})=>{
+              const top=(axisMin(b.start)-DAY_START)*ppm, hgt=Math.max(16,(axisMin(b.end)-axisMin(b.start))*ppm);
+              const cw=(COL-6)/lanes;
+              return <button key={b.id} className="tl-block" onClick={()=>setSel(b)} style={{left:colX(rk)+3+lane*cw,width:cw-2,top,height:hgt,background:COLORS[rk]}}>
+                <b>{b.video?"▶ ":""}{b.title}</b><span>{b.start}–{b.end}</span></button>;
+            });
+          })}
+          {packLanes(blocks.filter(b=>b.role==="common"), axisMin).map(({b,lane,lanes})=>{
             const top=(axisMin(b.start)-DAY_START)*ppm, hgt=Math.max(16,(axisMin(b.end)-axisMin(b.start))*ppm);
-            return <button key={b.id} className="tl-block" onClick={()=>setSel(b)} style={{left:colX(rk)+3,width:COL-6,top,height:hgt,background:COLORS[rk]}}>
-              <b>{b.video?"▶ ":""}{b.title}</b><span>{b.start}–{b.end}</span></button>;
-          }))}
-          {blocks.filter(b=>b.role==="common").map(b=>{
-            const top=(axisMin(b.start)-DAY_START)*ppm, hgt=Math.max(16,(axisMin(b.end)-axisMin(b.start))*ppm);
-            return <button key={b.id} className="tl-block" onClick={()=>setSel(b)} style={{left:AXIS+3,width:COL*2-6,top,height:hgt,background:COLORS.common}}>
+            const cw=(COL*2-6)/lanes;
+            return <button key={b.id} className="tl-block" onClick={()=>setSel(b)} style={{left:AXIS+3+lane*cw,width:cw-2,top,height:hgt,background:COLORS.common}}>
               <b>{b.video?"▶ ":""}共通　{b.title}</b><span>{b.start}–{b.end}</span></button>;
           })}
           {showNow&&<><div className="tl-now" style={{top:nowTop}}/><div className="tl-nowdot" style={{top:nowTop-4,left:AXIS-4}}/></>}
