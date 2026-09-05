@@ -226,6 +226,15 @@
   .thumb{border:none;padding:0;border-radius:12px;overflow:hidden;background:#eee;cursor:pointer;display:flex;flex-direction:column;}
   .thumb img{width:100%;height:100px;object-fit:cover;display:block;}
   .thumb span{font-size:10px;color:#94808A;padding:4px 6px;background:#fff;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .rec-thumb{width:40px;height:40px;object-fit:cover;border-radius:8px;cursor:pointer;}
+  .album-filter{display:flex;gap:12px;margin-bottom:12px;flex-wrap:wrap;}
+  .album-filter label{font-size:12px;color:#C9788F;font-weight:700;display:flex;flex-direction:column;gap:4px;}
+  .album-filter input{padding:8px;border:1px solid #F0D3DB;border-radius:8px;background:#FCF4F5;font-size:14px;}
+  .recbtn.vit{background:#FDECF0;border-color:#EBB7C6;color:#C9788F;}
+  .vit-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .unitwrap{display:flex;align-items:center;gap:6px;}
+  .unitwrap input{width:100%;padding:11px 10px;border-radius:12px;border:1px solid #F0D3DB;font-size:16px;background:#FCF4F5;}
+  .unitwrap em{font-style:normal;color:#94808A;font-size:13px;white-space:nowrap;}
 
   @media (min-width:700px){
     .top{max-width:620px;padding-bottom:56px;}
@@ -264,9 +273,10 @@ const sbHead = ()=>({ "apikey":SUPABASE_KEY, "Authorization":"Bearer "+SUPABASE_
 async function sbGet(){ const r=await fetch(`${SUPABASE_URL}/rest/v1/app_state?id=eq.1&select=data,updated_at`,{headers:sbHead()}); if(!r.ok) throw new Error("sbGet "+r.status); const j=await r.json(); return (j&&j[0])?j[0]:null; }
 async function sbSave(data,ts){ const body=JSON.stringify({id:1,data,updated_at:ts||new Date().toISOString()}); await fetch(`${SUPABASE_URL}/rest/v1/app_state`,{method:"POST",headers:{...sbHead(),"Prefer":"resolution=merge-duplicates,return=minimal"},body}); }
 async function sbInsertPhoto(rec){ const r=await fetch(`${SUPABASE_URL}/rest/v1/photos`,{method:"POST",headers:{...sbHead(),"Prefer":"return=minimal"},body:JSON.stringify(rec)}); if(!r.ok) throw new Error("photo insert "+r.status); }
-async function sbListPhotos(){ const r=await fetch(`${SUPABASE_URL}/rest/v1/photos?select=id,meta,image,created&order=created.desc&limit=40`,{headers:sbHead()}); if(!r.ok) throw new Error("photo list"); return await r.json(); }
+async function sbListPhotos(from,to){ let u=`${SUPABASE_URL}/rest/v1/photos?select=id,meta,created&order=created.desc&limit=300`; if(from) u+=`&created=gte.${from}T00:00:00`; if(to) u+=`&created=lte.${to}T23:59:59`; const r=await fetch(u,{headers:sbHead()}); if(!r.ok) throw new Error("photo list"); return await r.json(); }
+async function sbPhotoFull(id){ const r=await fetch(`${SUPABASE_URL}/rest/v1/photos?id=eq.${id}&select=id,meta,image,created`,{headers:sbHead()}); if(!r.ok) throw new Error("photo full"); const j=await r.json(); return j&&j[0]?j[0]:null; }
 async function sbDeletePhoto(id){ await fetch(`${SUPABASE_URL}/rest/v1/photos?id=eq.${id}`,{method:"DELETE",headers:sbHead()}); }
-function compressImage(file){ return new Promise((res,rej)=>{ const fr=new FileReader(); fr.onload=()=>{ const img=new Image(); img.onload=()=>{ const max=800; let w=img.width,h=img.height; if(w>h&&w>max){h=Math.round(h*max/w);w=max;} else if(h>max){w=Math.round(w*max/h);h=max;} const c=document.createElement("canvas"); c.width=w;c.height=h; c.getContext("2d").drawImage(img,0,0,w,h); res(c.toDataURL("image/jpeg",0.55)); }; img.onerror=rej; img.src=fr.result; }; fr.onerror=rej; fr.readAsDataURL(file); }); }
+function compressImage(file,max,q){ max=max||800; q=q||0.55; return new Promise((res,rej)=>{ const fr=new FileReader(); fr.onload=()=>{ const img=new Image(); img.onload=()=>{ let w=img.width,h=img.height; if(w>h&&w>max){h=Math.round(h*max/w);w=max;} else if(h>max){w=Math.round(w*max/h);h=max;} const c=document.createElement("canvas"); c.width=w;c.height=h; c.getContext("2d").drawImage(img,0,0,w,h); res(c.toDataURL("image/jpeg",q)); }; img.onerror=rej; img.src=fr.result; }; fr.onerror=rej; fr.readAsDataURL(file); }); }
 
 /* 所属（応援元）とタイムライン/シフトの役割 */
 const AFFILIATIONS=[
@@ -430,17 +440,22 @@ function Records({me,data,persist}){
   const [view,setView]=useState("log"); const [photos,setPhotos]=useState(null);
   const [busy,setBusy]=useState(false); const [pv,setPv]=useState(null);
   const [editItems,setEditItems]=useState(false); const [newItem,setNewItem]=useState("");
+  const [vit,setVit]=useState(null);
+  const [af,setAf]=useState(iso(addDays(new Date(),-7))); const [at,setAt]=useState(iso(new Date()));
   const fileRef=useRef(null);
   const toggleUser=(u)=> setSel(s=> s.includes(u)? s.filter(x=>x!==u):[...s,u]);
   const flash=(m)=>{ setToast(m); setTimeout(()=>setToast(""),1800); };
-  const log=(data.records||[]).filter(r=>r.ts&&r.ts.slice(0,10)===date).sort((a,b)=>b.ts.localeCompare(a.ts));
   const hm=(ts)=>{ const d=new Date(ts); return String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0"); };
-  const addRecord=(item)=>{ if(sel.length===0){ flash("利用者を選んでください"); return; } const ts=new Date().toISOString(); const recs=sel.map(u=>({id:uid(),ts,user:u,item})); persist({...data,records:[...(data.records||[]),...recs]}); flash("記録："+sel.join("・")+" "+item); };
-  const addNote=()=>{ if(!note.trim())return; addRecord(note.trim()); setNote(""); };
+  const log=(data.records||[]).filter(r=>r.ts&&r.ts.slice(0,10)===date).sort((a,b)=>b.ts.localeCompare(a.ts));
+  const pushRecords=(item,extra)=>{ if(sel.length===0){ flash("利用者を選んでください"); return false; } const ts=new Date().toISOString(); const recs=sel.map(u=>Object.assign({id:uid(),ts,user:u,item},extra||{})); persist({...data,records:[...(data.records||[]),...recs]}); return true; };
+  const addRecord=(item)=>{ if(pushRecords(item)) flash("記録："+sel.join("・")+" "+item); };
+  const addNote=()=>{ if(!note.trim())return; if(pushRecords(note.trim())){ flash("記録しました"); setNote(""); } };
   const delRec=(id)=>persist({...data,records:(data.records||[]).filter(r=>r.id!==id)});
-  const loadPhotos=async()=>{ if(!SB_ON){ setPhotos([]); return; } try{ setPhotos(await sbListPhotos()); }catch(e){ setPhotos([]); } };
-  useEffect(()=>{ if(view==="album"&&photos===null) loadPhotos(); },[view]);
-  const onFile=async(e)=>{ const f=e.target.files&&e.target.files[0]; e.target.value=""; if(!f)return; if(sel.length===0){ flash("先に利用者を選んでください"); return; } if(!SB_ON){ flash("写真の保存には共有DBの設定が必要です"); return; } setBusy(true); try{ const b64=await compressImage(f); const id=uid()+"_"+Date.now(); const ts=new Date().toISOString(); await sbInsertPhoto({id, meta:{users:sel, ts}, image:b64, created:ts}); const recs=sel.map(u=>({id:uid(),ts,user:u,item:"📷 写真を記録"})); persist({...data,records:[...(data.records||[]),...recs]}); flash("写真を記録しました"); setPhotos(null); }catch(err){ flash("写真の保存に失敗（写真表の設定をご確認ください）"); } finally{ setBusy(false); } };
+  const submitVit=()=>{ const v=vit; const parts=[]; if(v.sys&&v.dia) parts.push(v.sys+"mmHg/"+v.dia+"mmHg"); if(v.hr) parts.push(v.hr+"回/分"); if(v.temp) parts.push("体温"+v.temp+"℃"); if(parts.length===0){ flash("数値を入力してください"); return; } if(pushRecords("🩺 "+parts.join(" "))){ flash("バイタルを記録しました"); setVit(null); } };
+  const loadPhotos=async()=>{ if(!SB_ON){ setPhotos([]); return; } try{ setPhotos(await sbListPhotos(af,at)); }catch(e){ setPhotos([]); } };
+  useEffect(()=>{ if(view==="album"){ setPhotos(null); loadPhotos(); } },[view,af,at]);
+  const onFile=async(e)=>{ const f=e.target.files&&e.target.files[0]; e.target.value=""; if(!f)return; if(sel.length===0){ flash("先に利用者を選んでください"); return; } if(!SB_ON){ flash("写真の保存には共有DBの設定が必要です"); return; } setBusy(true); try{ const full=await compressImage(f,900,0.6); const thumb=await compressImage(f,160,0.5); const id=uid()+"_"+Date.now(); const ts=new Date().toISOString(); await sbInsertPhoto({id, meta:{users:sel, ts, thumb}, image:full, created:ts}); pushRecords("📷 写真",{photoId:id, thumb}); flash("写真を記録しました"); }catch(err){ flash("写真の保存に失敗（写真表の設定をご確認ください）"); } finally{ setBusy(false); } };
+  const openFull=async(id)=>{ if(!id||!SB_ON)return; try{ const p=await sbPhotoFull(id); if(p) setPv(p); else flash("写真が見つかりません"); }catch(e){ flash("写真を開けませんでした"); } };
   const delPhoto=async(id)=>{ if(!confirm("この写真を削除しますか？"))return; try{ await sbDeletePhoto(id); setPhotos(p=>(p||[]).filter(x=>x.id!==id)); setPv(null); }catch(e){} };
   const addItem=()=>{ if(!newItem.trim())return; persist({...data,recordItems:[...items,newItem.trim()]}); setNewItem(""); };
   const delItem=(it)=>persist({...data,recordItems:items.filter(x=>x!==it)});
@@ -452,6 +467,7 @@ function Records({me,data,persist}){
     </div>
     {view==="log"&&<>
       <div className="rec-items">
+        <button className="recbtn vit" onClick={()=>setVit({sys:"",dia:"",hr:"",temp:""})}>🩺 血圧・体温</button>
         {items.map(it=>(<button key={it} className="recbtn" onClick={()=>addRecord(it)}>{it}</button>))}
         <button className="recbtn cam" onClick={()=>fileRef.current&&fileRef.current.click()} disabled={busy}>📷 写真</button>
       </div>
@@ -472,16 +488,33 @@ function Records({me,data,persist}){
       </div>
       {log.length===0&&<p className="empty">まだ記録がありません。</p>}
       <div className="rec-log">{log.map(r=>(<div key={r.id} className="rec-row">
-        <span className="rec-time">{hm(r.ts)}</span><span className="chip">{r.user}</span><span className="rec-item">{r.item}</span>
+        <span className="rec-time">{hm(r.ts)}</span><span className="chip">{r.user}</span>
+        {r.thumb&&<img className="rec-thumb" src={r.thumb} alt="写真" onClick={()=>openFull(r.photoId)}/>}
+        <span className="rec-item">{r.item}</span>
         <button className="mini-del" onClick={()=>delRec(r.id)}>🗑</button></div>))}</div>
     </>}
     {view==="album"&&<div>
+      <div className="album-filter">
+        <label>開始<input type="date" value={af} onChange={e=>setAf(e.target.value)}/></label>
+        <label>終了<input type="date" value={at} onChange={e=>setAt(e.target.value)}/></label>
+      </div>
       {photos===null&&<p className="empty">読み込み中…</p>}
-      {photos!==null&&photos.length===0&&<p className="empty">写真がありません。「記録」タブの「📷 写真」から撮影できます。</p>}
-      <div className="album">{(photos||[]).map(p=>(<button key={p.id} className="thumb" onClick={()=>setPv(p)}>
-        <img src={p.image} alt="記録写真"/><span>{p.meta&&p.meta.users?p.meta.users.join("・"):""} {p.created?hm(p.created):""}</span></button>))}</div>
+      {photos!==null&&photos.length===0&&<p className="empty">この期間の写真はありません。</p>}
+      <div className="album">{(photos||[]).map(p=>(<button key={p.id} className="thumb" onClick={()=>openFull(p.id)}>
+        <img src={p.meta&&p.meta.thumb?p.meta.thumb:""} alt="記録写真"/><span>{p.meta&&p.meta.users?p.meta.users.join("・"):""} {p.created?(p.created.slice(5,10)+" "+hm(p.created)):""}</span></button>))}</div>
     </div>}
     {toast&&<div className="toast">{toast}</div>}
+    {vit&&<Modal title="🩺 血圧・体温の記録" tint="#C9788F" onClose={()=>setVit(null)}>
+      <p className="hint">数値だけ入力してください（単位は自動で付きます）。来所時・起床時に測定。</p>
+      <div className="vit-grid">
+        <label className="field"><span>最高血圧</span><div className="unitwrap"><input type="number" inputMode="decimal" value={vit.sys} onChange={e=>setVit({...vit,sys:e.target.value})}/><em>mmHg</em></div></label>
+        <label className="field"><span>最低血圧</span><div className="unitwrap"><input type="number" inputMode="decimal" value={vit.dia} onChange={e=>setVit({...vit,dia:e.target.value})}/><em>mmHg</em></div></label>
+        <label className="field"><span>平均心拍数</span><div className="unitwrap"><input type="number" inputMode="decimal" value={vit.hr} onChange={e=>setVit({...vit,hr:e.target.value})}/><em>回/分</em></div></label>
+        <label className="field"><span>体温</span><div className="unitwrap"><input type="number" inputMode="decimal" value={vit.temp} onChange={e=>setVit({...vit,temp:e.target.value})}/><em>℃</em></div></label>
+      </div>
+      <p className="tiny">記録例：{(vit.sys&&vit.dia?vit.sys+"mmHg/"+vit.dia+"mmHg ":"")}{(vit.hr?vit.hr+"回/分 ":"")}{(vit.temp?"体温"+vit.temp+"℃":"")}</p>
+      <div className="row-end"><Btn onClick={submitVit}>記録する</Btn></div>
+    </Modal>}
     {pv&&<Modal title="記録写真" tint="#C9788F" onClose={()=>setPv(null)}>
       <img src={pv.image} style={{width:"100%",borderRadius:12}} alt="記録写真"/>
       <p className="hint" style={{marginTop:10}}>{pv.meta&&pv.meta.users?pv.meta.users.join("・"):""}　{pv.created?new Date(pv.created).toLocaleString():""}</p>
@@ -489,6 +522,7 @@ function Records({me,data,persist}){
     </Modal>}
   </Section>;
 }
+
 function AlarmPopup({type,onClose}){
   const sleep=type==="sleep";
   return <div className="ov alarm-ov">
@@ -616,7 +650,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.10〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.11〉</p>
   </div>;
 }
 
@@ -781,7 +815,7 @@ function Schedule({me,data,persist}){
   useEffect(()=>{ if(mode==="detail"&&scrollRef.current){ const pos=((nmAxis!=null?nmAxis:rawNow)-DAY_START)*ppm; scrollRef.current.scrollTop=Math.max(0,pos-scrollRef.current.clientHeight/2); } },[mode,date,now,ppm]);
   const marks=[]; for(let m=Math.ceil(DAY_START/60)*60; m<=DAY_END; m+=60){ marks.push({m, label:(Math.floor(m/60)%24)+":00"}); }
   const W=AXIS+3*COL;
-  return <Section title="タイムスケジュール" note="業務時間は15:30〜翌9:30。予定は毎日共通です（日付は担当者名の切替用）。重なる予定は自動で横並びに分割。2本指でつまむ、または＋－で時間帯を拡大できます。〈ver.10〉">
+  return <Section title="タイムスケジュール" note="業務時間は15:30〜翌9:30。予定は毎日共通です（日付は担当者名の切替用）。重なる予定は自動で横並びに分割。2本指でつまむ、または＋－で時間帯を拡大できます。〈ver.11〉">
     <div className="tl-toolbar">
       <div className="tl-modes">
         <button className={"seg "+(mode==="overview"?"on":"")} onClick={()=>{setMode("overview");setZoom(1);}}>全体</button>
