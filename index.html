@@ -196,6 +196,15 @@
   .acc-line1{display:flex;align-items:center;gap:8px;}
   .acc-line1 .acc-nm{flex:1;}
   .affil-sel{margin-top:6px;width:100%;font-size:12px;padding:6px 8px;border:1px solid #F0D3DB;border-radius:8px;background:#FCF4F5;color:#5A4A50;}
+  .alarm-ov{z-index:100;}
+  .alarm-card{background:#fff;border-radius:24px;padding:28px 24px;max-width:340px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.3);}
+  .cup-scene{position:relative;height:120px;display:flex;align-items:flex-end;justify-content:center;}
+  .cup{font-size:64px;line-height:1;}
+  .pop-item{position:absolute;bottom:44px;font-size:44px;animation:pop 1.2s ease-out infinite;}
+  @keyframes pop{0%{transform:translateY(22px) scale(.2);opacity:0;}30%{transform:translateY(-48px) scale(1.25);opacity:1;}60%{transform:translateY(-32px) scale(1);}100%{transform:translateY(-40px) scale(1.05);opacity:1;}}
+  .alarm-title{color:#B25E77;margin:10px 0 4px;font-size:22px;}
+  .alarm-sub{color:#5A4A50;font-size:14px;margin:0 0 18px;}
+  .alarm-card .btn{width:100%;justify-content:center;}
 
   @media (min-width:700px){
     .top{max-width:620px;padding-bottom:56px;}
@@ -386,6 +395,18 @@ function InstallPrompt({onNever,onLater}){
     </div></div></div>;
 }
 
+function AlarmPopup({type,onClose}){
+  const sleep=type==="sleep";
+  return <div className="ov alarm-ov">
+    <div className="alarm-card">
+      <div className="cup-scene"><div className="pop-item">{sleep?"😴":"🌸"}</div><div className="cup">☕</div></div>
+      <h2 className="alarm-title">{sleep?"🌙 22:00 就寝の時間です":"☀️ 6:30 起床の時間です"}</h2>
+      <p className="alarm-sub">{sleep?"利用者様の就寝の時間です。":"利用者様の起床の時間です。"}</p>
+      <button className="btn primary" onClick={onClose}>とめる</button>
+    </div>
+  </div>;
+}
+
 /* ================================ 本体 ================================ */
 function App(){
   const [data,setData]=useState(null);
@@ -398,6 +419,12 @@ function App(){
   const [hotaruOpen,setHotaruOpen]=useState(false);
   const [showInstall,setShowInstall]=useState(false);
   const tsRef=useRef(null);
+  const [alarm,setAlarm]=useState(null);
+  const audioRef=useRef(null); const firedRef=useRef({});
+  const playChime=()=>{ try{ const ac=audioRef.current; if(!ac) return; if(ac.state==="suspended") ac.resume(); const t0=ac.currentTime; [880,1108.73,1318.51].forEach((f,i)=>{ const o=ac.createOscillator(),g=ac.createGain(); o.type="sine"; o.frequency.value=f; o.connect(g); g.connect(ac.destination); const t=t0+i*0.18; g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(0.25,t+0.02); g.gain.exponentialRampToValueAtTime(0.0001,t+0.9); o.start(t); o.stop(t+0.95); }); }catch(e){} };
+  useEffect(()=>{ const unlock=()=>{ try{ if(!audioRef.current){ const AC=window.AudioContext||window.webkitAudioContext; if(AC) audioRef.current=new AC(); } if(audioRef.current&&audioRef.current.state==="suspended") audioRef.current.resume(); }catch(e){} }; window.addEventListener("pointerdown",unlock); window.addEventListener("touchstart",unlock); return ()=>{ window.removeEventListener("pointerdown",unlock); window.removeEventListener("touchstart",unlock); }; },[]);
+  useEffect(()=>{ const check=()=>{ const n=new Date(); const hm=String(n.getHours()).padStart(2,"0")+":"+String(n.getMinutes()).padStart(2,"0"); const ev= hm==="22:00"?"sleep": hm==="06:30"?"wake":null; if(ev){ const key=ev+"-"+n.toDateString(); if(firedRef.current[key]) return; firedRef.current[key]=1; setAlarm({type:ev}); } }; const iv=setInterval(check,15000); check(); return ()=>clearInterval(iv); },[]);
+  useEffect(()=>{ if(!alarm) return; playChime(); const iv=setInterval(playChime,2600); return ()=>clearInterval(iv); },[alarm]);
 
   useEffect(()=>{(async()=>{
     let d=load();
@@ -439,6 +466,7 @@ function App(){
 
   return <div>
     {showInstall && <InstallPrompt onNever={()=>dismissInstall(true)} onLater={()=>dismissInstall(false)}/>}
+      {alarm && <AlarmPopup type={alarm.type} onClose={()=>setAlarm(null)}/>}
     {me
       ? <Inside me={me} data={data} tab={tab} setTab={setTab} onLogout={logout} persist={persist}/>
       : <Top data={data} season={season} onPick={a=>{setLogin(a);setErr("");}} onAdminReg={()=>setAdminReg(true)} onHotaru={()=>setHotaruOpen(true)}/>}
@@ -567,22 +595,22 @@ function Inside({me,data,tab,setTab,onLogout,persist}){
 function Section({title,note,children}){return <section><h2 className="sec-title">{title}</h2>{note&&<p className="sec-note">{note}</p>}{children}</section>;}
 
 const RLABEL=(r)=>({s1:"支援1",s2:"支援2",common:"共通",user:"利用者"}[r]||r);
-function TimelineEdit({data,persist,date}){
+function TimelineEdit({data,persist}){
   const [role,setRole]=useState("s1"); const [start,setStart]=useState("15:30"); const [end,setEnd]=useState("16:30");
   const [title,setTitle]=useState(""); const [detail,setDetail]=useState(""); const [editId,setEditId]=useState(null); const [msg,setMsg]=useState("");
-  const list=data.timeline.filter(b=>b.date===date).sort((a,b)=>a.start.localeCompare(b.start));
+  const list=(data.timeline||[]).slice().sort((a,b)=>a.start.localeCompare(b.start));
   const reset=()=>{setRole("s1");setStart("15:30");setEnd("16:30");setTitle("");setDetail("");setEditId(null);};
   const submit=()=>{
     if(!title.trim())return setMsg("業務のタイトルを入力してください。");
-    if(toMin(end)<=toMin(start))return setMsg("終了は開始より後にしてください。");
+    if(toMin(end)<toMin(start))return setMsg("終了は開始より前にはできません。");
     if(editId){ persist({...data,timeline:data.timeline.map(b=>b.id===editId?{...b,role,start,end,title:title.trim(),detail:detail.trim()}:b)}); setMsg("更新しました。"); }
-    else{ persist({...data,timeline:[...data.timeline,{id:uid(),date,role,start,end,title:title.trim(),detail:detail.trim()}]}); setMsg("追加しました。"); }
+    else{ persist({...data,timeline:[...data.timeline,{id:uid(),role,start,end,title:title.trim(),detail:detail.trim()}]}); setMsg("追加しました。"); }
     reset();
   };
   const editOne=(b)=>{setEditId(b.id);setRole(b.role||"s1");setStart(b.start);setEnd(b.end);setTitle(b.title);setDetail(b.detail||"");setMsg("");};
   const del=(id)=>{ if(!confirm("この予定を削除しますか？"))return; persist({...data,timeline:data.timeline.filter(b=>b.id!==id)}); if(editId===id) reset(); };
   return <div className="tl-editpanel">
-    <h3 className="blk">✏️ {fmtDate(date)} の予定を{editId?"編集":"追加"}</h3>
+    <h3 className="blk">✏️ 毎日共通の予定を{editId?"編集":"追加"}</h3>
     <label className="field"><span>誰に対する業務ですか？</span>
       <select value={role} onChange={e=>setRole(e.target.value)}>
         {TL_ROLES.map(r=><option key={r.v} value={r.v}>{r.label}</option>)}
@@ -612,7 +640,7 @@ function Schedule({me,data,persist}){
   const [edit,setEdit]=useState(false); const [now,setNow]=useState(new Date()); const [sel,setSel]=useState(null);
   const scrollRef=useRef(null); const ppm= mode==="overview"?0.5:8;
   useEffect(()=>{const t=setInterval(()=>setNow(new Date()),30000);return()=>clearInterval(t);},[]);
-  const blocks=data.timeline.filter(b=>b.date===date);
+  const blocks=data.timeline||[];
   const dayShifts=(data.shifts||[]).filter(s=>s.date===date);
   const nameA=(dayShifts.find(s=>s.role==="A")||{}).name||"";
   const nameB=(dayShifts.find(s=>s.role==="B")||{}).name||"";
@@ -626,7 +654,7 @@ function Schedule({me,data,persist}){
   useEffect(()=>{ if(mode==="detail"&&scrollRef.current){ const pos=((nmAxis!=null?nmAxis:rawNow)-DAY_START)*ppm; scrollRef.current.scrollTop=Math.max(0,pos-scrollRef.current.clientHeight/2); } },[mode,date,now,ppm]);
   const marks=[]; for(let m=Math.ceil(DAY_START/60)*60; m<=DAY_END; m+=60){ marks.push({m, label:(Math.floor(m/60)%24)+":00"}); }
   const W=AXIS+3*COL;
-  return <Section title="タイムスケジュール" note="業務時間は15:30〜翌9:30。縦＝時間、横＝支援1・支援2・利用者。シフトで夜勤A/Bを決めると担当者名が入ります。管理者は「編集」で予定を登録します。">
+  return <Section title="タイムスケジュール" note="業務時間は15:30〜翌9:30。予定は毎日共通です（日付は担当者名の切替用）。シフトで夜勤A/Bを決めると支援1・支援2に名前が入ります。管理者は「編集」で登録します。">
     <div className="tl-toolbar">
       <div className="tl-modes">
         <button className={"seg "+(mode==="overview"?"on":"")} onClick={()=>setMode("overview")}>全体</button>
@@ -640,7 +668,7 @@ function Schedule({me,data,persist}){
       <b>{fmtDate(date)}</b>
       <button className="link-btn" onClick={()=>setDate(iso(addDays(new Date(date+"T00:00:00"),1)))}>翌日 ›</button>
     </div>
-    {edit&&me.isAdmin&&<TimelineEdit data={data} persist={persist} date={date}/>}
+    {edit&&me.isAdmin&&<TimelineEdit data={data} persist={persist}/>}
     <div className="tl-scroll" ref={scrollRef} style={{height: mode==="overview"?(TOTAL*ppm+HEAD+8):"64vh"}}>
       <div className="tl-inner" style={{width:W}}>
         <div className="tl-head" style={{height:HEAD,width:W}}>
