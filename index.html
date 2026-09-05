@@ -235,6 +235,20 @@
   .unitwrap{display:flex;align-items:center;gap:6px;}
   .unitwrap input{width:100%;padding:11px 10px;border-radius:12px;border:1px solid #F0D3DB;font-size:16px;background:#FCF4F5;}
   .unitwrap em{font-style:normal;color:#94808A;font-size:13px;white-space:nowrap;}
+  .nisshi{background:#fff;border:1px solid #F0D3DB;border-radius:12px;padding:16px;margin-top:8px;}
+  .nisshi-head{text-align:center;font-weight:700;color:#B25E77;font-size:18px;margin-bottom:14px;}
+  .nf{margin-bottom:10px;}
+  .nf label{display:block;font-size:12px;color:#C9788F;font-weight:700;margin-bottom:4px;}
+  .nf input,.nf textarea{width:100%;padding:9px 10px;border:1px solid #F0D3DB;border-radius:8px;font-size:14px;background:#FCF4F5;font-family:inherit;}
+  .nf2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .n-actions{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0;}
+  @media print{
+    body *{visibility:hidden;}
+    .nisshi,.nisshi *{visibility:visible;}
+    .nisshi{position:absolute;left:0;top:0;width:100%;border:none;padding:0;}
+    .nisshi input,.nisshi textarea{border:1px solid #ccc;background:#fff;color:#000;}
+    .no-print{display:none!important;}
+  }
 
   @media (min-width:700px){
     .top{max-width:620px;padding-bottom:56px;}
@@ -256,6 +270,7 @@
 <div id="root"></div>
 <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
 <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.24.4/babel.min.js"></script>
 <script type="text/babel" data-presets="react">
 const {useState,useEffect,useRef,useMemo} = React;
@@ -432,6 +447,108 @@ function InstallPrompt({onNever,onLater}){
     </div></div></div>;
 }
 
+const NISSHI_SYS = `あなたは、障害者生活訓練事業所「ふれあいホームみずほ」の職員が書く「利用日誌」の下書きを手伝います。職員がタップ入力した記録（時刻つき）をもとに、日誌の各項目を日本語で埋めてください。
+
+【文章のトーン（大切）】
+・その方が「できたこと」「頑張っていたこと」「感心した発見」を中心に、あたたかく前向きに書く。
+・時間の流れに沿って、具体的に、ていねいな敬語で。ご本人を尊重した表現。
+・できないことや否定的な評価は基本的に書かない（必要な事実は特記事項に簡潔に）。
+・介助した場面は「〜を声かけでご自身で」「〜はこちらでサポート」のようにやさしく描写。
+
+【出力（JSONのみ・前後に文章やコードブロックを付けない）】
+{
+ "vitals1":"来所時のバイタル（例：16:05 体温36.2℃ 血圧147/94 脈拍61回/分）",
+ "vitals2":"起床時のバイタル（同じ形式）",
+ "urine":"排尿（回数・時刻）",
+ "stool":"排便（有無・時刻・性状）",
+ "medication":"投薬（晩／朝など）",
+ "program":"時間ごとの行動。各行『16:20 塗り絵』の形式で改行区切り",
+ "dinnerMenu":"夕食メニュー","dinnerAmount":"夕食量（完食／主x副y など）",
+ "breakfastMenu":"朝食メニュー","breakfastAmount":"朝食量",
+ "appearance":"【利用のご様子】本文。上記トーンで200〜500字程度の読みやすい文章。",
+ "special":"特記事項（簡潔に。なければ空）",
+ "nextRequest":"次回へのお願い（なければ空）"
+}
+記録から読み取れない項目は空文字にする。推測で医療的判断はしない。`;
+
+function Nisshi({me,data}){
+  const [user,setUser]=useState("利用者1");
+  const [date,setDate]=useState(iso(new Date()));
+  const [f,setF]=useState(null);
+  const [loading,setLoading]=useState(false); const [err,setErr]=useState("");
+  const apiKey=localStorage.getItem("mizuho_api_key")||"";
+  const hm=(ts)=>{ const d=new Date(ts); return String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0"); };
+  const start=new Date(date+"T15:00:00"); const end=(()=>{ const e=addDays(new Date(date+"T00:00:00"),1); e.setHours(12,0,0,0); return e; })();
+  const recs=(data.records||[]).filter(r=>r.user===user && new Date(r.ts)>=start && new Date(r.ts)<end).sort((a,b)=>a.ts.localeCompare(b.ts));
+  const recText=recs.map(r=>hm(r.ts)+" "+r.item).join("\n");
+  const buildInitial=(obj)=>Object.assign({name:user,period:fmtDate(date)+" 16:00 〜 翌朝",writer:me.name,vitals1:"",vitals2:"",urine:"",stool:"",medication:"",staff:"",program:recText,dinnerMenu:"",dinnerAmount:"",breakfastMenu:"",breakfastAmount:"",appearance:"",special:"",nextRequest:""}, obj||{}, {name:user,period:fmtDate(date)+" 16:00 〜 翌朝"});
+  const emptyForm=()=>{ setErr(""); setF(buildInitial({program:recText})); };
+  const setField=(k,v)=>setF(p=>Object.assign({},p,{[k]:v}));
+  const genDraft=async()=>{
+    if(!apiKey){ setErr("AI下書きには、AI相談と同じAPIキーの設定が必要です（AI相談タブの「AIの設定」から）。"); return; }
+    if(recs.length===0){ setErr("この日の「"+user+"」の記録がありません。先に記録タブで入力してください。"); return; }
+    setLoading(true); setErr("");
+    try{
+      const um="利用者："+user+"\n対象："+fmtDate(date)+" 16:00〜翌朝\n\n【この日の記録（時刻 内容）】\n"+recText+"\n\n上記からJSONを作成してください。";
+      const res=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"content-type":"application/json","x-api-key":apiKey,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},body:JSON.stringify({model:"claude-sonnet-5",max_tokens:2000,system:NISSHI_SYS,messages:[{role:"user",content:um}]})});
+      const d=await res.json();
+      if(d.error){ setErr("AIエラー："+(d.error.message||"")); setLoading(false); return; }
+      let txt=(d.content||[]).filter(b=>b.type==="text").map(b=>b.text).join("").trim();
+      txt=txt.replace(/```json/g,"").replace(/```/g,"").trim();
+      let obj={}; try{ obj=JSON.parse(txt); }catch(e){ obj={appearance:txt}; }
+      if(!obj.program) obj.program=recText;
+      setF(buildInitial(obj));
+    }catch(e){ setErr("接続に失敗しました。通信状況をご確認ください。"); }
+    setLoading(false);
+  };
+  const toExcel=()=>{
+    if(!window.XLSX){ setErr("Excel機能の読み込みに失敗しました。少し待って再度お試しください。"); return; }
+    let rows=[["ふれあいホームみずほ 利用日誌"],["利用者名",f.name+" 様"],["期間",f.period],["記入者",f.writer],[],["バイタル（来所）",f.vitals1],["バイタル（起床）",f.vitals2],["排尿",f.urine],["排便",f.stool],["投薬",f.medication],["担当職員",f.staff],[],["プログラム",""]];
+    (f.program||"").split("\n").forEach(l=>{ if(l.trim()) rows.push(["",l]); });
+    rows=rows.concat([[],["夕食メニュー",f.dinnerMenu],["夕食量",f.dinnerAmount],["朝食メニュー",f.breakfastMenu],["朝食量",f.breakfastAmount],[],["利用のご様子",f.appearance],["特記事項",f.special],["次回へのお願い",f.nextRequest]]);
+    const ws=XLSX.utils.aoa_to_sheet(rows); ws["!cols"]=[{wch:16},{wch:64}];
+    const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,"利用日誌");
+    XLSX.writeFile(wb, "利用日誌_"+f.name+"_"+date+".xlsx");
+  };
+  return <Section title="日誌まとめ" note="利用者と日付を選び、その日の記録からAIが「利用のご様子」などを下書きします。内容を確認・修正して、印刷やExcel出力ができます。">
+    <div className="rec-users" style={{gridTemplateColumns:"repeat(4,1fr)"}}>{USERS4.map(u=>(<button key={u} className={"ruser "+(user===u?"on":"")} onClick={()=>{setUser(u);}}>{u}</button>))}</div>
+    <div className="tl-datenav">
+      <button className="link-btn" onClick={()=>setDate(iso(addDays(new Date(date+"T00:00:00"),-1)))}>‹ 前日</button>
+      <b>{fmtDate(date)}</b>
+      <button className="link-btn" onClick={()=>setDate(iso(addDays(new Date(date+"T00:00:00"),1)))}>翌日 ›</button>
+    </div>
+    <p className="tiny">この日の「{user}」の記録：{recs.length}件</p>
+    <div className="n-actions no-print">
+      <Btn onClick={genDraft} kind={loading?"ghost2":"primary"}>{loading?"作成中…":"🤖 AIで下書きを作成"}</Btn>
+      <Btn kind="ghost2" onClick={emptyForm}>空フォーム</Btn>
+    </div>
+    {err&&<p className="err">{err}</p>}
+    {f&&<div className="nisshi">
+      <div className="nisshi-head">ふれあいホームみずほ 利用日誌</div>
+      <div className="nf2"><div className="nf"><label>利用者名</label><input value={f.name} onChange={e=>setField("name",e.target.value)}/></div>
+        <div className="nf"><label>記入者</label><input value={f.writer} onChange={e=>setField("writer",e.target.value)}/></div></div>
+      <div className="nf"><label>期間</label><input value={f.period} onChange={e=>setField("period",e.target.value)}/></div>
+      <div className="nf2"><div className="nf"><label>バイタル（来所）</label><input value={f.vitals1} onChange={e=>setField("vitals1",e.target.value)}/></div>
+        <div className="nf"><label>バイタル（起床）</label><input value={f.vitals2} onChange={e=>setField("vitals2",e.target.value)}/></div></div>
+      <div className="nf2"><div className="nf"><label>排尿</label><input value={f.urine} onChange={e=>setField("urine",e.target.value)}/></div>
+        <div className="nf"><label>排便</label><input value={f.stool} onChange={e=>setField("stool",e.target.value)}/></div></div>
+      <div className="nf2"><div className="nf"><label>投薬</label><input value={f.medication} onChange={e=>setField("medication",e.target.value)}/></div>
+        <div className="nf"><label>担当職員</label><input value={f.staff} onChange={e=>setField("staff",e.target.value)}/></div></div>
+      <div className="nf"><label>プログラム（時間ごとの行動）</label><textarea rows={6} value={f.program} onChange={e=>setField("program",e.target.value)}/></div>
+      <div className="nf2"><div className="nf"><label>夕食メニュー</label><input value={f.dinnerMenu} onChange={e=>setField("dinnerMenu",e.target.value)}/></div>
+        <div className="nf"><label>夕食量</label><input value={f.dinnerAmount} onChange={e=>setField("dinnerAmount",e.target.value)}/></div></div>
+      <div className="nf2"><div className="nf"><label>朝食メニュー</label><input value={f.breakfastMenu} onChange={e=>setField("breakfastMenu",e.target.value)}/></div>
+        <div className="nf"><label>朝食量</label><input value={f.breakfastAmount} onChange={e=>setField("breakfastAmount",e.target.value)}/></div></div>
+      <div className="nf"><label>【利用のご様子】</label><textarea rows={10} value={f.appearance} onChange={e=>setField("appearance",e.target.value)}/></div>
+      <div className="nf"><label>特記事項</label><textarea rows={3} value={f.special} onChange={e=>setField("special",e.target.value)}/></div>
+      <div className="nf"><label>次回へのお願い</label><input value={f.nextRequest} onChange={e=>setField("nextRequest",e.target.value)}/></div>
+      <div className="n-actions no-print">
+        <Btn onClick={()=>window.print()}>🖨 印刷</Btn>
+        <Btn kind="ghost2" onClick={toExcel}>⬇ Excel出力</Btn>
+      </div>
+    </div>}
+  </Section>;
+}
 function Records({me,data,persist}){
   const items=data.recordItems||REC_DEFAULT;
   const [sel,setSel]=useState(["利用者1"]);
@@ -650,7 +767,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.11〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.12〉</p>
   </div>;
 }
 
@@ -691,6 +808,7 @@ const TABS=[
   {id:"schedule",label:"タイムスケジュール"},
   {id:"shifts",label:"シフト"},
   {id:"records",label:"記録"},
+  {id:"nisshi",label:"日誌まとめ"},
   {id:"work",label:"各業務の詳細"},
   {id:"traits",label:"障害特性と支援"},
   {id:"materials",label:"研修資料"},
@@ -712,6 +830,7 @@ function Inside({me,data,tab,setTab,onLogout,persist}){
       {tab==="schedule"&&<Schedule me={me} data={data} persist={persist}/>}
       {tab==="shifts"&&<Shifts me={me} data={data} persist={persist}/>}
       {tab==="records"&&<Records me={me} data={data} persist={persist}/>}
+      {tab==="nisshi"&&<Nisshi me={me} data={data}/>}
       {tab==="work"&&<Work/>}
       {tab==="traits"&&<Traits/>}
       {tab==="materials"&&<Materials me={me} data={data} persist={persist}/>}
@@ -815,7 +934,7 @@ function Schedule({me,data,persist}){
   useEffect(()=>{ if(mode==="detail"&&scrollRef.current){ const pos=((nmAxis!=null?nmAxis:rawNow)-DAY_START)*ppm; scrollRef.current.scrollTop=Math.max(0,pos-scrollRef.current.clientHeight/2); } },[mode,date,now,ppm]);
   const marks=[]; for(let m=Math.ceil(DAY_START/60)*60; m<=DAY_END; m+=60){ marks.push({m, label:(Math.floor(m/60)%24)+":00"}); }
   const W=AXIS+3*COL;
-  return <Section title="タイムスケジュール" note="業務時間は15:30〜翌9:30。予定は毎日共通です（日付は担当者名の切替用）。重なる予定は自動で横並びに分割。2本指でつまむ、または＋－で時間帯を拡大できます。〈ver.11〉">
+  return <Section title="タイムスケジュール" note="業務時間は15:30〜翌9:30。予定は毎日共通です（日付は担当者名の切替用）。重なる予定は自動で横並びに分割。2本指でつまむ、または＋－で時間帯を拡大できます。〈ver.12〉">
     <div className="tl-toolbar">
       <div className="tl-modes">
         <button className={"seg "+(mode==="overview"?"on":"")} onClick={()=>{setMode("overview");setZoom(1);}}>全体</button>
