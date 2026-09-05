@@ -205,6 +205,10 @@
   .alarm-title{color:#B25E77;margin:10px 0 4px;font-size:22px;}
   .alarm-sub{color:#5A4A50;font-size:14px;margin:0 0 18px;}
   .alarm-card .btn{width:100%;justify-content:center;}
+  .videobox{margin-top:14px;}
+  .vwrap{position:relative;width:100%;padding-top:56.25%;border-radius:12px;overflow:hidden;background:#000;margin-bottom:10px;}
+  .vwrap iframe{position:absolute;inset:0;width:100%;height:100%;border:0;}
+  .vopen{width:100%;justify-content:center;}
 
   @media (min-width:700px){
     .top{max-width:620px;padding-bottom:56px;}
@@ -594,20 +598,34 @@ function Inside({me,data,tab,setTab,onLogout,persist}){
 }
 function Section({title,note,children}){return <section><h2 className="sec-title">{title}</h2>{note&&<p className="sec-note">{note}</p>}{children}</section>;}
 
+function ytOrDrive(url){
+  try{ let m;
+    if(m=url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/)([\w-]{6,})/)) return "https://www.youtube.com/embed/"+m[1];
+    if(m=url.match(/drive\.google\.com\/file\/d\/([\w-]+)/)) return "https://drive.google.com/file/d/"+m[1]+"/preview";
+    return null;
+  }catch(e){ return null; }
+}
+function VideoView({url}){
+  const emb=ytOrDrive(url);
+  return <div className="videobox">
+    {emb&&<div className="vwrap"><iframe src={emb} allow="autoplay; fullscreen; encrypted-media" allowFullScreen title="参考動画"></iframe></div>}
+    <a className="btn primary vopen" href={url} target="_blank" rel="noreferrer">▶ やり方の動画を開く ↗</a>
+  </div>;
+}
 const RLABEL=(r)=>({s1:"支援1",s2:"支援2",common:"共通",user:"利用者"}[r]||r);
 function TimelineEdit({data,persist}){
   const [role,setRole]=useState("s1"); const [start,setStart]=useState("15:30"); const [end,setEnd]=useState("16:30");
-  const [title,setTitle]=useState(""); const [detail,setDetail]=useState(""); const [editId,setEditId]=useState(null); const [msg,setMsg]=useState("");
+  const [title,setTitle]=useState(""); const [detail,setDetail]=useState(""); const [video,setVideo]=useState(""); const [editId,setEditId]=useState(null); const [msg,setMsg]=useState("");
   const list=(data.timeline||[]).slice().sort((a,b)=>a.start.localeCompare(b.start));
-  const reset=()=>{setRole("s1");setStart("15:30");setEnd("16:30");setTitle("");setDetail("");setEditId(null);};
+  const reset=()=>{setRole("s1");setStart("15:30");setEnd("16:30");setTitle("");setDetail("");setVideo("");setEditId(null);};
   const submit=()=>{
     if(!title.trim())return setMsg("業務のタイトルを入力してください。");
     if(toMin(end)<toMin(start))return setMsg("終了は開始より前にはできません。");
-    if(editId){ persist({...data,timeline:data.timeline.map(b=>b.id===editId?{...b,role,start,end,title:title.trim(),detail:detail.trim()}:b)}); setMsg("更新しました。"); }
-    else{ persist({...data,timeline:[...data.timeline,{id:uid(),role,start,end,title:title.trim(),detail:detail.trim()}]}); setMsg("追加しました。"); }
+    if(editId){ persist({...data,timeline:data.timeline.map(b=>b.id===editId?{...b,role,start,end,title:title.trim(),detail:detail.trim(),video:video.trim()}:b)}); setMsg("更新しました。"); }
+    else{ persist({...data,timeline:[...data.timeline,{id:uid(),role,start,end,title:title.trim(),detail:detail.trim(),video:video.trim()}]}); setMsg("追加しました。"); }
     reset();
   };
-  const editOne=(b)=>{setEditId(b.id);setRole(b.role||"s1");setStart(b.start);setEnd(b.end);setTitle(b.title);setDetail(b.detail||"");setMsg("");};
+  const editOne=(b)=>{setEditId(b.id);setRole(b.role||"s1");setStart(b.start);setEnd(b.end);setTitle(b.title);setDetail(b.detail||"");setVideo(b.video||"");setMsg("");};
   const del=(id)=>{ if(!confirm("この予定を削除しますか？"))return; persist({...data,timeline:data.timeline.filter(b=>b.id!==id)}); if(editId===id) reset(); };
   return <div className="tl-editpanel">
     <h3 className="blk">✏️ 毎日共通の予定を{editId?"編集":"追加"}</h3>
@@ -621,6 +639,7 @@ function TimelineEdit({data,persist}){
     </div>
     <Field label="業務のタイトル" value={title} onChange={e=>setTitle(e.target.value)} placeholder="例：調理サポート"/>
     <Area label="詳細（任意）" rows={3} value={detail} onChange={e=>setDetail(e.target.value)} placeholder="具体的な支援内容や注意点"/>
+    <Field label="参考動画のURL（任意）" value={video} onChange={e=>setVideo(e.target.value)} placeholder="YouTube や Google ドライブの共有リンク"/>
     <div className="row-end">{editId&&<Btn kind="ghost2" onClick={reset}>新規に戻す</Btn>}<Btn onClick={submit}>{editId?"更新する":"追加する"}</Btn></div>
     {msg&&<p className="ok">{msg}</p>}
     <h3 className="blk">この日の予定一覧</h3>
@@ -682,12 +701,12 @@ function Schedule({me,data,persist}){
           {["s1","s2","user"].map(rk=>blocks.filter(b=>b.role===rk).map(b=>{
             const top=(axisMin(b.start)-DAY_START)*ppm, hgt=Math.max(16,(axisMin(b.end)-axisMin(b.start))*ppm);
             return <button key={b.id} className="tl-block" onClick={()=>setSel(b)} style={{left:colX(rk)+3,width:COL-6,top,height:hgt,background:COLORS[rk]}}>
-              <b>{b.title}</b><span>{b.start}–{b.end}</span></button>;
+              <b>{b.video?"▶ ":""}{b.title}</b><span>{b.start}–{b.end}</span></button>;
           }))}
           {blocks.filter(b=>b.role==="common").map(b=>{
             const top=(axisMin(b.start)-DAY_START)*ppm, hgt=Math.max(16,(axisMin(b.end)-axisMin(b.start))*ppm);
             return <button key={b.id} className="tl-block" onClick={()=>setSel(b)} style={{left:AXIS+3,width:COL*2-6,top,height:hgt,background:COLORS.common}}>
-              <b>共通　{b.title}</b><span>{b.start}–{b.end}</span></button>;
+              <b>{b.video?"▶ ":""}共通　{b.title}</b><span>{b.start}–{b.end}</span></button>;
           })}
           {showNow&&<><div className="tl-now" style={{top:nowTop}}/><div className="tl-nowdot" style={{top:nowTop-4,left:AXIS-4}}/></>}
         </div>
@@ -696,6 +715,7 @@ function Schedule({me,data,persist}){
     {sel&&<Modal title={sel.title} tint="#C9788F" onClose={()=>setSel(null)}>
       <p className="hint">🕒 {RLABEL(sel.role)}　{sel.start}–{sel.end}</p>
       {sel.detail?<p style={{whiteSpace:"pre-wrap",fontSize:14,lineHeight:1.8}}>{sel.detail}</p>:<p className="tiny">詳細は未入力です。</p>}
+      {sel.video&&<VideoView url={sel.video}/>}
     </Modal>}
   </Section>;
 }
