@@ -235,6 +235,9 @@
   .unitwrap{display:flex;align-items:center;gap:6px;}
   .unitwrap input{width:100%;padding:11px 10px;border-radius:12px;border:1px solid #F0D3DB;font-size:16px;background:#FCF4F5;}
   .unitwrap em{font-style:normal;color:#94808A;font-size:13px;white-space:nowrap;}
+  .timepick{background:#FBEAEE;border:1px solid #F0D3DB;border-radius:12px;padding:12px;margin-top:6px;}
+  .wheel{display:flex;gap:8px;}
+  .wheel select{flex:1;padding:12px;border:1px solid #F0D3DB;border-radius:10px;background:#fff;font-size:16px;}
   .nisshi{background:#fff;border:1px solid #F0D3DB;border-radius:12px;padding:16px;margin-top:8px;}
   .nisshi-head{text-align:center;font-weight:700;color:#B25E77;font-size:18px;margin-bottom:14px;}
   .nf{margin-bottom:10px;}
@@ -305,6 +308,8 @@ const TL_ROLES=[{v:"s1",label:"支援1"},{v:"s2",label:"支援2"},{v:"common",la
 const SHIFT_ROLES=[{v:"A",label:"夜勤A（支援1）"},{v:"B",label:"夜勤B（支援2）"},{v:"day",label:"日勤"},{v:"other",label:"その他"}];
 const REC_DEFAULT=["トイレ（小）","トイレ（大）","食事","水分補給","服薬","入浴","就寝","起床","バイタル測定","来所","帰宅","様子・特記"];
 const USERS4=["利用者1","利用者2","利用者3","利用者4"];
+const REC_HOURS=(()=>{const a=[];for(let h=15;h<=23;h++)a.push(h);for(let h=0;h<=9;h++)a.push(h);return a;})();
+const REC_MINS=(()=>{const a=[];for(let m=0;m<60;m+=5)a.push(m);return a;})();
 async function sha256(t){
   try{ const b=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(t));
     return Array.from(new Uint8Array(b)).map(x=>x.toString(16).padStart(2,"0")).join(""); }
@@ -473,7 +478,7 @@ const NISSHI_SYS = `あなたは、障害者生活訓練事業所「ふれあい
 
 function Nisshi({me,data}){
   const [user,setUser]=useState("利用者1");
-  const [date,setDate]=useState(iso(new Date()));
+  const [date,setDate]=useState(()=>{const n=new Date();return (n.getHours()*60+n.getMinutes())<(15*60+30)?iso(addDays(n,-1)):iso(n);});
   const [f,setF]=useState(null);
   const [loading,setLoading]=useState(false); const [err,setErr]=useState("");
   const apiKey=localStorage.getItem("mizuho_api_key")||"";
@@ -552,8 +557,9 @@ function Nisshi({me,data}){
 function Records({me,data,persist}){
   const items=data.recordItems||REC_DEFAULT;
   const [sel,setSel]=useState(["利用者1"]);
-  const [date,setDate]=useState(iso(new Date()));
+  const [date,setDate]=useState(()=>{const n=new Date();return (n.getHours()*60+n.getMinutes())<(15*60+30)?iso(addDays(n,-1)):iso(n);});
   const [note,setNote]=useState(""); const [toast,setToast]=useState("");
+  const [useTime,setUseTime]=useState(false); const [mDate,setMDate]=useState(iso(new Date())); const [mH,setMH]=useState("16"); const [mM,setMM]=useState("00");
   const [view,setView]=useState("log"); const [photos,setPhotos]=useState(null);
   const [busy,setBusy]=useState(false); const [pv,setPv]=useState(null);
   const [editItems,setEditItems]=useState(false); const [newItem,setNewItem]=useState("");
@@ -563,10 +569,12 @@ function Records({me,data,persist}){
   const toggleUser=(u)=> setSel(s=> s.includes(u)? s.filter(x=>x!==u):[...s,u]);
   const flash=(m)=>{ setToast(m); setTimeout(()=>setToast(""),1800); };
   const hm=(ts)=>{ const d=new Date(ts); return String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0"); };
-  const log=(data.records||[]).filter(r=>r.ts&&r.ts.slice(0,10)===date).sort((a,b)=>b.ts.localeCompare(a.ts));
-  const pushRecords=(item,extra)=>{ if(sel.length===0){ flash("利用者を選んでください"); return false; } const ts=new Date().toISOString(); const recs=sel.map(u=>Object.assign({id:uid(),ts,user:u,item},extra||{})); persist({...data,records:[...(data.records||[]),...recs]}); return true; };
+  const _bs=new Date(date+"T15:00:00"); const _be=(()=>{const e=addDays(new Date(date+"T00:00:00"),1); e.setHours(12,0,0,0); return e;})();
+  const log=(data.records||[]).filter(r=>{ const t=new Date(r.ts); return t>=_bs && t<_be; }).sort((a,b)=>b.ts.localeCompare(a.ts));
+  const pushRecords=(item,extra,tsOverride)=>{ if(sel.length===0){ flash("利用者を選んでください"); return false; } const ts=tsOverride||new Date().toISOString(); const recs=sel.map(u=>Object.assign({id:uid(),ts,user:u,item},extra||{})); persist({...data,records:[...(data.records||[]),...recs]}); return true; };
+  const bizTs=()=>{ const bd=new Date(mDate+"T00:00:00"); const cal=(+mH>=15)?bd:addDays(bd,1); cal.setHours(+mH,+mM,0,0); return cal.toISOString(); };
   const addRecord=(item)=>{ if(pushRecords(item)) flash("記録："+sel.join("・")+" "+item); };
-  const addNote=()=>{ if(!note.trim())return; if(pushRecords(note.trim())){ flash("記録しました"); setNote(""); } };
+  const addNote=()=>{ if(!note.trim())return; const ts=useTime?bizTs():undefined; if(pushRecords(note.trim(),null,ts)){ flash("記録しました"); setNote(""); } };
   const delRec=(id)=>persist({...data,records:(data.records||[]).filter(r=>r.id!==id)});
   const submitVit=()=>{ const v=vit; const parts=[]; if(v.sys&&v.dia) parts.push(v.sys+"mmHg/"+v.dia+"mmHg"); if(v.hr) parts.push(v.hr+"回/分"); if(v.temp) parts.push("体温"+v.temp+"℃"); if(parts.length===0){ flash("数値を入力してください"); return; } if(pushRecords("🩺 "+parts.join(" "))){ flash("バイタルを記録しました"); setVit(null); } };
   const loadPhotos=async()=>{ if(!SB_ON){ setPhotos([]); return; } try{ setPhotos(await sbListPhotos(af,at)); }catch(e){ setPhotos([]); } };
@@ -593,16 +601,28 @@ function Records({me,data,persist}){
         <textarea rows={1} value={note} placeholder="自由に記録（例：トイレ小で笑顔）" onChange={e=>setNote(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();addNote();}}}/>
         <button className="send" onClick={addNote} aria-label="記録">＋</button>
       </div>
+      <div style={{marginTop:6}}>
+        <button className="link-btn" onClick={()=>{ if(!useTime){ setMDate(date); const n=new Date(); const nh=n.getHours(); setMH(String((nh>=15||nh<=9)?nh:16)); setMM(String(Math.floor(n.getMinutes()/5)*5)); } setUseTime(!useTime); }}>{useTime?"日時の指定を閉じる":"🕒 日時を指定して記録（勤務後の入力など）"}</button>
+        {useTime&&<div className="timepick">
+          <label className="field"><span>勤務開始日（この日の勤務として記録）</span><input type="date" value={mDate} onChange={e=>setMDate(e.target.value)}/></label>
+          <div className="wheel">
+            <select value={mH} onChange={e=>setMH(e.target.value)}>{REC_HOURS.map(h=><option key={h} value={h}>{h}時</option>)}</select>
+            <select value={mM} onChange={e=>setMM(e.target.value)}>{REC_MINS.map(m=><option key={m} value={m}>{String(m).padStart(2,"0")}分</option>)}</select>
+          </div>
+          <p className="tiny">15時〜翌9時台で選べます（0〜9時台は自動で翌日扱いになります）。上の「＋」で記録されます。</p>
+        </div>}
+      </div>
       {me.isAdmin&&<div style={{marginTop:8}}><button className="link-btn" onClick={()=>setEditItems(!editItems)}>{editItems?"項目の編集を閉じる":"項目を編集（管理者）"}</button></div>}
       {editItems&&me.isAdmin&&<div className="tl-editpanel">
         <div className="composer"><textarea rows={1} value={newItem} placeholder="新しい項目名" onChange={e=>setNewItem(e.target.value)}/><button className="send" onClick={addItem}>＋</button></div>
         <div className="rec-items" style={{marginTop:8}}>{items.map(it=>(<span key={it} className="chip" style={{padding:"6px 10px"}}>{it} <button className="mini-del" onClick={()=>delItem(it)}>×</button></span>))}</div>
       </div>}
       <div className="tl-datenav" style={{marginTop:14}}>
-        <button className="link-btn" onClick={()=>setDate(iso(addDays(new Date(date+"T00:00:00"),-1)))}>‹ 前日</button>
-        <b>{fmtDate(date)}</b>
-        <button className="link-btn" onClick={()=>setDate(iso(addDays(new Date(date+"T00:00:00"),1)))}>翌日 ›</button>
+        <button className="link-btn" onClick={()=>setDate(iso(addDays(new Date(date+"T00:00:00"),-1)))}>‹ 前の勤務</button>
+        <b>{fmtDate(date)}（勤務）</b>
+        <button className="link-btn" onClick={()=>setDate(iso(addDays(new Date(date+"T00:00:00"),1)))}>次の勤務 ›</button>
       </div>
+      <p className="tiny" style={{textAlign:"center",marginTop:2}}>15:30〜翌9:30の記録をまとめて表示します</p>
       {log.length===0&&<p className="empty">まだ記録がありません。</p>}
       <div className="rec-log">{log.map(r=>(<div key={r.id} className="rec-row">
         <span className="rec-time">{hm(r.ts)}</span><span className="chip">{r.user}</span>
@@ -767,7 +787,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.12〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.13〉</p>
   </div>;
 }
 
@@ -934,7 +954,7 @@ function Schedule({me,data,persist}){
   useEffect(()=>{ if(mode==="detail"&&scrollRef.current){ const pos=((nmAxis!=null?nmAxis:rawNow)-DAY_START)*ppm; scrollRef.current.scrollTop=Math.max(0,pos-scrollRef.current.clientHeight/2); } },[mode,date,now,ppm]);
   const marks=[]; for(let m=Math.ceil(DAY_START/60)*60; m<=DAY_END; m+=60){ marks.push({m, label:(Math.floor(m/60)%24)+":00"}); }
   const W=AXIS+3*COL;
-  return <Section title="タイムスケジュール" note="業務時間は15:30〜翌9:30。予定は毎日共通です（日付は担当者名の切替用）。重なる予定は自動で横並びに分割。2本指でつまむ、または＋－で時間帯を拡大できます。〈ver.12〉">
+  return <Section title="タイムスケジュール" note="業務時間は15:30〜翌9:30。予定は毎日共通です（日付は担当者名の切替用）。重なる予定は自動で横並びに分割。2本指でつまむ、または＋－で時間帯を拡大できます。〈ver.13〉">
     <div className="tl-toolbar">
       <div className="tl-modes">
         <button className={"seg "+(mode==="overview"?"on":"")} onClick={()=>{setMode("overview");setZoom(1);}}>全体</button>
