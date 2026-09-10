@@ -247,6 +247,27 @@
   .att-info{flex:1;display:flex;flex-direction:column;min-width:0;}
   .att-info b{font-size:13px;color:#5A4A50;}
   .att-info span{font-size:11px;color:#94808A;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .res-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:12px;}
+  .res-card{position:relative;display:flex;flex-direction:column;align-items:center;gap:4px;padding:14px 8px;border:1px solid #F0D3DB;border-radius:14px;background:#fff;cursor:pointer;}
+  .res-av{width:44px;height:44px;border-radius:50%;background:#E79AB0;color:#fff;display:grid;place-items:center;font-weight:700;font-size:18px;font-family:"Zen Maru Gothic";}
+  .res-nm{font-weight:700;color:#5A4A50;font-size:14px;}
+  .res-tag{font-size:10px;color:#94808A;text-align:center;line-height:1.3;}
+  .res-badge{position:absolute;top:6px;right:8px;width:18px;height:18px;border-radius:50%;background:#E4577A;color:#fff;font-size:12px;font-weight:700;display:grid;place-items:center;}
+  .res-sec{font-weight:700;color:#B25E77;font-size:15px;margin:18px 0 8px;border-bottom:2px solid #F6D4DD;padding-bottom:4px;}
+  .res-sec2{font-weight:700;color:#C9788F;font-size:13px;margin:12px 0 6px;}
+  .res-table{background:#fff;border:1px solid #F0D3DB;border-radius:12px;overflow:hidden;}
+  .res-row{display:flex;border-top:1px solid #F6E3E8;}
+  .res-row:first-child{border-top:none;}
+  .res-k{width:96px;flex-shrink:0;background:#FBEAEE;color:#C9788F;font-weight:700;font-size:12px;padding:9px 10px;}
+  .res-v{flex:1;padding:9px 10px;font-size:13.5px;white-space:pre-wrap;}
+  .res-advice{background:#FFF9F1;border:1px solid rgba(199,180,90,.35);border-radius:12px;padding:12px;font-size:13.5px;line-height:1.7;white-space:pre-wrap;}
+  .notice-box{background:#FFF6F8;border:1px solid rgba(228,87,122,.4);border-radius:12px;padding:12px;margin:8px 0;}
+  .notice-box>b{color:#E4577A;}
+  .notice-item{border-top:1px dashed #F0D3DB;margin-top:8px;padding-top:8px;position:relative;}
+  .notice-item:first-of-type{border-top:none;}
+  .notice-item span{font-size:11px;color:#94808A;}
+  .notice-item p{margin:2px 0 0;font-size:13.5px;line-height:1.6;}
+  .plan-row{display:flex;align-items:center;justify-content:space-between;background:#fff;border:1px solid #F0D3DB;border-radius:10px;padding:6px 10px;margin-bottom:6px;}
   .nisshi{background:#fff;border:1px solid #F0D3DB;border-radius:12px;padding:16px;margin-top:8px;}
   .nisshi-head{text-align:center;font-weight:700;color:#B25E77;font-size:18px;margin-bottom:14px;}
   .nf{margin-bottom:10px;}
@@ -307,6 +328,30 @@ async function sbInsertAttach(rec){ const r=await fetch(`${SUPABASE_URL}/rest/v1
 async function sbListAttach(){ const r=await fetch(`${SUPABASE_URL}/rest/v1/attachments?select=id,meta,created&order=created.desc&limit=100`,{headers:sbHead()}); if(!r.ok) throw new Error("attach list"); return await r.json(); }
 async function sbAttachFull(id){ const r=await fetch(`${SUPABASE_URL}/rest/v1/attachments?id=eq.${id}&select=id,meta,data,created`,{headers:sbHead()}); if(!r.ok) throw new Error("attach full"); const j=await r.json(); return j&&j[0]?j[0]:null; }
 async function sbDeleteAttach(id){ await fetch(`${SUPABASE_URL}/rest/v1/attachments?id=eq.${id}`,{method:"DELETE",headers:sbHead()}); }
+/* ===== 認証（Supabase Auth）：利用者情報は認証した職員だけがアクセス可 ===== */
+function authLoad(){ try{return JSON.parse(localStorage.getItem("mizuho_sb_auth")||"null");}catch(e){return null;} }
+function authSaveTok(o){ localStorage.setItem("mizuho_sb_auth", JSON.stringify(o)); }
+function authClear(){ localStorage.removeItem("mizuho_sb_auth"); }
+async function sbLogin(email,password){
+  const r=await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`,{method:"POST",headers:{"apikey":SUPABASE_KEY,"Content-Type":"application/json"},body:JSON.stringify({email,password})});
+  const j=await r.json(); if(!r.ok) throw new Error(j.error_description||j.msg||"login");
+  const o={access:j.access_token,refresh:j.refresh_token,at:Date.now()}; authSaveTok(o); return o;
+}
+async function sbRefresh(){
+  const a=authLoad(); if(!a||!a.refresh) throw new Error("no refresh");
+  const r=await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`,{method:"POST",headers:{"apikey":SUPABASE_KEY,"Content-Type":"application/json"},body:JSON.stringify({refresh_token:a.refresh})});
+  const j=await r.json(); if(!r.ok) throw new Error("refresh"); const o={access:j.access_token,refresh:j.refresh_token,at:Date.now()}; authSaveTok(o); return o;
+}
+async function authHeaders(){ let a=authLoad(); if(!a) throw new Error("未ログイン"); if(Date.now()-a.at>2700000){ try{ a=await sbRefresh(); }catch(e){} } return {"apikey":SUPABASE_KEY,"Authorization":"Bearer "+a.access,"Content-Type":"application/json"}; }
+async function authFetch(url,opts){ opts=opts||{}; opts.headers=Object.assign({}, await authHeaders(), opts.headers||{}); let r=await fetch(url,opts); if(r.status===401){ try{ await sbRefresh(); opts.headers=Object.assign({}, await authHeaders(), opts.headers||{}); r=await fetch(url,opts); }catch(e){} } return r; }
+async function resList(){ const r=await authFetch(`${SUPABASE_URL}/rest/v1/residents?select=id,data,updated_at&order=updated_at.desc&limit=200`); if(!r.ok) throw new Error("res list "+r.status); return await r.json(); }
+async function resSave(id,data){ const r=await authFetch(`${SUPABASE_URL}/rest/v1/residents`,{method:"POST",headers:{"Prefer":"resolution=merge-duplicates,return=minimal"},body:JSON.stringify({id,data,updated_at:new Date().toISOString()})}); if(!r.ok) throw new Error("res save "+r.status); }
+async function resDelete(id){ await authFetch(`${SUPABASE_URL}/rest/v1/residents?id=eq.${id}`,{method:"DELETE"}); }
+async function rfInsert(rec){ const r=await authFetch(`${SUPABASE_URL}/rest/v1/resident_files`,{method:"POST",headers:{"Prefer":"return=minimal"},body:JSON.stringify(rec)}); if(!r.ok) throw new Error("rf ins "+r.status); }
+async function rfList(rid){ const r=await authFetch(`${SUPABASE_URL}/rest/v1/resident_files?resident_id=eq.${rid}&select=id,meta,created`); if(!r.ok) throw new Error("rf list"); return await r.json(); }
+async function rfFull(id){ const r=await authFetch(`${SUPABASE_URL}/rest/v1/resident_files?id=eq.${id}&select=id,meta,data`); const j=await r.json(); return j&&j[0]?j[0]:null; }
+async function rfDelete(id){ await authFetch(`${SUPABASE_URL}/rest/v1/resident_files?id=eq.${id}`,{method:"DELETE"}); }
+const nendoOf=(d)=>{ d=d||new Date(); return (d.getMonth()+1>=4)?d.getFullYear():d.getFullYear()-1; };
 function compressImage(file,max,q){ max=max||800; q=q||0.55; return new Promise((res,rej)=>{ const fr=new FileReader(); fr.onload=()=>{ const img=new Image(); img.onload=()=>{ let w=img.width,h=img.height; if(w>h&&w>max){h=Math.round(h*max/w);w=max;} else if(h>max){w=Math.round(w*max/h);h=max;} const c=document.createElement("canvas"); c.width=w;c.height=h; c.getContext("2d").drawImage(img,0,0,w,h); res(c.toDataURL("image/jpeg",q)); }; img.onerror=rej; img.src=fr.result; }; fr.onerror=rej; fr.readAsDataURL(file); }); }
 
 /* 所属（応援元）とタイムライン/シフトの役割 */
@@ -883,7 +928,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.17〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.18〉</p>
   </div>;
 }
 
@@ -954,7 +999,7 @@ function Inside({me,data,tab,setTab,onLogout,persist}){
       {tab==="materials"&&<Materials me={me} data={data} persist={persist}/>}
       {tab==="consult"&&<Consult data={data}/>}
       {tab==="history"&&<HistoryView/>}
-      {tab==="users"&&<UsersView/>}
+      {tab==="users"&&<UsersView me={me}/>}
       {tab==="admin"&&me.isAdmin&&<AdminPanel data={data} persist={persist}/>}
     </main>
   </div>;
@@ -1053,7 +1098,7 @@ function Schedule({me,data,persist}){
   useEffect(()=>{ if(mode==="detail"&&scrollRef.current){ const pos=((nmAxis!=null?nmAxis:rawNow)-DAY_START)*ppm; scrollRef.current.scrollTop=Math.max(0,pos-scrollRef.current.clientHeight/2); } },[mode,date,now,ppm]);
   const marks=[]; for(let m=Math.ceil(DAY_START/5)*5; m<=DAY_END; m+=5){ const mm=m%60; if(!(mm%10===0||mm===15||mm===45)) continue; let lv,label=""; if(mm===0){lv=0;label=(Math.floor(m/60)%24)+":00";} else if(mm===30){lv=1;label=(Math.floor(m/60)%24)+":30";} else if(mm===15||mm===45){lv=2;label=String(mm);} else {lv=3;} marks.push({m,lv,label}); }
   const W=AXIS+3*COL;
-  return <Section title="タイムスケジュール" note="業務時間は15:30〜翌9:30。予定は毎日共通です（日付は担当者名の切替用）。重なる予定は自動で横並びに分割。2本指でつまむ、または＋－で時間帯を拡大できます。〈ver.17〉">
+  return <Section title="タイムスケジュール" note="業務時間は15:30〜翌9:30。予定は毎日共通です（日付は担当者名の切替用）。重なる予定は自動で横並びに分割。2本指でつまむ、または＋－で時間帯を拡大できます。〈ver.18〉">
     <div className="tl-toolbar">
       <div className="tl-modes">
         <button className={"seg "+(mode==="overview"?"on":"")} onClick={()=>{setMode("overview");setZoom(1);}}>全体</button>
@@ -1131,17 +1176,101 @@ function HistoryView(){
   return <Section title="あゆみ" note="ふれあいホームみずほの歩みです。">
     <div className="timeline">{rows.map(([y,t])=>(<div key={y} className="tl-item"><span className="tl-dot"/><b>{y}</b><p>{t}</p></div>))}</div></Section>;
 }
-function UsersView(){
-  return <Section title="利用者情報" note="">
-    <div className="privacy"><span>ℹ️</span><div>
-      <b>個人情報の取り扱いについて（重要）</b>
-      <p>この試作版には、実在する利用者さんの個人情報（氏名・住所・障害・医療・記録など）を入力しないでください。今の保存方法（この端末のブラウザ内）では情報が安全に保護されないため、本番用の仕組みを整えてから登録します。</p>
-    </div></div>
-    <p className="tiny" style={{marginTop:12}}>本番では、利用者ごとに「基本情報／個別支援計画／健康・服薬／緊急連絡先／記録」などを、アクセス権限を管理したうえで表示します。</p>
+function UsersView({me}){
+  const [authed,setAuthed]=useState(()=>!!authLoad());
+  const [email,setEmail]=useState(""); const [pw,setPw]=useState(""); const [aerr,setAerr]=useState(""); const [al,setAl]=useState(false);
+  if(!SB_ON) return <Section title="利用者情報"><p className="empty">共有データベースが未設定です。</p></Section>;
+  const doAuth=async()=>{ setAl(true); setAerr(""); try{ await sbLogin(email.trim(),pw); setAuthed(true); setPw(""); }catch(e){ setAerr("ログインできませんでした。メール／パスワードをご確認ください。"); } setAl(false); };
+  if(!authed) return <Section title="利用者情報" note="個人情報を守るため、ここは専用のログインが必要です。">
+    <div className="privacy"><span>🔐</span><div><b>安全のための専用ログイン</b><p>利用者情報は、認証した職員だけが閲覧できます。事業所で共有のメールアドレスとパスワードでログインしてください（ログインはこの端末に保持されます）。</p></div></div>
+    <Field label="メールアドレス" type="email" value={email} onChange={e=>setEmail(e.target.value)}/>
+    <Field label="パスワード" type="password" value={pw} onChange={e=>setPw(e.target.value)} onKeyDown={e=>e.key==="Enter"&&doAuth()}/>
+    {aerr&&<p className="err">{aerr}</p>}
+    <div className="row-end"><Btn onClick={doAuth} kind={al?"ghost2":"primary"}>{al?"確認中…":"ログイン"}</Btn></div>
+  </Section>;
+  return <Residents me={me} onLogout={()=>{authClear();setAuthed(false);}}/>;
+}
+const RES_FIELDS=[["name","氏名","i"],["age","年齢","i"],["sex","性別","i"],["techo","手帳","i"],["kubun","区分","i"],["disability","障害名","i"],["illness","持病","t"],["family","家族構成","t"],["strong","得意","t"],["weak","苦手","t"],["familyHope","家族の希望","t"],["vision","本人の将来ビジョン","t"]];
+function Residents({me,onLogout}){
+  const [list,setList]=useState(null); const [q,setQ]=useState(""); const [sel,setSel]=useState(null); const [edit,setEdit]=useState(null); const [toast,setToast]=useState("");
+  const flash=(m)=>{ setToast(m); setTimeout(()=>setToast(""),1800); };
+  const load=async()=>{ try{ setList(await resList()); }catch(e){ flash("読み込みに失敗しました"); setList([]); } };
+  useEffect(()=>{ load(); },[]);
+  const save=async(id,data)=>{ try{ await resSave(id,data); await load(); setEdit(null); setSel({id,data}); flash("保存しました"); }catch(e){ flash("保存に失敗しました"); } };
+  const del=async(id)=>{ if(!confirm("この利用者を削除しますか？"))return; try{ await resDelete(id); setSel(null); await load(); }catch(e){} };
+  if(edit) return <ResidentForm init={edit} onCancel={()=>setEdit(null)} onSave={save}/>;
+  if(sel){ const cur=(list||[]).find(x=>x.id===sel.id)||sel; return <ResidentDetail me={me} res={cur} onBack={()=>setSel(null)} onEdit={()=>setEdit(cur)} onDel={()=>del(cur.id)} onChange={save}/>; }
+  const items=(list||[]).filter(r=>!q||(((r.data&&r.data.name)||"").includes(q)));
+  return <Section title="利用者情報" note="認証済み。利用者を選ぶと詳細が見られます。">
+    <div className="row-between"><button className="link-btn" onClick={onLogout}>専用ログアウト</button>{me.isAdmin&&<Btn onClick={()=>setEdit({id:"",data:{}})}>＋ 利用者を登録</Btn>}</div>
+    <div className="composer" style={{marginTop:10}}><textarea rows={1} value={q} placeholder="名前で検索" onChange={e=>setQ(e.target.value)}/></div>
+    {list===null&&<p className="empty">読み込み中…</p>}
+    {list!==null&&items.length===0&&<p className="empty">該当がありません。</p>}
+    <div className="res-grid">{items.map(r=>(<button key={r.id} className="res-card" onClick={()=>setSel(r)}>
+      <span className="res-av">{(((r.data&&r.data.name)||"？")).slice(0,1)}</span>
+      <span className="res-nm">{(r.data&&r.data.name)||"（無名）"}</span>
+      <span className="res-tag">{[r.data&&r.data.kubun,r.data&&r.data.disability].filter(Boolean).join("・")}</span>
+      {r.data&&r.data.notices&&r.data.notices.length>0&&<span className="res-badge">!</span>}
+    </button>))}</div>
+    {toast&&<div className="toast">{toast}</div>}
   </Section>;
 }
-
-/* ============================ シフト ============================ */
+function ResidentForm({init,onCancel,onSave}){
+  const [d,setD]=useState(Object.assign({},init.data||{}));
+  const set=(k,v)=>setD(p=>Object.assign({},p,{[k]:v}));
+  const submit=()=>{ if(!(d.name&&d.name.trim())){ alert("氏名を入力してください"); return; } const id=init.id||("r_"+uid()+Date.now()); onSave(id, Object.assign({notices:[]},d,{name:d.name.trim()})); };
+  return <Section title={init.id?"利用者の編集":"利用者の登録"} note="">
+    {RES_FIELDS.map(function(fld){ const k=fld[0],label=fld[1],t=fld[2]; return <div className="nf" key={k}><label>{label}</label>{t==="t"?<textarea rows={2} value={d[k]||""} onChange={e=>set(k,e.target.value)}/>:<input value={d[k]||""} onChange={e=>set(k,e.target.value)}/>}</div>; })}
+    <div className="nf"><label>対応アドバイス（こういう時はこう対応）</label><textarea rows={5} value={d.advice||""} onChange={e=>set("advice",e.target.value)} placeholder="例：不安が強い時は静かな場所で、短い言葉で見通しを伝える 等"/></div>
+    <div className="n-actions"><Btn onClick={submit}>保存</Btn><Btn kind="ghost2" onClick={onCancel}>キャンセル</Btn></div>
+  </Section>;
+}
+function ResidentDetail({me,res,onBack,onEdit,onDel,onChange}){
+  const d=res.data||{};
+  const [showNotice,setShowNotice]=useState((d.notices&&d.notices.length>0));
+  const [nfrom,setNfrom]=useState(""); const [ntext,setNtext]=useState(""); const [addN,setAddN]=useState(false);
+  const [plans,setPlans]=useState(null); const [pv,setPv]=useState(null); const [showArch,setShowArch]=useState(false);
+  const [py,setPy]=useState(String(nendoOf())); const fileRef=useRef(null); const [busy,setBusy]=useState(false); const [toast,setToast]=useState("");
+  const flash=(m)=>{ setToast(m); setTimeout(()=>setToast(""),1800); };
+  const loadPlans=async()=>{ try{ const l=await rfList(res.id); l.sort((a,b)=>String((b.meta&&b.meta.year)||"").localeCompare(String((a.meta&&a.meta.year)||""))); setPlans(l); }catch(e){ setPlans([]); } };
+  useEffect(()=>{ loadPlans(); },[res.id]);
+  const curNendo=nendoOf();
+  const curP=(plans||[]).filter(p=>String(p.meta&&p.meta.year)===String(curNendo));
+  const arch=(plans||[]).filter(p=>String(p.meta&&p.meta.year)!==String(curNendo));
+  const addNotice=()=>{ if(!ntext.trim())return; const notices=[{id:uid(),date:new Date().toISOString().slice(0,10),from:nfrom.trim(),text:ntext.trim()},...(d.notices||[])]; onChange(res.id,Object.assign({},d,{notices})); setNfrom("");setNtext("");setAddN(false); };
+  const delNotice=(id)=>{ onChange(res.id,Object.assign({},d,{notices:(d.notices||[]).filter(n=>n.id!==id)})); };
+  const onFile=async(e)=>{ const f=e.target.files&&e.target.files[0]; e.target.value=""; if(!f)return; setBusy(true);
+    try{ let dataURI; if(f.type==="application/pdf"){ dataURI=await new Promise((rs,rj)=>{const fr=new FileReader();fr.onload=()=>rs(fr.result);fr.onerror=rj;fr.readAsDataURL(f);}); } else { dataURI=await compressImage(f,1400,0.72); }
+      await rfInsert({id:"rf_"+uid()+Date.now(), resident_id:res.id, meta:{year:py, name:f.name, type:f.type==="application/pdf"?"pdf":"image"}, data:dataURI, created:new Date().toISOString()});
+      flash("計画を追加しました"); loadPlans();
+    }catch(err){ flash("追加に失敗（resident_files表の設定をご確認ください）"); } finally{ setBusy(false); } };
+  const openPlan=async(id)=>{ try{ const p=await rfFull(id); if(p) setPv(p); }catch(e){} };
+  const delPlan=async(id)=>{ if(!confirm("この計画を削除しますか？"))return; try{ await rfDelete(id); loadPlans(); setPv(null); }catch(e){} };
+  return <Section title="" note="">
+    <div className="row-between"><button className="link-btn" onClick={onBack}>‹ 一覧へ</button>{me.isAdmin&&<span><button className="link-btn" onClick={onEdit}>編集</button>　<button className="link-btn" style={{color:"#C0392B"}} onClick={onDel}>削除</button></span>}</div>
+    <h2 className="sec-title" style={{marginTop:6}}>{d.name||"（無名）"} 様</h2>
+    {(d.notices&&d.notices.length>0)&&<div className="notice-box"><b>📌 お知らせ・注意</b>{(d.notices).map(n=>(<div key={n.id} className="notice-item"><span>{n.date}{n.from?"／"+n.from:""}</span><p>{n.text}</p>{me.isAdmin&&<button className="mini-del" onClick={()=>delNotice(n.id)}>🗑</button>}</div>))}</div>}
+    {me.isAdmin&&(addN?<div className="tl-editpanel"><Field label="連絡元（例：ご家族／本部）" value={nfrom} onChange={e=>setNfrom(e.target.value)}/><Area label="内容" rows={2} value={ntext} onChange={e=>setNtext(e.target.value)}/><div className="row-end"><Btn onClick={addNotice}>追加</Btn><Btn kind="ghost2" onClick={()=>setAddN(false)}>閉じる</Btn></div></div>:<button className="link-btn" onClick={()=>setAddN(true)}>＋ お知らせ・注意を追加</button>)}
+    <div className="res-sec">基本情報</div>
+    <div className="res-table">{RES_FIELDS.map(function(fld){ const k=fld[0],label=fld[1]; return <div className="res-row" key={k}><span className="res-k">{label}</span><span className="res-v">{d[k]||"—"}</span></div>; })}</div>
+    <div className="res-sec">対応アドバイス</div>
+    <p className="res-advice">{d.advice||"（未入力）"}</p>
+    <div className="res-sec">個別訓練計画</div>
+    {me.isAdmin&&<div className="tl-editpanel"><div className="wheel"><input type="number" value={py} onChange={e=>setPy(e.target.value)} placeholder="年度（西暦）" style={{flex:1,padding:"12px",border:"1px solid #F0D3DB",borderRadius:"10px"}}/><button className="recbtn cam" onClick={()=>fileRef.current&&fileRef.current.click()} disabled={busy}>⬆ PDF/写真</button></div><input ref={fileRef} type="file" accept="image/*,application/pdf" onChange={onFile} style={{display:"none"}}/><p className="tiny">年度（西暦）を入れて、その年の計画を追加します（過去分も追加できます）。</p></div>}
+    {plans===null&&<p className="empty">読み込み中…</p>}
+    <div className="res-sec2">今年度（{curNendo}年度）</div>
+    {curP.length===0?<p className="tiny">今年度の計画はまだありません。</p>:curP.map(p=>(<div key={p.id} className="plan-row"><button className="link-btn" onClick={()=>openPlan(p.id)}>📄 {(p.meta&&p.meta.name)||"計画"}</button>{me.isAdmin&&<button className="mini-del" onClick={()=>delPlan(p.id)}>🗑</button>}</div>))}
+    {arch.length>0&&<><button className="link-btn" style={{marginTop:8}} onClick={()=>setShowArch(!showArch)}>{showArch?"過去の計画を閉じる":"過去の計画（アーカイブ）を見る"}</button>{showArch&&arch.map(p=>(<div key={p.id} className="plan-row"><button className="link-btn" onClick={()=>openPlan(p.id)}>📄 {(p.meta&&p.meta.year)}年度：{(p.meta&&p.meta.name)||"計画"}</button>{me.isAdmin&&<button className="mini-del" onClick={()=>delPlan(p.id)}>🗑</button>}</div>))}</>}
+    {showNotice&&(d.notices&&d.notices.length>0)&&<Modal title={(d.name||"")+" 様 へのお知らせ"} tint="#E4577A" onClose={()=>setShowNotice(false)}>
+      {(d.notices).map(n=>(<div key={n.id} className="notice-item"><span>{n.date}{n.from?"／"+n.from:""}</span><p>{n.text}</p></div>))}
+      <div className="row-end"><Btn onClick={()=>setShowNotice(false)}>確認しました</Btn></div>
+    </Modal>}
+    {pv&&<Modal title="個別訓練計画" tint="#C9788F" onClose={()=>setPv(null)}>
+      {pv.meta&&pv.meta.type==="pdf"?<><embed src={pv.data} type="application/pdf" style={{width:"100%",height:"60vh",borderRadius:8}}/><div className="row-end" style={{marginTop:8}}><a className="btn ghost2" href={pv.data} target="_blank" rel="noreferrer">新しいタブで開く ↗</a></div></>:<img src={pv.data} style={{width:"100%",borderRadius:8}} alt="計画"/>}
+    </Modal>}
+    {toast&&<div className="toast">{toast}</div>}
+  </Section>;
+}
 function Shifts({me,data,persist}){
   const [weekStart,setWeekStart]=useState(()=>mondayOf(new Date()));
   const [open,setOpen]=useState(false);
