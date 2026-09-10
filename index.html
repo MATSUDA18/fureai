@@ -883,7 +883,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.16〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.17〉</p>
   </div>;
 }
 
@@ -1033,7 +1033,7 @@ function Schedule({me,data,persist}){
   const [mode,setMode]=useState("overview"); const [date,setDate]=useState(()=>{const n=new Date();return (n.getHours()*60+n.getMinutes())<(15*60)?iso(addDays(n,-1)):iso(n);});
   const [edit,setEdit]=useState(false); const [now,setNow]=useState(new Date()); const [sel,setSel]=useState(null); const [dpOpen,setDpOpen]=useState(false);
   const scrollRef=useRef(null); const [zoom,setZoom]=useState(1); const pinchRef=useRef({d0:0,z0:1,active:false});
-  const ppm=(mode==="overview"?0.5:8)*zoom;
+  const ppm=(mode==="overview"?1.0:8)*zoom;
   const dist=(t)=>Math.hypot(t[0].clientX-t[1].clientX, t[0].clientY-t[1].clientY);
   const onTS=(e)=>{ if(e.touches.length===2){ pinchRef.current={d0:dist(e.touches), z0:zoom, active:true}; } };
   const onTM=(e)=>{ if(e.touches.length===2&&pinchRef.current.active){ let z=pinchRef.current.z0*(dist(e.touches)/pinchRef.current.d0); z=Math.max(0.5,Math.min(6,z)); setZoom(z); if(e.cancelable) e.preventDefault(); } };
@@ -1051,9 +1051,9 @@ function Schedule({me,data,persist}){
   if(rawNow>=DAY_START){ bizDate=iso(now); nmAxis=rawNow; } else if(rawNow<=DAY_END-1440){ bizDate=iso(addDays(now,-1)); nmAxis=rawNow+1440; }
   const showNow= bizDate===date && nmAxis!==null; const nowTop= showNow?(nmAxis-DAY_START)*ppm:0;
   useEffect(()=>{ if(mode==="detail"&&scrollRef.current){ const pos=((nmAxis!=null?nmAxis:rawNow)-DAY_START)*ppm; scrollRef.current.scrollTop=Math.max(0,pos-scrollRef.current.clientHeight/2); } },[mode,date,now,ppm]);
-  const marks=[]; for(let m=Math.ceil(DAY_START/60)*60; m<=DAY_END; m+=60){ marks.push({m, label:(Math.floor(m/60)%24)+":00"}); }
+  const marks=[]; for(let m=Math.ceil(DAY_START/5)*5; m<=DAY_END; m+=5){ const mm=m%60; if(!(mm%10===0||mm===15||mm===45)) continue; let lv,label=""; if(mm===0){lv=0;label=(Math.floor(m/60)%24)+":00";} else if(mm===30){lv=1;label=(Math.floor(m/60)%24)+":30";} else if(mm===15||mm===45){lv=2;label=String(mm);} else {lv=3;} marks.push({m,lv,label}); }
   const W=AXIS+3*COL;
-  return <Section title="タイムスケジュール" note="業務時間は15:30〜翌9:30。予定は毎日共通です（日付は担当者名の切替用）。重なる予定は自動で横並びに分割。2本指でつまむ、または＋－で時間帯を拡大できます。〈ver.16〉">
+  return <Section title="タイムスケジュール" note="業務時間は15:30〜翌9:30。予定は毎日共通です（日付は担当者名の切替用）。重なる予定は自動で横並びに分割。2本指でつまむ、または＋－で時間帯を拡大できます。〈ver.17〉">
     <div className="tl-toolbar">
       <div className="tl-modes">
         <button className={"seg "+(mode==="overview"?"on":"")} onClick={()=>{setMode("overview");setZoom(1);}}>全体</button>
@@ -1070,7 +1070,7 @@ function Schedule({me,data,persist}){
     </div>
     <button className="time-toggle" style={{marginTop:0,marginBottom:10}} onClick={()=>setDpOpen(true)}>👥 この日の支援員・利用者を設定</button>
     {edit&&me.isAdmin&&<TimelineEdit data={data} persist={persist}/>}
-    <div className="tl-scroll" ref={scrollRef} onTouchStart={onTS} onTouchMove={onTM} onTouchEnd={onTE} style={{height: mode==="overview"?(TOTAL*ppm+HEAD+8):"64vh"}}>
+    <div className="tl-scroll" ref={scrollRef} onTouchStart={onTS} onTouchMove={onTM} onTouchEnd={onTE} style={{height:"64vh"}}>
       <div className="tl-inner" style={{width:W}}>
         <div className="tl-head" style={{height:HEAD,width:W}}>
           <div className="tl-corner" style={{width:AXIS}}>時刻</div>
@@ -1078,8 +1078,8 @@ function Schedule({me,data,persist}){
             <span className="ch-role">{c.label}</span>{c.name&&<span className="ch-name">{c.name}</span>}</div>)}
         </div>
         <div className="tl-body" style={{position:"relative",height:TOTAL*ppm,width:W}}>
-          {marks.map(mk=>{const y=(mk.m-DAY_START)*ppm;return <div key={mk.m}>
-            <div className="tl-hline" style={{top:y}}/><div className="tl-hlabel" style={{top:y-7,width:AXIS}}>{mk.label}</div></div>;})}
+          {marks.map(mk=>{const y=(mk.m-DAY_START)*ppm; const col=mk.lv===0?"#E3B9C6":mk.lv===1?"#EECEDA":mk.lv===2?"#F1D7E0":"#F8EBF0"; return <div key={mk.m}>
+            <div className="tl-hline" style={{top:y,borderTopColor:col}}/>{mk.label&&<div className="tl-hlabel" style={{top:y-6,width:AXIS,fontWeight:mk.lv===0?700:400,color:mk.lv===0?"#B25E77":(mk.lv===2?"#B79AA4":"#94808A"),fontSize:mk.lv===2?9:10}}>{mk.label}</div>}</div>;})}
           {["s1","s2","user"].map(rk=>{
             const packed=packLanes(blocks.filter(b=>b.role===rk), axisMin);
             return packed.map(({b,lane,lanes})=>{
