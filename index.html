@@ -286,6 +286,9 @@
   .face-prev{width:64px;height:64px;border-radius:12px;overflow:hidden;background:#FBEAEE;display:grid;place-items:center;color:#94808A;font-size:11px;}
   .face-prev.sm{width:48px;height:48px;}
   .face-prev img{width:100%;height:100%;object-fit:cover;}
+  .rec-item.abn{color:#C0392B;font-weight:700;}
+  .vit-abn{color:#C0392B;font-weight:700;}
+  .crop-wrap{max-height:52vh;overflow:hidden;background:#000;border-radius:8px;}
   .nisshi{background:#fff;border:1px solid #F0D3DB;border-radius:12px;padding:16px;margin-top:8px;}
   .nisshi-head{text-align:center;font-weight:700;color:#B25E77;font-size:18px;margin-bottom:14px;}
   .nf{margin-bottom:10px;}
@@ -321,6 +324,8 @@
 <div id="root"></div>
 <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
 <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.24.4/babel.min.js"></script>
 <script type="text/babel" data-presets="react">
@@ -632,6 +637,19 @@ function Nisshi({me,data}){
     </div>}
   </Section>;
 }
+function CropModal({src,onCancel,onDone}){
+  const imgRef=useRef(null); const cRef=useRef(null);
+  useEffect(()=>{ let c; const t=setTimeout(()=>{ try{ if(imgRef.current&&window.Cropper){ c=new window.Cropper(imgRef.current,{viewMode:1,autoCropArea:1,background:false,responsive:true}); cRef.current=c; } }catch(e){} },60); return ()=>{ clearTimeout(t); if(cRef.current){ try{cRef.current.destroy();}catch(e){} } }; },[]);
+  const done=()=>{ const c=cRef.current; if(!c){ onDone(src); return; } try{ const cv=c.getCroppedCanvas({maxWidth:1400,maxHeight:1400}); onDone(cv.toDataURL("image/jpeg",0.75)); }catch(e){ onDone(src); } };
+  return <div className="ov" style={{zIndex:130}}><div className="modal" style={{maxWidth:"520px"}}>
+    <div className="modal-head" style={{background:"#C9788F"}}><span>写真の切り取り</span><button className="icon-btn" onClick={onCancel}>×</button></div>
+    <div className="modal-body"><div className="crop-wrap"><img ref={imgRef} src={src} style={{maxWidth:"100%",display:"block"}} alt="crop"/></div>
+    <p className="tiny">指で範囲を動かす・つまんで拡大縮小できます。</p>
+    <div className="row-end"><Btn kind="ghost2" onClick={onCancel}>キャンセル</Btn><Btn onClick={done}>この範囲で決定</Btn></div></div></div></div>;
+}
+function parseVit(item){ const s=(item||"").match(/(\d+)mmHg\/(\d+)mmHg/)||[]; const p=(item||"").match(/(\d+)回\/分/)||[]; const t=(item||"").match(/体温([\d.]+)℃/)||[]; return {sys:s[1]||"",dia:s[2]||"",hr:p[1]||"",temp:t[1]||""}; }
+function buildVitItem(v){ const parts=[]; if(v.sys&&v.dia) parts.push(v.sys+"mmHg/"+v.dia+"mmHg"); if(v.hr) parts.push(v.hr+"回/分"); if(v.temp) parts.push("体温"+v.temp+"℃"); return "🩺 "+parts.join(" "); }
+function vitAbn(v){ const sys=parseFloat(v.sys),dia=parseFloat(v.dia),temp=parseFloat(v.temp); return !!((v.sys&&sys>=140)||(v.dia&&dia>=90)||(v.temp&&temp>=37.5)); }
 function DayPlanModal({data,persist,date,onClose}){
   const accounts=data.accounts||[]; const userList=data.userList||[];
   const cur=(data.dayPlans||{})[date]||{};
@@ -705,6 +723,52 @@ function Plans({me,data,persist}){
     </Modal>}
   </Section>;
 }
+function VitalsView({data,persist}){
+  const users=Array.from(new Set([].concat(USERS4,(data.userList||[]),((data.records||[]).map(r=>r.user))))).filter(Boolean);
+  const [user,setUser]=useState(users[0]||"利用者1");
+  const [ed,setEd]=useState(null); const [toast,setToast]=useState("");
+  const flash=(m)=>{setToast(m);setTimeout(()=>setToast(""),1600);};
+  const list=(data.records||[]).filter(r=>r.user===user&&(r.item||"").indexOf("🩺")===0).sort((a,b)=>b.ts.localeCompare(a.ts));
+  const hm=(ts)=>{const d=new Date(ts);return String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0");};
+  const ymd=(ts)=>{const d=new Date(ts);return (d.getMonth()+1)+"/"+d.getDate();};
+  const openNew=()=>{ const n=new Date(); setEd({id:"",y:n.getFullYear(),mo:n.getMonth()+1,da:n.getDate(),h:n.getHours(),mi:Math.floor(n.getMinutes()/5)*5,sys:"",dia:"",hr:"",temp:""}); };
+  const openEdit=(r)=>{ const v=parseVit(r.item); const d=new Date(r.ts); setEd({id:r.id,y:d.getFullYear(),mo:d.getMonth()+1,da:d.getDate(),h:d.getHours(),mi:d.getMinutes(),sys:v.sys,dia:v.dia,hr:v.hr,temp:v.temp}); };
+  const setE=(k,v)=>setEd(p=>Object.assign({},p,{[k]:v}));
+  const save=()=>{ const e=ed; const ts=new Date(e.y,e.mo-1,e.da,e.h,e.mi,0).toISOString(); const item=buildVitItem(e); const abn=vitAbn(e); let recs=(data.records||[]).slice(); if(e.id){ recs=recs.map(r=>r.id===e.id?Object.assign({},r,{ts,item,abn}):r); } else { recs.push({id:uid(),ts,user,item,abn}); } persist(Object.assign({},data,{records:recs})); setEd(null); flash("保存しました"); };
+  const del=(id)=>{ if(!confirm("この記録を削除しますか？"))return; persist(Object.assign({},data,{records:(data.records||[]).filter(r=>r.id!==id)})); };
+  const YEARS=[]; for(let y=2015;y<=new Date().getFullYear()+1;y++)YEARS.push(y); const MO=[]; for(let m=1;m<=12;m++)MO.push(m); const DA=[]; for(let dd=1;dd<=31;dd++)DA.push(dd); const HH=[]; for(let h=0;h<=23;h++)HH.push(h); const MI=[]; for(let m=0;m<60;m+=5)MI.push(m);
+  return <Section title="バイタル一覧" note="利用者ごとの血圧・脈拍・体温の一覧です。記録タブの入力が自動反映されます。過去分の手入力・修正もできます。">
+    <label className="field"><span>利用者</span><select value={user} onChange={e=>setUser(e.target.value)}>{users.map(u=><option key={u} value={u}>{u}</option>)}</select></label>
+    <div className="row-end"><Btn onClick={openNew}>＋ 過去の測定を手入力</Btn></div>
+    {list.length===0&&<p className="empty">記録がありません。</p>}
+    {list.length>0&&<table className="tbl" style={{marginTop:10}}><tbody>
+      <tr><th style={{width:"58px"}}>日付</th><th style={{width:"48px"}}>時刻</th><td>測定値</td></tr>
+      {list.map(r=>{const v=parseVit(r.item);return <tr key={r.id}>
+        <th>{ymd(r.ts)}</th><td style={{padding:"8px",textAlign:"center"}}>{hm(r.ts)}</td>
+        <td className={r.abn?"vit-abn":""}>{v.sys&&(v.sys+"/"+v.dia+" ")}{v.hr&&(v.hr+"回 ")}{v.temp&&(v.temp+"℃")} <button className="mini-key" onClick={()=>openEdit(r)}>✏️</button><button className="mini-del" onClick={()=>del(r.id)}>🗑</button></td>
+      </tr>;})}
+    </tbody></table>}
+    {ed&&<Modal title={ed.id?"バイタルの修正":"過去の測定を手入力"} tint="#C9788F" onClose={()=>setEd(null)}>
+      <div className="chk-grid" style={{gridTemplateColumns:"repeat(3,1fr)"}}>
+        <label className="field"><span>年</span><select value={ed.y} onChange={e=>setE("y",+e.target.value)}>{YEARS.map(y=><option key={y} value={y}>{y}</option>)}</select></label>
+        <label className="field"><span>月</span><select value={ed.mo} onChange={e=>setE("mo",+e.target.value)}>{MO.map(m=><option key={m} value={m}>{m}</option>)}</select></label>
+        <label className="field"><span>日</span><select value={ed.da} onChange={e=>setE("da",+e.target.value)}>{DA.map(dd=><option key={dd} value={dd}>{dd}</option>)}</select></label>
+      </div>
+      <div className="chk-grid" style={{gridTemplateColumns:"repeat(2,1fr)"}}>
+        <label className="field"><span>時</span><select value={ed.h} onChange={e=>setE("h",+e.target.value)}>{HH.map(h=><option key={h} value={h}>{h}時</option>)}</select></label>
+        <label className="field"><span>分</span><select value={ed.mi} onChange={e=>setE("mi",+e.target.value)}>{MI.map(m=><option key={m} value={m}>{String(m).padStart(2,"0")}分</option>)}</select></label>
+      </div>
+      <div className="vit-grid">
+        <label className="field"><span>最高血圧</span><div className="unitwrap"><input type="number" value={ed.sys} onChange={e=>setE("sys",e.target.value)}/><em>mmHg</em></div></label>
+        <label className="field"><span>最低血圧</span><div className="unitwrap"><input type="number" value={ed.dia} onChange={e=>setE("dia",e.target.value)}/><em>mmHg</em></div></label>
+        <label className="field"><span>平均心拍数</span><div className="unitwrap"><input type="number" value={ed.hr} onChange={e=>setE("hr",e.target.value)}/><em>回/分</em></div></label>
+        <label className="field"><span>体温</span><div className="unitwrap"><input type="number" value={ed.temp} onChange={e=>setE("temp",e.target.value)}/><em>℃</em></div></label>
+      </div>
+      <div className="row-end"><Btn onClick={save}>保存</Btn></div>
+    </Modal>}
+    {toast&&<div className="toast">{toast}</div>}
+  </Section>;
+}
 function Records({me,data,persist}){
   const items=data.recordItems||REC_DEFAULT;
   const [sel,setSel]=useState(["利用者1"]);
@@ -714,7 +778,7 @@ function Records({me,data,persist}){
   const [view,setView]=useState("log"); const [photos,setPhotos]=useState(null);
   const [busy,setBusy]=useState(false); const [pv,setPv]=useState(null);
   const [editItems,setEditItems]=useState(false); const [newItem,setNewItem]=useState("");
-  const [vit,setVit]=useState(null);
+  const [vit,setVit]=useState(null); const [valert,setValert]=useState(null);
   const [af,setAf]=useState(iso(addDays(new Date(),-7))); const [at,setAt]=useState(iso(new Date()));
   const [dpOpen,setDpOpen]=useState(false);
   const fileRef=useRef(null);
@@ -730,7 +794,7 @@ function Records({me,data,persist}){
   const addNote=()=>{ if(!note.trim())return; if(pushRecords(note.trim())){ flash("記録しました（現在時刻）"); setNote(""); } };
   const addNoteAt=()=>{ if(!note.trim()){ flash("記録内容を入力してください"); return; } if(pushRecords(note.trim(),null,bizTs())){ flash("記録しました（指定時刻）"); setNote(""); } };
   const delRec=(id)=>persist({...data,records:(data.records||[]).filter(r=>r.id!==id)});
-  const submitVit=()=>{ const v=vit; const parts=[]; if(v.sys&&v.dia) parts.push(v.sys+"mmHg/"+v.dia+"mmHg"); if(v.hr) parts.push(v.hr+"回/分"); if(v.temp) parts.push("体温"+v.temp+"℃"); if(parts.length===0){ flash("数値を入力してください"); return; } if(pushRecords("🩺 "+parts.join(" "))){ flash("バイタルを記録しました"); setVit(null); } };
+  const submitVit=()=>{ const v=vit; const item=buildVitItem(v); if(item==="🩺 "){ flash("数値を入力してください"); return; } const abn=vitAbn(v); if(pushRecords(item, abn?{abn:true}:null)){ if(abn){ setVit(null); setValert(v.re?"second":"first"); } else { flash("バイタルを記録しました"); setVit(null); } } };
   const loadPhotos=async()=>{ if(!SB_ON){ setPhotos([]); return; } try{ setPhotos(await sbListPhotos(af,at)); }catch(e){ setPhotos([]); } };
   useEffect(()=>{ if(view==="album"){ setPhotos(null); loadPhotos(); } },[view,af,at]);
   useEffect(()=>{ setSel(dayUsers.length?[dayUsers[0]]:["利用者1"]); },[date]);
@@ -785,7 +849,7 @@ function Records({me,data,persist}){
       <div className="rec-log">{log.map(r=>(<div key={r.id} className="rec-row">
         <span className="rec-time">{hm(r.ts)}</span><span className="chip">{r.user}</span>
         {r.thumb&&<img className="rec-thumb" src={r.thumb} alt="写真" onClick={()=>openFull(r.photoId)}/>}
-        <span className="rec-item">{r.item}</span>
+        <span className={"rec-item"+(r.abn?" abn":"")}>{r.item}</span>
         <button className="mini-del" onClick={()=>delRec(r.id)}>🗑</button></div>))}</div>
     </>}
     {view==="album"&&<div>
@@ -810,6 +874,15 @@ function Records({me,data,persist}){
       </div>
       <p className="tiny">記録例：{(vit.sys&&vit.dia?vit.sys+"mmHg/"+vit.dia+"mmHg ":"")}{(vit.hr?vit.hr+"回/分 ":"")}{(vit.temp?"体温"+vit.temp+"℃":"")}</p>
       <div className="row-end"><Btn onClick={submitVit}>記録する</Btn></div>
+    </Modal>}
+    {valert==="first"&&<Modal title="⚠ 再測定のお願い" tint="#E4577A" onClose={()=>{setValert(null);}}>
+      <p className="hint">血圧・体温の測定値が基準範囲を外れています。5分以上あけて再測定してください。</p>
+      <p className="hint">測定は椅子に座り、毎回同じ側の上腕で行い、再測定の前は数分落ち着いた状態で過ごしてから測ってください。</p>
+      <div className="row-end"><Btn kind="ghost2" onClick={()=>setValert(null)}>このまま記録</Btn><Btn onClick={()=>{setValert(null);setVit({sys:"",dia:"",hr:"",temp:"",re:true});}}>再測定する</Btn></div>
+    </Modal>}
+    {valert==="second"&&<Modal title="記録しました" tint="#C9788F" onClose={()=>setValert(null)}>
+      <p className="hint">再測定でも基準範囲外でした。いったんこの数値で記録します。以降の再測定は不要ですが、日中にご本人の様子がおかしい・体調不良の際は、必ず再測定してください。</p>
+      <div className="row-end"><Btn onClick={()=>setValert(null)}>確認しました</Btn></div>
     </Modal>}
     {pv&&<Modal title="記録写真" tint="#C9788F" onClose={()=>setPv(null)}>
       <img src={pv.image} style={{width:"100%",borderRadius:12}} alt="記録写真"/>
@@ -946,7 +1019,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.19〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.20〉</p>
   </div>;
 }
 
@@ -988,6 +1061,7 @@ const TABS=[
   {id:"shifts",label:"シフト"},
   {id:"plans",label:"予定・シフト"},
   {id:"records",label:"記録"},
+  {id:"vitals",label:"バイタル一覧"},
   {id:"nisshi",label:"日誌まとめ"},
   {id:"work",label:"各業務の詳細"},
   {id:"traits",label:"障害特性と支援"},
@@ -1010,6 +1084,7 @@ function Inside({me,data,tab,setTab,onLogout,persist}){
       {tab==="schedule"&&<Schedule me={me} data={data} persist={persist}/>}
       {tab==="shifts"&&<Shifts me={me} data={data} persist={persist}/>}
       {tab==="records"&&<Records me={me} data={data} persist={persist}/>}
+      {tab==="vitals"&&<VitalsView data={data} persist={persist}/>}
       {tab==="plans"&&<Plans me={me} data={data} persist={persist}/>}
       {tab==="nisshi"&&<Nisshi me={me} data={data}/>}
       {tab==="work"&&<Work/>}
@@ -1116,7 +1191,7 @@ function Schedule({me,data,persist}){
   useEffect(()=>{ if(mode==="detail"&&scrollRef.current){ const pos=((nmAxis!=null?nmAxis:rawNow)-DAY_START)*ppm; scrollRef.current.scrollTop=Math.max(0,pos-scrollRef.current.clientHeight/2); } },[mode,date,now,ppm]);
   const marks=[]; for(let m=Math.ceil(DAY_START/5)*5; m<=DAY_END; m+=5){ const mm=m%60; if(!(mm%10===0||mm===15||mm===45)) continue; let lv,label=""; if(mm===0){lv=0;label=(Math.floor(m/60)%24)+":00";} else if(mm===30){lv=1;label=(Math.floor(m/60)%24)+":30";} else if(mm===15||mm===45){lv=2;label=String(mm);} else {lv=3;} marks.push({m,lv,label}); }
   const W=AXIS+3*COL;
-  return <Section title="タイムスケジュール" note="業務時間は15:30〜翌9:30。予定は毎日共通です（日付は担当者名の切替用）。重なる予定は自動で横並びに分割。2本指でつまむ、または＋－で時間帯を拡大できます。〈ver.19〉">
+  return <Section title="タイムスケジュール" note="業務時間は15:30〜翌9:30。予定は毎日共通です（日付は担当者名の切替用）。重なる予定は自動で横並びに分割。2本指でつまむ、または＋－で時間帯を拡大できます。〈ver.20〉">
     <div className="tl-toolbar">
       <div className="tl-modes">
         <button className={"seg "+(mode==="overview"?"on":"")} onClick={()=>{setMode("overview");setZoom(1);}}>全体</button>
@@ -1319,7 +1394,7 @@ function ResidentDetail({me,res,onBack,onEdit,onDel,onChange}){
   const [showNotice,setShowNotice]=useState((d.notices&&d.notices.length>0));
   const [nfrom,setNfrom]=useState(""); const [ntext,setNtext]=useState(""); const [addN,setAddN]=useState(false);
   const [plans,setPlans]=useState(null); const [pv,setPv]=useState(null); const [mv,setMv]=useState(null); const [showArch,setShowArch]=useState(false);
-  const [py,setPy]=useState(String(nendoOf())); const fileRef=useRef(null); const [busy,setBusy]=useState(false); const [toast,setToast]=useState("");
+  const [py,setPy]=useState(String(nendoOf())); const fileRef=useRef(null); const [busy,setBusy]=useState(false); const [toast,setToast]=useState(""); const [cropSrc,setCropSrc]=useState(null); const pendName=useRef("");
   const flash=(m)=>{ setToast(m); setTimeout(()=>setToast(""),1800); };
   const loadPlans=async()=>{ try{ const l=await rfList(res.id); l.sort((a,b)=>String((b.meta&&b.meta.year)||"").localeCompare(String((a.meta&&a.meta.year)||""))); setPlans(l); }catch(e){ setPlans([]); } };
   useEffect(()=>{ loadPlans(); },[res.id]);
@@ -1328,11 +1403,9 @@ function ResidentDetail({me,res,onBack,onEdit,onDel,onChange}){
   const arch=(plans||[]).filter(p=>String(p.meta&&p.meta.year)!==String(curNendo));
   const addNotice=()=>{ if(!ntext.trim())return; const notices=[{id:uid(),date:new Date().toISOString().slice(0,10),from:nfrom.trim(),text:ntext.trim()},...(d.notices||[])]; onChange(res.id,Object.assign({},d,{notices})); setNfrom("");setNtext("");setAddN(false); };
   const delNotice=(id)=>{ onChange(res.id,Object.assign({},d,{notices:(d.notices||[]).filter(n=>n.id!==id)})); };
-  const onFile=async(e)=>{ const f=e.target.files&&e.target.files[0]; e.target.value=""; if(!f)return; setBusy(true);
-    try{ let du; if(f.type==="application/pdf"){ du=await new Promise((rs,rj)=>{const fr=new FileReader();fr.onload=()=>rs(fr.result);fr.onerror=rj;fr.readAsDataURL(f);}); } else { du=await compressImage(f,1400,0.72); }
-      await rfInsert({id:"rf_"+uid()+Date.now(), resident_id:res.id, meta:{year:py, name:f.name, type:f.type==="application/pdf"?"pdf":"image"}, data:du, created:new Date().toISOString()});
-      flash("計画を追加しました"); loadPlans();
-    }catch(err){ flash("追加に失敗（resident_files表の設定をご確認ください）"); } finally{ setBusy(false); } };
+  const uploadPlan=async(du,type)=>{ setBusy(true); try{ await rfInsert({id:"rf_"+uid()+Date.now(), resident_id:res.id, meta:{year:py, name:pendName.current||"計画", type}, data:du, created:new Date().toISOString()}); flash("計画を追加しました"); loadPlans(); }catch(err){ flash("追加に失敗（resident_files表の設定をご確認ください）"); } finally{ setBusy(false); } };
+  const readDU=(f)=>new Promise((rs,rj)=>{const fr=new FileReader();fr.onload=()=>rs(fr.result);fr.onerror=rj;fr.readAsDataURL(f);});
+  const onFile=async(e)=>{ const f=e.target.files&&e.target.files[0]; e.target.value=""; if(!f)return; pendName.current=f.name; if(f.type==="application/pdf"){ uploadPlan(await readDU(f),"pdf"); } else { setCropSrc(await readDU(f)); } };
   const openPlan=async(id)=>{ try{ const p=await rfFull(id); if(p) setPv(p); }catch(e){} };
   const delPlan=async(id)=>{ if(!confirm("この計画を削除しますか？"))return; try{ await rfDelete(id); loadPlans(); setPv(null); }catch(e){} };
   const f=d.family||{}; const fam=[]; if(f.father)fam.push("父"); if(f.mother)fam.push("母"); if(f.gfather)fam.push("祖父"); if(f.gmother)fam.push("祖母"); if(f.bro)fam.push("兄"+f.bro+"人"); if(f.ybro)fam.push("弟"+f.ybro+"人"); if(f.sis)fam.push("姉"+f.sis+"人"); if(f.ysis)fam.push("妹"+f.ysis+"人"); if(f.other)fam.push(f.other);
@@ -1378,6 +1451,7 @@ function ResidentDetail({me,res,onBack,onEdit,onDel,onChange}){
     {pv&&<Modal title="個別訓練計画" tint="#C9788F" onClose={()=>setPv(null)}>
       {pv.meta&&pv.meta.type==="pdf"?<><embed src={pv.data} type="application/pdf" style={{width:"100%",height:"60vh",borderRadius:8}}/><div className="row-end" style={{marginTop:8}}><a className="btn ghost2" href={pv.data} target="_blank" rel="noreferrer">新しいタブで開く ↗</a></div></>:<img src={pv.data} style={{width:"100%",borderRadius:8}} alt="計画"/>}
     </Modal>}
+    {cropSrc&&<CropModal src={cropSrc} onCancel={()=>setCropSrc(null)} onDone={(du)=>{ setCropSrc(null); uploadPlan(du,"image"); }}/>}
     {toast&&<div className="toast">{toast}</div>}
   </Section>;
 }
