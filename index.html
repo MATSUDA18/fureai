@@ -289,6 +289,19 @@
   .rec-item.abn{color:#C0392B;font-weight:700;}
   .vit-abn{color:#C0392B;font-weight:700;}
   .crop-wrap{max-height:52vh;overflow:hidden;background:#000;border-radius:8px;}
+  .ho-card{background:#fff;border:1px solid #F0D3DB;border-radius:12px;padding:12px;margin-bottom:10px;border-left:5px solid #E79AB0;}
+  .ho-card.hq{border-left-color:#E4577A;background:#FFF6F8;}
+  .ho-top{display:flex;align-items:center;gap:8px;}
+  .ho-date{font-weight:700;color:#C9788F;font-size:13px;}
+  .ho-top .chip{margin-left:0;}
+  .ho-top .mini-del{margin-left:auto;}
+  .ho-text{margin:8px 0 0;font-size:14px;line-height:1.7;white-space:pre-wrap;}
+  .ho-ok{color:#5B8A45;font-weight:700;font-size:13px;margin-top:6px;}
+  .ho-status{background:#FBEAEE;border-radius:10px;padding:8px;margin-top:6px;}
+  .ho-st-row{display:flex;justify-content:space-between;font-size:12px;padding:3px 0;}
+  .sup-row{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #F0D3DB;border-radius:10px;padding:8px 10px;margin-bottom:6px;}
+  .sup-done{color:#5B8A45;font-size:12px;font-weight:700;}
+  .sup-want{color:#C9788F;font-size:12px;}
   .nisshi{background:#fff;border:1px solid #F0D3DB;border-radius:12px;padding:16px;margin-top:8px;}
   .nisshi-head{text-align:center;font-weight:700;color:#B25E77;font-size:18px;margin-bottom:14px;}
   .nf{margin-bottom:10px;}
@@ -669,6 +682,68 @@ function DayPlanModal({data,persist,date,onClose}){
     <div className="row-end"><Btn onClick={save}>保存</Btn></div>
   </Modal>;
 }
+function Handover({me,data,persist}){
+  const [sub,setSub]=useState("ho");
+  const [from,setFrom]=useState("field"); const [text,setText]=useState(""); const [scope,setScope]=useState("all"); const [day,setDay]=useState(iso(new Date()));
+  const [toast,setToast]=useState(""); const flash=(m)=>{setToast(m);setTimeout(()=>setToast(""),1600);};
+  const [showStatus,setShowStatus]=useState(null);
+  const [newItem,setNewItem]=useState(""); const [note,setNote]=useState(data.supplyNote||"");
+  const hoDate=(ts)=>fmtDate(iso(new Date(ts)));
+  const dt=(ts)=>{ const d=new Date(ts); return (d.getMonth()+1)+"/"+d.getDate()+" "+String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0"); };
+  const list=(data.handovers||[]);
+  const post=()=>{ if(!text.trim())return; const h={id:uid(),ts:new Date().toISOString(),from,text:text.trim(),scope:from==="hq"?scope:null,day:(from==="hq"&&scope==="day")?day:null,confirmedBy:{}}; persist(Object.assign({},data,{handovers:[h,...list]})); setText(""); flash("申し送りを投稿しました"); };
+  const delHo=(id)=>{ if(!confirm("削除しますか？"))return; persist(Object.assign({},data,{handovers:list.filter(h=>h.id!==id)})); };
+  const confirmHo=(h)=>{ const cb=Object.assign({},h.confirmedBy||{},{[me.id]:new Date().toISOString()}); persist(Object.assign({},data,{handovers:list.map(x=>x.id===h.id?Object.assign({},x,{confirmedBy:cb}):x)})); };
+  const targeted=(h)=>{ if(h.from!=="hq")return false; if(h.scope==="all")return true; if(h.scope==="day"){ const p=(data.dayPlans||{})[h.day]||{}; return me.name===p.s1||me.name===p.s2; } return false; };
+  const needConfirm=(h)=>targeted(h)&&!(h.confirmedBy&&h.confirmedBy[me.id]);
+  const items=data.supplyItems||[];
+  const addItem=()=>{ if(!newItem.trim())return; persist(Object.assign({},data,{supplyItems:[...items,{id:uid(),name:newItem.trim()}]})); setNewItem(""); };
+  const delItem=(id)=>{ if(!confirm("この品目を削除しますか？"))return; persist(Object.assign({},data,{supplyItems:items.filter(i=>i.id!==id)})); };
+  const toggleWant=(it)=>{ const now=new Date().toISOString(); const upd=it.want?{want:false}:{want:true,wantBy:me.name,wantAt:now,done:false,doneAt:null}; persist(Object.assign({},data,{supplyItems:items.map(i=>i.id===it.id?Object.assign({},i,upd):i)})); };
+  const markDone=(it)=>{ persist(Object.assign({},data,{supplyItems:items.map(i=>i.id===it.id?Object.assign({},i,{done:true,doneAt:new Date().toISOString(),want:false}):i)})); };
+  const clearDone=(it)=>{ persist(Object.assign({},data,{supplyItems:items.map(i=>i.id===it.id?Object.assign({},i,{done:false,doneAt:null}):i)})); };
+  const saveNote=()=>{ persist(Object.assign({},data,{supplyNote:note})); flash("備考を保存しました"); };
+  return <Section title="申し送り・補充品" note="">
+    <div className="tl-modes" style={{marginBottom:12}}>
+      <button className={"seg "+(sub==="ho"?"on":"")} onClick={()=>setSub("ho")}>申し送り</button>
+      <button className={"seg "+(sub==="sup"?"on":"")} onClick={()=>setSub("sup")}>補充品</button>
+    </div>
+    {sub==="ho"&&<>
+      {list.filter(needConfirm).length>0&&<div className="notice-box"><b>📌 未確認の申し送り（本部）</b>{list.filter(needConfirm).map(h=>(<div key={h.id} className="notice-item"><span>{hoDate(h.ts)}・本部{h.scope==="day"?"（本日担当）":"（全員）"}</span><p>{h.text}</p><div className="row-end"><Btn onClick={()=>confirmHo(h)}>確認済みにする</Btn></div></div>))}</div>}
+      <div className="tl-editpanel">
+        <div className="chk-row"><label className="chk"><input type="radio" name="hofrom" checked={from==="field"} onChange={()=>setFrom("field")}/>現場より</label><label className="chk"><input type="radio" name="hofrom" checked={from==="hq"} onChange={()=>setFrom("hq")}/>本部より</label></div>
+        {from==="hq"&&<><div className="chk-row"><label className="chk"><input type="radio" name="hoscope" checked={scope==="all"} onChange={()=>setScope("all")}/>全員に周知</label><label className="chk"><input type="radio" name="hoscope" checked={scope==="day"} onChange={()=>setScope("day")}/>その日の担当のみ</label></div>{scope==="day"&&<label className="field"><span>対象日（担当＝その日の支援1・2）</span><input type="date" value={day} onChange={e=>setDay(e.target.value)}/></label>}</>}
+        <Area label="申し送りの内容" rows={3} value={text} onChange={e=>setText(e.target.value)}/>
+        <div className="row-end"><Btn onClick={post}>投稿する</Btn></div>
+      </div>
+      {list.length===0&&<p className="empty">申し送りはまだありません。</p>}
+      {list.map(h=>(<div key={h.id} className={"ho-card "+(h.from==="hq"?"hq":"field")}>
+        <div className="ho-top"><span className="ho-date">{hoDate(h.ts)}</span><span className="chip">{h.from==="hq"?("本部"+(h.scope==="day"?"・本日担当":"・全員")):"現場"}</span>{me.isAdmin&&<button className="mini-del" onClick={()=>delHo(h.id)}>🗑</button>}</div>
+        <p className="ho-text">{h.text}</p>
+        {h.from==="hq"&&((h.confirmedBy&&h.confirmedBy[me.id])?<div className="ho-ok">✓ 確認済み</div>:(targeted(h)&&<div className="row-end"><Btn kind="ghost2" onClick={()=>confirmHo(h)}>確認済みにする</Btn></div>))}
+        {me.isAdmin&&h.from==="hq"&&<button className="link-btn" onClick={()=>setShowStatus(showStatus===h.id?null:h.id)}>{showStatus===h.id?"確認状況を閉じる":"確認状況をみる"}</button>}
+        {me.isAdmin&&h.from==="hq"&&showStatus===h.id&&<div className="ho-status">{(function(){ const targets=h.scope==="all"?(data.accounts||[]):(data.accounts||[]).filter(a=>{const p=(data.dayPlans||{})[h.day]||{};return a.name===p.s1||a.name===p.s2;}); if(targets.length===0) return <div className="ho-st-row"><span>対象者が未設定です</span></div>; return targets.map(a=>(<div key={a.id} className="ho-st-row"><span>{a.name}</span><span>{(h.confirmedBy&&h.confirmedBy[a.id])?("✓ "+dt(h.confirmedBy[a.id])):"未確認"}</span></div>)); })()}</div>}
+      </div>))}
+    </>}
+    {sub==="sup"&&<>
+      <div className="rec-sub" style={{marginTop:0}}>補充品リスト（希望する物にチェック）</div>
+      {items.length===0&&<p className="empty">品目がありません。下で登録できます。</p>}
+      {items.map(it=>(<div key={it.id} className="sup-row">
+        <label className="chk" style={{flex:1}}><input type="checkbox" checked={!!it.want} onChange={()=>toggleWant(it)}/>{it.name}</label>
+        {it.done?<span className="sup-done">済 {dt(it.doneAt)}</span>:(it.want?<span className="sup-want">希望 {it.wantBy}</span>:null)}
+        {me.isAdmin&&it.want&&!it.done&&<button className="btn ghost2" onClick={()=>markDone(it)}>済みにする</button>}
+        {me.isAdmin&&it.done&&<button className="link-btn" onClick={()=>clearDone(it)}>戻す</button>}
+        {me.isAdmin&&<button className="mini-del" onClick={()=>delItem(it.id)}>🗑</button>}
+      </div>))}
+      <div className="rec-sub">品目を追加（スタッフも可）</div>
+      <div className="composer"><textarea rows={1} value={newItem} placeholder="例：ペーパータオル" onChange={e=>setNewItem(e.target.value)}/><button className="send" onClick={addItem}>＋</button></div>
+      <div className="rec-sub">備考</div>
+      <Area label="" rows={3} value={note} onChange={e=>setNote(e.target.value)} placeholder="補充に関する自由メモ"/>
+      <div className="row-end"><Btn kind="ghost2" onClick={saveNote}>備考を保存</Btn></div>
+    </>}
+    {toast&&<div className="toast">{toast}</div>}
+  </Section>;
+}
 function Plans({me,data,persist}){
   const [sub,setSub]=useState("files");
   const [list,setList]=useState(null); const [busy,setBusy]=useState(false); const [av,setAv]=useState(null);
@@ -677,7 +752,7 @@ function Plans({me,data,persist}){
   const [d,setD]=useState(iso(new Date())); const [dpOpen,setDpOpen]=useState(false);
   const flash=(m)=>{ setToast(m); setTimeout(()=>setToast(""),1800); };
   const loadList=async()=>{ if(!SB_ON){setList([]);return;} try{ setList(await sbListAttach()); }catch(e){ setList([]); } };
-  useEffect(()=>{ if(sub==="files"&&list===null) loadList(); },[sub]);
+  useEffect(()=>{ if(list===null) loadList(); },[]);
   const onAttach=async(e)=>{ const f=e.target.files&&e.target.files[0]; e.target.value=""; if(!f)return; if(!SB_ON){flash("共有DBの設定が必要です");return;} setBusy(true);
     try{ const id=uid()+"_"+Date.now(); const created=new Date().toISOString(); let dataURI,type,thumb=null;
       if(f.type==="application/pdf"){ dataURI=await new Promise((res,rej)=>{const fr=new FileReader();fr.onload=()=>res(fr.result);fr.onerror=rej;fr.readAsDataURL(f);}); type="pdf"; }
@@ -688,26 +763,24 @@ function Plans({me,data,persist}){
   const openAttach=async(id)=>{ try{ const a=await sbAttachFull(id); if(a) setAv(a); }catch(e){ flash("開けませんでした"); } };
   const delAttach=async(id)=>{ if(!confirm("この資料を削除しますか？"))return; try{ await sbDeleteAttach(id); setList(l=>(l||[]).filter(x=>x.id!==id)); setAv(null); }catch(e){} };
   const cur=(data.dayPlans||{})[d]||{};
-  return <Section title="予定・シフト" note="利用予定表・勤務シフトの資料（PDF/写真）を登録し、その日の利用者・支援員を設定します。どのページで設定しても全体に反映されます。">
-    <div className="tl-modes" style={{marginBottom:12}}>
+  return <Section title="利用予定カレンダー" note="利用予定表・勤務シフトの資料（PDF/写真）を登録し、その日の利用者・支援員を設定します。どのページで設定しても全体に反映されます。">
+    {list===null&&<p className="empty">読み込み中…</p>}
+    {list!==null&&list.length===0&&<p className="empty">まだ資料がありません。下の「資料の登録」から追加できます。</p>}
+    <div className="att-list">{(list||[]).map(a=>(<div key={a.id} className="att-card" onClick={()=>openAttach(a.id)}>
+      {a.meta&&a.meta.type==="image"&&a.meta.thumb?<img src={a.meta.thumb} alt="資料"/>:<div className="att-pdf">PDF</div>}
+      <div className="att-info"><b>{a.meta?a.meta.month:""}　{a.meta?a.meta.kind:""}</b><span>{a.meta?a.meta.name:""}</span></div>
+      <button className="mini-del" onClick={e=>{e.stopPropagation();delAttach(a.id);}}>🗑</button>
+    </div>))}</div>
+    <div className="tl-modes" style={{margin:"16px 0 12px"}}>
       <button className={"seg "+(sub==="files"?"on":"")} onClick={()=>setSub("files")}>資料の登録</button>
       <button className={"seg "+(sub==="day"?"on":"")} onClick={()=>setSub("day")}>その日の利用者・支援員</button>
     </div>
-    {sub==="files"&&<>
-      <div className="tl-editpanel">
-        <div className="nf2"><label className="field"><span>対象の月</span><input type="month" value={month} onChange={e=>setMonth(e.target.value)}/></label>
-          <label className="field"><span>種類</span><select value={kind} onChange={e=>setKind(e.target.value)}><option>両方（利用者＋シフト）</option><option>利用者の利用予定</option><option>スタッフのシフト</option></select></label></div>
-        <button className="recbtn cam" onClick={()=>fileRef.current&&fileRef.current.click()} disabled={busy}>⬆ PDF / 写真をアップロード</button>
-        <input ref={fileRef} type="file" accept="image/*,application/pdf" onChange={onAttach} style={{display:"none"}}/>
-      </div>
-      {list===null&&<p className="empty">読み込み中…</p>}
-      {list!==null&&list.length===0&&<p className="empty">まだ資料がありません。</p>}
-      <div className="att-list">{(list||[]).map(a=>(<div key={a.id} className="att-card" onClick={()=>openAttach(a.id)}>
-        {a.meta&&a.meta.type==="image"&&a.meta.thumb?<img src={a.meta.thumb} alt="資料"/>:<div className="att-pdf">PDF</div>}
-        <div className="att-info"><b>{a.meta?a.meta.month:""}　{a.meta?a.meta.kind:""}</b><span>{a.meta?a.meta.name:""}</span></div>
-        <button className="mini-del" onClick={e=>{e.stopPropagation();delAttach(a.id);}}>🗑</button>
-      </div>))}</div>
-    </>}
+    {sub==="files"&&<div className="tl-editpanel">
+      <div className="nf2"><label className="field"><span>対象の月</span><input type="month" value={month} onChange={e=>setMonth(e.target.value)}/></label>
+        <label className="field"><span>種類</span><select value={kind} onChange={e=>setKind(e.target.value)}><option>両方（利用者＋シフト）</option><option>利用者の利用予定</option><option>スタッフのシフト</option></select></label></div>
+      <button className="recbtn cam" onClick={()=>fileRef.current&&fileRef.current.click()} disabled={busy}>⬆ PDF / 写真をアップロード</button>
+      <input ref={fileRef} type="file" accept="image/*,application/pdf" onChange={onAttach} style={{display:"none"}}/>
+    </div>}
     {sub==="day"&&<div>
       <div className="tl-datenav"><button className="link-btn" onClick={()=>setD(iso(addDays(new Date(d+"T00:00:00"),-1)))}>‹ 前日</button><b>{fmtDate(d)}</b><button className="link-btn" onClick={()=>setD(iso(addDays(new Date(d+"T00:00:00"),1)))}>翌日 ›</button></div>
       <div className="rec-sub" style={{marginTop:8}}>現在の設定</div>
@@ -954,7 +1027,7 @@ function App(){
       save(d);
     }
     // 旧データの補完
-    d.shifts=d.shifts||[]; d.philosophy=d.philosophy||""; d.materials=d.materials||[]; d.news=d.news||[]; d.hotaruUrl=d.hotaruUrl||""; d.timeline=d.timeline||[]; d.records=d.records||[]; d.recordItems=d.recordItems||REC_DEFAULT; d.dayPlans=d.dayPlans||{}; d.userList=d.userList||[];
+    d.shifts=d.shifts||[]; d.philosophy=d.philosophy||""; d.materials=d.materials||[]; d.news=d.news||[]; d.hotaruUrl=d.hotaruUrl||""; d.timeline=d.timeline||[]; d.records=d.records||[]; d.recordItems=d.recordItems||REC_DEFAULT; d.dayPlans=d.dayPlans||{}; d.userList=d.userList||[]; d.handovers=d.handovers||[]; d.supplyItems=d.supplyItems||[]; d.supplyNote=d.supplyNote||"";
     if(localStorage.getItem("mizuho_staff_seeded")!=="1"){
       const have=new Set(d.accounts.map(a=>a.name));
       SEED_STAFF.forEach(s=>{ if(!have.has(s.name)) d.accounts.push({id:uid(),name:s.name,hash:s.hash,isAdmin:false}); });
@@ -1037,7 +1110,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.21〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.22〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
@@ -1077,17 +1150,18 @@ function AdminRegister({data,persist,onClose}){
 /* =============================== ログイン後 =============================== */
 const TABS=[
   {id:"schedule",label:"タイムスケジュール"},
-  {id:"shifts",label:"シフト"},
-  {id:"plans",label:"予定・シフト"},
+  {id:"handover",label:"申し送り・補充品"},
+  {id:"shifts",label:"職員シフト"},
+  {id:"plans",label:"利用予定カレンダー"},
   {id:"records",label:"記録"},
-  {id:"vitals",label:"バイタル一覧"},
+  {id:"users",label:"利用者情報"},
+  {id:"consult",label:"AI相談"},
   {id:"nisshi",label:"日誌まとめ"},
-  {id:"work",label:"各業務の詳細"},
+  {id:"vitals",label:"バイタル一覧"},
+  {id:"work",label:"業務の詳細"},
   {id:"traits",label:"障害特性と支援"},
   {id:"materials",label:"研修資料"},
-  {id:"consult",label:"AI相談"},
   {id:"history",label:"あゆみ"},
-  {id:"users",label:"利用者情報"},
 ];
 function Inside({me,data,tab,setTab,onLogout,persist}){
   const tabs=me.isAdmin?[...TABS,{id:"admin",label:"管理者パネル"}]:TABS;
@@ -1101,6 +1175,7 @@ function Inside({me,data,tab,setTab,onLogout,persist}){
       <button key={t.id} className={"tab "+(tab===t.id?"on":"")} onClick={()=>setTab(t.id)}>{t.label}</button>))}</nav>
     <main className="ins-body">
       {tab==="schedule"&&<Schedule me={me} data={data} persist={persist}/>}
+      {tab==="handover"&&<Handover me={me} data={data} persist={persist}/>}
       {tab==="shifts"&&<Shifts me={me} data={data} persist={persist}/>}
       {tab==="records"&&<Records me={me} data={data} persist={persist}/>}
       {tab==="vitals"&&<VitalsView data={data} persist={persist}/>}
