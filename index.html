@@ -268,6 +268,24 @@
   .notice-item span{font-size:11px;color:#94808A;}
   .notice-item p{margin:2px 0 0;font-size:13.5px;line-height:1.6;}
   .plan-row{display:flex;align-items:center;justify-content:space-between;background:#fff;border:1px solid #F0D3DB;border-radius:10px;padding:6px 10px;margin-bottom:6px;}
+  .res-av img{width:100%;height:100%;object-fit:cover;border-radius:50%;}
+  .res-card.allergy{background:#FDECEC;border-color:#E9A8A8;}
+  .res-badge.alg{left:8px;right:auto;background:#C0392B;}
+  .res-detail.allergy{background:#FDECEC;border:1px solid #E9A8A8;border-radius:14px;padding:12px;}
+  .res-head{display:flex;align-items:center;gap:12px;margin-bottom:8px;}
+  .res-face{width:64px;height:64px;border-radius:12px;object-fit:cover;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.12);}
+  .alg-banner{background:#F9DADA;border:1px solid #E4577A;color:#B03030;border-radius:12px;padding:10px 12px;font-weight:700;margin-bottom:10px;}
+  .chk-row{display:flex;gap:18px;padding:6px 0;}
+  .chk{display:inline-flex;align-items:center;gap:6px;font-size:14px;color:#5A4A50;}
+  .chk-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:8px;}
+  .chk-grid3{display:grid;grid-template-columns:repeat(2,1fr);gap:6px;}
+  .nf select{width:100%;padding:11px 10px;border:1px solid #F0D3DB;border-radius:10px;background:#FCF4F5;font-size:15px;}
+  .nf-label{display:block;font-size:12px;color:#C9788F;font-weight:700;margin:8px 0 4px;}
+  .med-card{background:#fff;border:1px solid #F0D3DB;border-radius:12px;padding:12px;margin-bottom:10px;}
+  .med-thumb{width:44px;height:44px;object-fit:cover;border-radius:8px;cursor:pointer;}
+  .face-prev{width:64px;height:64px;border-radius:12px;overflow:hidden;background:#FBEAEE;display:grid;place-items:center;color:#94808A;font-size:11px;}
+  .face-prev.sm{width:48px;height:48px;}
+  .face-prev img{width:100%;height:100%;object-fit:cover;}
   .nisshi{background:#fff;border:1px solid #F0D3DB;border-radius:12px;padding:16px;margin-top:8px;}
   .nisshi-head{text-align:center;font-weight:700;color:#B25E77;font-size:18px;margin-bottom:14px;}
   .nf{margin-bottom:10px;}
@@ -928,7 +946,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.18〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.19〉</p>
   </div>;
 }
 
@@ -1098,7 +1116,7 @@ function Schedule({me,data,persist}){
   useEffect(()=>{ if(mode==="detail"&&scrollRef.current){ const pos=((nmAxis!=null?nmAxis:rawNow)-DAY_START)*ppm; scrollRef.current.scrollTop=Math.max(0,pos-scrollRef.current.clientHeight/2); } },[mode,date,now,ppm]);
   const marks=[]; for(let m=Math.ceil(DAY_START/5)*5; m<=DAY_END; m+=5){ const mm=m%60; if(!(mm%10===0||mm===15||mm===45)) continue; let lv,label=""; if(mm===0){lv=0;label=(Math.floor(m/60)%24)+":00";} else if(mm===30){lv=1;label=(Math.floor(m/60)%24)+":30";} else if(mm===15||mm===45){lv=2;label=String(mm);} else {lv=3;} marks.push({m,lv,label}); }
   const W=AXIS+3*COL;
-  return <Section title="タイムスケジュール" note="業務時間は15:30〜翌9:30。予定は毎日共通です（日付は担当者名の切替用）。重なる予定は自動で横並びに分割。2本指でつまむ、または＋－で時間帯を拡大できます。〈ver.18〉">
+  return <Section title="タイムスケジュール" note="業務時間は15:30〜翌9:30。予定は毎日共通です（日付は担当者名の切替用）。重なる予定は自動で横並びに分割。2本指でつまむ、または＋－で時間帯を拡大できます。〈ver.19〉">
     <div className="tl-toolbar">
       <div className="tl-modes">
         <button className={"seg "+(mode==="overview"?"on":"")} onClick={()=>{setMode("overview");setZoom(1);}}>全体</button>
@@ -1206,30 +1224,101 @@ function Residents({me,onLogout}){
     <div className="composer" style={{marginTop:10}}><textarea rows={1} value={q} placeholder="名前で検索" onChange={e=>setQ(e.target.value)}/></div>
     {list===null&&<p className="empty">読み込み中…</p>}
     {list!==null&&items.length===0&&<p className="empty">該当がありません。</p>}
-    <div className="res-grid">{items.map(r=>(<button key={r.id} className="res-card" onClick={()=>setSel(r)}>
-      <span className="res-av">{(((r.data&&r.data.name)||"？")).slice(0,1)}</span>
+    <div className="res-grid">{items.map(r=>(<button key={r.id} className={"res-card"+((r.data&&r.data.allergy&&r.data.allergy.has)?" allergy":"")} onClick={()=>setSel(r)}>
+      <span className="res-av">{r.data&&r.data.face?<img src={r.data.face} alt=""/>:(((r.data&&r.data.name)||"？").slice(0,1))}</span>
       <span className="res-nm">{(r.data&&r.data.name)||"（無名）"}</span>
-      <span className="res-tag">{[r.data&&r.data.kubun,r.data&&r.data.disability].filter(Boolean).join("・")}</span>
+      <span className="res-tag">{[r.data&&r.data.kubun&&("区分"+r.data.kubun),r.data&&r.data.disability].filter(Boolean).join("・")}</span>
+      {(r.data&&r.data.allergy&&r.data.allergy.has)&&<span className="res-badge alg">ア</span>}
       {r.data&&r.data.notices&&r.data.notices.length>0&&<span className="res-badge">!</span>}
     </button>))}</div>
     {toast&&<div className="toast">{toast}</div>}
   </Section>;
 }
+const MED_TIMES=[["cb","朝食前"],["ca","朝食中"],["caf","朝食後"],["yb","夕食前"],["ya","夕食時"],["yaf","夕食後"],["bs","就寝前"]];
+const TECHO_OPTS=["","身体障害者手帳","精神障害者保健福祉手帳","療育手帳"];
+const KUBUN_OPTS=["","1","2","3","4","5","6"];
+const RELATIONS=["母","父","祖母","祖父","兄弟姉妹","親戚","その他"];
 function ResidentForm({init,onCancel,onSave}){
-  const [d,setD]=useState(Object.assign({},init.data||{}));
+  const [d,setD]=useState(Object.assign({family:{},allergy:{},meds:[],emergency:[]}, init.data||{}));
   const set=(k,v)=>setD(p=>Object.assign({},p,{[k]:v}));
-  const submit=()=>{ if(!(d.name&&d.name.trim())){ alert("氏名を入力してください"); return; } const id=init.id||("r_"+uid()+Date.now()); onSave(id, Object.assign({notices:[]},d,{name:d.name.trim()})); };
+  const setFam=(k,v)=>setD(p=>Object.assign({},p,{family:Object.assign({},p.family,{[k]:v})}));
+  const setAllergy=(k,v)=>setD(p=>Object.assign({},p,{allergy:Object.assign({},p.allergy,{[k]:v})}));
+  const setMed=(i,k,v)=>setD(p=>{const meds=(p.meds||[]).slice(); meds[i]=Object.assign({},meds[i],{[k]:v}); return Object.assign({},p,{meds});});
+  const setMedT=(i,k,v)=>setD(p=>{const meds=(p.meds||[]).slice(); const t=Object.assign({},(meds[i]&&meds[i].timing)||{},{[k]:v}); meds[i]=Object.assign({},meds[i],{timing:t}); return Object.assign({},p,{meds});});
+  const addMed=()=>setD(p=>((p.meds||[]).length>=4?p:Object.assign({},p,{meds:[...(p.meds||[]),{name:"",content:"",photo:"",timing:{},forgetOk:false}]})));
+  const rmMed=(i)=>setD(p=>Object.assign({},p,{meds:(p.meds||[]).filter((_,j)=>j!==i)}));
+  const setEmg=(i,k,v)=>setD(p=>{const e=(p.emergency||[]).slice(); e[i]=Object.assign({},e[i],{[k]:v}); return Object.assign({},p,{emergency:e});});
+  const addEmg=()=>setD(p=>((p.emergency||[]).length>=3?p:Object.assign({},p,{emergency:[...(p.emergency||[]),{relation:"母",name:"",phone:""}]})));
+  const rmEmg=(i)=>setD(p=>Object.assign({},p,{emergency:(p.emergency||[]).filter((_,j)=>j!==i)}));
+  const faceRef=useRef(null); const medRefs=useRef({});
+  const onFace=async(e)=>{ const f=e.target.files&&e.target.files[0]; e.target.value=""; if(!f)return; try{ set("face", await compressImage(f,240,0.6)); }catch(err){} };
+  const onMedP=async(i,e)=>{ const f=e.target.files&&e.target.files[0]; e.target.value=""; if(!f)return; try{ setMed(i,"photo", await compressImage(f,300,0.5)); }catch(err){} };
+  const submit=()=>{ if(!(d.name&&d.name.trim())){ alert("氏名を入力してください"); return; } const id=init.id||("r_"+uid()+Date.now()); onSave(id, Object.assign({},d,{notices:(d.notices||[]),name:d.name.trim()})); };
+  const AGES=[]; for(let a=0;a<=100;a++)AGES.push(a); const CNT=[0,1,2,3,4,5,6];
   return <Section title={init.id?"利用者の編集":"利用者の登録"} note="">
-    {RES_FIELDS.map(function(fld){ const k=fld[0],label=fld[1],t=fld[2]; return <div className="nf" key={k}><label>{label}</label>{t==="t"?<textarea rows={2} value={d[k]||""} onChange={e=>set(k,e.target.value)}/>:<input value={d[k]||""} onChange={e=>set(k,e.target.value)}/>}</div>; })}
-    <div className="nf"><label>対応アドバイス（こういう時はこう対応）</label><textarea rows={5} value={d.advice||""} onChange={e=>set("advice",e.target.value)} placeholder="例：不安が強い時は静かな場所で、短い言葉で見通しを伝える 等"/></div>
+    <div className="res-sec">基本情報</div>
+    <div className="nf"><label>氏名</label><input value={d.name||""} onChange={e=>set("name",e.target.value)}/></div>
+    <div className="nf"><label>ふりがな</label><input value={d.furigana||""} onChange={e=>set("furigana",e.target.value)}/></div>
+    <div className="nf2">
+      <div className="nf"><label>性別</label><div className="chk-row"><label className="chk"><input type="radio" name="sex" checked={d.sex==="男性"} onChange={()=>set("sex","男性")}/>男性</label><label className="chk"><input type="radio" name="sex" checked={d.sex==="女性"} onChange={()=>set("sex","女性")}/>女性</label></div></div>
+      <div className="nf"><label>年齢</label><select value={d.age||""} onChange={e=>set("age",e.target.value)}><option value="">選択</option>{AGES.map(a=><option key={a} value={a}>{a}歳</option>)}</select></div>
+    </div>
+    <div className="nf2">
+      <div className="nf"><label>手帳</label><select value={d.techo||""} onChange={e=>set("techo",e.target.value)}>{TECHO_OPTS.map(t=><option key={t} value={t}>{t||"選択"}</option>)}</select></div>
+      <div className="nf"><label>区分</label><select value={d.kubun||""} onChange={e=>set("kubun",e.target.value)}>{KUBUN_OPTS.map(k=><option key={k} value={k}>{k?("区分"+k):"選択"}</option>)}</select></div>
+    </div>
+    <div className="nf"><label>障害名</label><input value={d.disability||""} onChange={e=>set("disability",e.target.value)}/></div>
+    <div className="nf"><label>顔写真</label><div className="row-between"><div className="face-prev">{d.face?<img src={d.face} alt="顔"/>:<span>なし</span>}</div><button className="recbtn cam" onClick={()=>faceRef.current&&faceRef.current.click()}>📷 写真</button></div><input ref={faceRef} type="file" accept="image/*" onChange={onFace} style={{display:"none"}}/></div>
+    <div className="res-sec">家族構成</div>
+    <div className="chk-grid">
+      <label className="chk"><input type="checkbox" checked={!!(d.family&&d.family.father)} onChange={e=>setFam("father",e.target.checked)}/>父</label>
+      <label className="chk"><input type="checkbox" checked={!!(d.family&&d.family.mother)} onChange={e=>setFam("mother",e.target.checked)}/>母</label>
+      <label className="chk"><input type="checkbox" checked={!!(d.family&&d.family.gfather)} onChange={e=>setFam("gfather",e.target.checked)}/>祖父</label>
+      <label className="chk"><input type="checkbox" checked={!!(d.family&&d.family.gmother)} onChange={e=>setFam("gmother",e.target.checked)}/>祖母</label>
+    </div>
+    <div className="nf2"><div className="nf"><label>兄</label><select value={(d.family&&d.family.bro)||0} onChange={e=>setFam("bro",+e.target.value)}>{CNT.map(c=><option key={c} value={c}>{c}人</option>)}</select></div>
+      <div className="nf"><label>弟</label><select value={(d.family&&d.family.ybro)||0} onChange={e=>setFam("ybro",+e.target.value)}>{CNT.map(c=><option key={c} value={c}>{c}人</option>)}</select></div></div>
+    <div className="nf2"><div className="nf"><label>姉</label><select value={(d.family&&d.family.sis)||0} onChange={e=>setFam("sis",+e.target.value)}>{CNT.map(c=><option key={c} value={c}>{c}人</option>)}</select></div>
+      <div className="nf"><label>妹</label><select value={(d.family&&d.family.ysis)||0} onChange={e=>setFam("ysis",+e.target.value)}>{CNT.map(c=><option key={c} value={c}>{c}人</option>)}</select></div></div>
+    <div className="nf"><label>その他（家族構成の補足）</label><input value={(d.family&&d.family.other)||""} onChange={e=>setFam("other",e.target.value)}/></div>
+    <div className="res-sec">健康・アレルギー・薬</div>
+    <div className="nf"><label>持病</label><textarea rows={2} value={d.illness||""} onChange={e=>set("illness",e.target.value)}/></div>
+    <div className="nf"><label>アレルギー</label><div className="chk-row"><label className="chk"><input type="radio" name="alg" checked={!(d.allergy&&d.allergy.has)} onChange={()=>setAllergy("has",false)}/>なし</label><label className="chk"><input type="radio" name="alg" checked={!!(d.allergy&&d.allergy.has)} onChange={()=>setAllergy("has",true)}/>あり</label></div></div>
+    {d.allergy&&d.allergy.has&&<div className="nf"><label>アレルギーの詳しい内容</label><textarea rows={2} value={(d.allergy&&d.allergy.detail)||""} onChange={e=>setAllergy("detail",e.target.value)}/></div>}
+    <div className="nf"><label>服薬の管理</label><div className="chk-row"><label className="chk"><input type="radio" name="mm" checked={d.medManage==="self"} onChange={()=>set("medManage","self")}/>自己管理</label><label className="chk"><input type="radio" name="mm" checked={d.medManage==="staff"} onChange={()=>set("medManage","staff")}/>スタッフ管理</label></div></div>
+    <div className="res-sec2">お薬（最大4種類）</div>
+    {(d.meds||[]).map((m,i)=>(<div className="med-card" key={i}>
+      <div className="row-between"><b>お薬 {i+1}</b><button className="mini-del" onClick={()=>rmMed(i)}>🗑</button></div>
+      <div className="nf"><label>薬の名前</label><input value={m.name||""} onChange={e=>setMed(i,"name",e.target.value)}/></div>
+      <div className="nf"><label>内容・メモ</label><textarea rows={2} value={m.content||""} onChange={e=>setMed(i,"content",e.target.value)}/></div>
+      <div className="nf"><label>薬の写真</label><div className="row-between"><div className="face-prev sm">{m.photo?<img src={m.photo} alt="薬"/>:<span>なし</span>}</div><button className="recbtn cam" onClick={()=>medRefs.current[i]&&medRefs.current[i].click()}>📷</button></div><input ref={el=>medRefs.current[i]=el} type="file" accept="image/*" onChange={e=>onMedP(i,e)} style={{display:"none"}}/></div>
+      <label className="nf-label">服用のタイミング</label>
+      <div className="chk-grid3">{MED_TIMES.map(function(mt){return <label className="chk" key={mt[0]}><input type="checkbox" checked={!!(m.timing&&m.timing[mt[0]])} onChange={e=>setMedT(i,mt[0],e.target.checked)}/>{mt[1]}</label>;})}</div>
+      <label className="chk" style={{marginTop:6}}><input type="checkbox" checked={!!m.forgetOk} onChange={e=>setMed(i,"forgetOk",e.target.checked)}/>飲み忘れがあっても可（チェックなし＝飲み忘れNG）</label>
+    </div>))}
+    {(d.meds||[]).length<4&&<button className="time-toggle" onClick={addMed}>＋ お薬を追加</button>}
+    <div className="res-sec">緊急連絡先</div>
+    {(d.emergency||[]).map((c,i)=>(<div className="med-card" key={i}>
+      <div className="row-between"><b>連絡先 {i+1}</b><button className="mini-del" onClick={()=>rmEmg(i)}>🗑</button></div>
+      <div className="nf2"><div className="nf"><label>続柄</label><select value={c.relation||"母"} onChange={e=>setEmg(i,"relation",e.target.value)}>{RELATIONS.map(r=><option key={r} value={r}>{r}</option>)}</select></div>
+        <div className="nf"><label>お名前（任意）</label><input value={c.name||""} onChange={e=>setEmg(i,"name",e.target.value)}/></div></div>
+      <div className="nf"><label>電話番号</label><input type="tel" value={c.phone||""} onChange={e=>setEmg(i,"phone",e.target.value)}/></div>
+    </div>))}
+    {(d.emergency||[]).length<3&&<button className="time-toggle" onClick={addEmg}>＋ 連絡先を追加</button>}
+    <div className="res-sec">その他</div>
+    <div className="nf"><label>得意</label><textarea rows={2} value={d.strong||""} onChange={e=>set("strong",e.target.value)}/></div>
+    <div className="nf"><label>苦手</label><textarea rows={2} value={d.weak||""} onChange={e=>set("weak",e.target.value)}/></div>
+    <div className="nf"><label>家族の希望</label><textarea rows={2} value={d.familyHope||""} onChange={e=>set("familyHope",e.target.value)}/></div>
+    <div className="nf"><label>本人の将来ビジョン</label><textarea rows={2} value={d.vision||""} onChange={e=>set("vision",e.target.value)}/></div>
+    <div className="nf"><label>対応アドバイス（こういう時はこう対応）</label><textarea rows={5} value={d.advice||""} onChange={e=>set("advice",e.target.value)}/></div>
     <div className="n-actions"><Btn onClick={submit}>保存</Btn><Btn kind="ghost2" onClick={onCancel}>キャンセル</Btn></div>
   </Section>;
 }
 function ResidentDetail({me,res,onBack,onEdit,onDel,onChange}){
-  const d=res.data||{};
+  const d=res.data||{}; const alg=!!(d.allergy&&d.allergy.has);
   const [showNotice,setShowNotice]=useState((d.notices&&d.notices.length>0));
   const [nfrom,setNfrom]=useState(""); const [ntext,setNtext]=useState(""); const [addN,setAddN]=useState(false);
-  const [plans,setPlans]=useState(null); const [pv,setPv]=useState(null); const [showArch,setShowArch]=useState(false);
+  const [plans,setPlans]=useState(null); const [pv,setPv]=useState(null); const [mv,setMv]=useState(null); const [showArch,setShowArch]=useState(false);
   const [py,setPy]=useState(String(nendoOf())); const fileRef=useRef(null); const [busy,setBusy]=useState(false); const [toast,setToast]=useState("");
   const flash=(m)=>{ setToast(m); setTimeout(()=>setToast(""),1800); };
   const loadPlans=async()=>{ try{ const l=await rfList(res.id); l.sort((a,b)=>String((b.meta&&b.meta.year)||"").localeCompare(String((a.meta&&a.meta.year)||""))); setPlans(l); }catch(e){ setPlans([]); } };
@@ -1240,31 +1329,52 @@ function ResidentDetail({me,res,onBack,onEdit,onDel,onChange}){
   const addNotice=()=>{ if(!ntext.trim())return; const notices=[{id:uid(),date:new Date().toISOString().slice(0,10),from:nfrom.trim(),text:ntext.trim()},...(d.notices||[])]; onChange(res.id,Object.assign({},d,{notices})); setNfrom("");setNtext("");setAddN(false); };
   const delNotice=(id)=>{ onChange(res.id,Object.assign({},d,{notices:(d.notices||[]).filter(n=>n.id!==id)})); };
   const onFile=async(e)=>{ const f=e.target.files&&e.target.files[0]; e.target.value=""; if(!f)return; setBusy(true);
-    try{ let dataURI; if(f.type==="application/pdf"){ dataURI=await new Promise((rs,rj)=>{const fr=new FileReader();fr.onload=()=>rs(fr.result);fr.onerror=rj;fr.readAsDataURL(f);}); } else { dataURI=await compressImage(f,1400,0.72); }
-      await rfInsert({id:"rf_"+uid()+Date.now(), resident_id:res.id, meta:{year:py, name:f.name, type:f.type==="application/pdf"?"pdf":"image"}, data:dataURI, created:new Date().toISOString()});
+    try{ let du; if(f.type==="application/pdf"){ du=await new Promise((rs,rj)=>{const fr=new FileReader();fr.onload=()=>rs(fr.result);fr.onerror=rj;fr.readAsDataURL(f);}); } else { du=await compressImage(f,1400,0.72); }
+      await rfInsert({id:"rf_"+uid()+Date.now(), resident_id:res.id, meta:{year:py, name:f.name, type:f.type==="application/pdf"?"pdf":"image"}, data:du, created:new Date().toISOString()});
       flash("計画を追加しました"); loadPlans();
     }catch(err){ flash("追加に失敗（resident_files表の設定をご確認ください）"); } finally{ setBusy(false); } };
   const openPlan=async(id)=>{ try{ const p=await rfFull(id); if(p) setPv(p); }catch(e){} };
   const delPlan=async(id)=>{ if(!confirm("この計画を削除しますか？"))return; try{ await rfDelete(id); loadPlans(); setPv(null); }catch(e){} };
+  const f=d.family||{}; const fam=[]; if(f.father)fam.push("父"); if(f.mother)fam.push("母"); if(f.gfather)fam.push("祖父"); if(f.gmother)fam.push("祖母"); if(f.bro)fam.push("兄"+f.bro+"人"); if(f.ybro)fam.push("弟"+f.ybro+"人"); if(f.sis)fam.push("姉"+f.sis+"人"); if(f.ysis)fam.push("妹"+f.ysis+"人"); if(f.other)fam.push(f.other);
+  const Row=function(p){ return <div className="res-row"><span className="res-k">{p.k}</span><span className="res-v">{p.v||"—"}</span></div>; };
+  const timingStr=(m)=>MED_TIMES.filter(function(mt){return m.timing&&m.timing[mt[0]];}).map(function(mt){return mt[1];}).join("・")||"—";
   return <Section title="" note="">
     <div className="row-between"><button className="link-btn" onClick={onBack}>‹ 一覧へ</button>{me.isAdmin&&<span><button className="link-btn" onClick={onEdit}>編集</button>　<button className="link-btn" style={{color:"#C0392B"}} onClick={onDel}>削除</button></span>}</div>
-    <h2 className="sec-title" style={{marginTop:6}}>{d.name||"（無名）"} 様</h2>
-    {(d.notices&&d.notices.length>0)&&<div className="notice-box"><b>📌 お知らせ・注意</b>{(d.notices).map(n=>(<div key={n.id} className="notice-item"><span>{n.date}{n.from?"／"+n.from:""}</span><p>{n.text}</p>{me.isAdmin&&<button className="mini-del" onClick={()=>delNotice(n.id)}>🗑</button>}</div>))}</div>}
-    {me.isAdmin&&(addN?<div className="tl-editpanel"><Field label="連絡元（例：ご家族／本部）" value={nfrom} onChange={e=>setNfrom(e.target.value)}/><Area label="内容" rows={2} value={ntext} onChange={e=>setNtext(e.target.value)}/><div className="row-end"><Btn onClick={addNotice}>追加</Btn><Btn kind="ghost2" onClick={()=>setAddN(false)}>閉じる</Btn></div></div>:<button className="link-btn" onClick={()=>setAddN(true)}>＋ お知らせ・注意を追加</button>)}
-    <div className="res-sec">基本情報</div>
-    <div className="res-table">{RES_FIELDS.map(function(fld){ const k=fld[0],label=fld[1]; return <div className="res-row" key={k}><span className="res-k">{label}</span><span className="res-v">{d[k]||"—"}</span></div>; })}</div>
-    <div className="res-sec">対応アドバイス</div>
-    <p className="res-advice">{d.advice||"（未入力）"}</p>
-    <div className="res-sec">個別訓練計画</div>
-    {me.isAdmin&&<div className="tl-editpanel"><div className="wheel"><input type="number" value={py} onChange={e=>setPy(e.target.value)} placeholder="年度（西暦）" style={{flex:1,padding:"12px",border:"1px solid #F0D3DB",borderRadius:"10px"}}/><button className="recbtn cam" onClick={()=>fileRef.current&&fileRef.current.click()} disabled={busy}>⬆ PDF/写真</button></div><input ref={fileRef} type="file" accept="image/*,application/pdf" onChange={onFile} style={{display:"none"}}/><p className="tiny">年度（西暦）を入れて、その年の計画を追加します（過去分も追加できます）。</p></div>}
-    {plans===null&&<p className="empty">読み込み中…</p>}
-    <div className="res-sec2">今年度（{curNendo}年度）</div>
-    {curP.length===0?<p className="tiny">今年度の計画はまだありません。</p>:curP.map(p=>(<div key={p.id} className="plan-row"><button className="link-btn" onClick={()=>openPlan(p.id)}>📄 {(p.meta&&p.meta.name)||"計画"}</button>{me.isAdmin&&<button className="mini-del" onClick={()=>delPlan(p.id)}>🗑</button>}</div>))}
-    {arch.length>0&&<><button className="link-btn" style={{marginTop:8}} onClick={()=>setShowArch(!showArch)}>{showArch?"過去の計画を閉じる":"過去の計画（アーカイブ）を見る"}</button>{showArch&&arch.map(p=>(<div key={p.id} className="plan-row"><button className="link-btn" onClick={()=>openPlan(p.id)}>📄 {(p.meta&&p.meta.year)}年度：{(p.meta&&p.meta.name)||"計画"}</button>{me.isAdmin&&<button className="mini-del" onClick={()=>delPlan(p.id)}>🗑</button>}</div>))}</>}
+    <div className={"res-detail"+(alg?" allergy":"")}>
+      <div className="res-head">{d.face&&<img className="res-face" src={d.face} alt="顔"/>}<div><h2 className="sec-title" style={{margin:0}}>{d.name||"（無名）"} 様</h2>{d.furigana&&<div className="tiny">{d.furigana}</div>}</div></div>
+      {alg&&<div className="alg-banner">⚠ アレルギーあり{(d.allergy&&d.allergy.detail)?"："+d.allergy.detail:""}</div>}
+      {(d.notices&&d.notices.length>0)&&<div className="notice-box"><b>📌 お知らせ・注意</b>{(d.notices).map(n=>(<div key={n.id} className="notice-item"><span>{n.date}{n.from?"／"+n.from:""}</span><p>{n.text}</p>{me.isAdmin&&<button className="mini-del" onClick={()=>delNotice(n.id)}>🗑</button>}</div>))}</div>}
+      {me.isAdmin&&(addN?<div className="tl-editpanel"><Field label="連絡元（例：ご家族／本部）" value={nfrom} onChange={e=>setNfrom(e.target.value)}/><Area label="内容" rows={2} value={ntext} onChange={e=>setNtext(e.target.value)}/><div className="row-end"><Btn onClick={addNotice}>追加</Btn><Btn kind="ghost2" onClick={()=>setAddN(false)}>閉じる</Btn></div></div>:<button className="link-btn" onClick={()=>setAddN(true)}>＋ お知らせ・注意を追加</button>)}
+      <div className="res-sec">基本情報</div>
+      <div className="res-table">
+        <Row k="性別" v={d.sex}/><Row k="年齢" v={d.age?d.age+"歳":""}/><Row k="手帳" v={d.techo}/><Row k="区分" v={d.kubun?("区分"+d.kubun):""}/><Row k="障害名" v={d.disability}/><Row k="家族構成" v={fam.join("・")}/><Row k="持病" v={d.illness}/>
+      </div>
+      <div className="res-sec">アレルギー・薬</div>
+      <div className="res-table"><Row k="アレルギー" v={alg?("あり"+((d.allergy&&d.allergy.detail)?"（"+d.allergy.detail+"）":"")):"なし"}/><Row k="服薬管理" v={d.medManage==="self"?"自己管理":(d.medManage==="staff"?"スタッフ管理":"")}/></div>
+      {(d.meds||[]).map((m,i)=>(<div className="med-card" key={i}>
+        <div className="row-between"><b>💊 {m.name||("お薬"+(i+1))}</b>{m.photo&&<img className="med-thumb" src={m.photo} alt="薬" onClick={()=>setMv(m.photo)}/>}</div>
+        <div className="tiny" style={{marginTop:4}}>タイミング：{timingStr(m)}</div>
+        <div className="tiny">飲み忘れ：{m.forgetOk?"あっても可":"NG（必ず服用）"}</div>
+        {m.content&&<p className="res-advice" style={{marginTop:6}}>{m.content}</p>}
+      </div>))}
+      <div className="res-sec">緊急連絡先</div>
+      {(d.emergency&&d.emergency.length)?(d.emergency||[]).map((c,i)=>(<div className="plan-row" key={i}><span>{c.relation}{c.name?"（"+c.name+"）":""}</span><a className="btn ghost2" href={"tel:"+(c.phone||"")}>📞 {c.phone||"—"}</a></div>)):<p className="tiny">未登録</p>}
+      <div className="res-sec">得意・苦手・希望</div>
+      <div className="res-table"><Row k="得意" v={d.strong}/><Row k="苦手" v={d.weak}/><Row k="家族の希望" v={d.familyHope}/><Row k="将来ビジョン" v={d.vision}/></div>
+      <div className="res-sec">対応アドバイス</div>
+      <p className="res-advice">{d.advice||"（未入力）"}</p>
+      <div className="res-sec">個別訓練計画</div>
+      {me.isAdmin&&<div className="tl-editpanel"><div className="wheel"><input type="number" value={py} onChange={e=>setPy(e.target.value)} placeholder="年度（西暦）" style={{flex:1,padding:"12px",border:"1px solid #F0D3DB",borderRadius:"10px"}}/><button className="recbtn cam" onClick={()=>fileRef.current&&fileRef.current.click()} disabled={busy}>⬆ PDF/写真</button></div><input ref={fileRef} type="file" accept="image/*,application/pdf" onChange={onFile} style={{display:"none"}}/><p className="tiny">年度（西暦）を入れて計画を追加（過去分も可）。</p></div>}
+      {plans===null&&<p className="empty">読み込み中…</p>}
+      <div className="res-sec2">今年度（{curNendo}年度）</div>
+      {curP.length===0?<p className="tiny">今年度の計画はまだありません。</p>:curP.map(p=>(<div key={p.id} className="plan-row"><button className="link-btn" onClick={()=>openPlan(p.id)}>📄 {(p.meta&&p.meta.name)||"計画"}</button>{me.isAdmin&&<button className="mini-del" onClick={()=>delPlan(p.id)}>🗑</button>}</div>))}
+      {arch.length>0&&<><button className="link-btn" style={{marginTop:8}} onClick={()=>setShowArch(!showArch)}>{showArch?"過去の計画を閉じる":"過去の計画（アーカイブ）を見る"}</button>{showArch&&arch.map(p=>(<div key={p.id} className="plan-row"><button className="link-btn" onClick={()=>openPlan(p.id)}>📄 {(p.meta&&p.meta.year)}年度：{(p.meta&&p.meta.name)||"計画"}</button>{me.isAdmin&&<button className="mini-del" onClick={()=>delPlan(p.id)}>🗑</button>}</div>))}</>}
+    </div>
     {showNotice&&(d.notices&&d.notices.length>0)&&<Modal title={(d.name||"")+" 様 へのお知らせ"} tint="#E4577A" onClose={()=>setShowNotice(false)}>
       {(d.notices).map(n=>(<div key={n.id} className="notice-item"><span>{n.date}{n.from?"／"+n.from:""}</span><p>{n.text}</p></div>))}
       <div className="row-end"><Btn onClick={()=>setShowNotice(false)}>確認しました</Btn></div>
     </Modal>}
+    {mv&&<Modal title="薬の写真" tint="#C9788F" onClose={()=>setMv(null)}><img src={mv} style={{width:"100%",borderRadius:8}} alt="薬"/></Modal>}
     {pv&&<Modal title="個別訓練計画" tint="#C9788F" onClose={()=>setPv(null)}>
       {pv.meta&&pv.meta.type==="pdf"?<><embed src={pv.data} type="application/pdf" style={{width:"100%",height:"60vh",borderRadius:8}}/><div className="row-end" style={{marginTop:8}}><a className="btn ghost2" href={pv.data} target="_blank" rel="noreferrer">新しいタブで開く ↗</a></div></>:<img src={pv.data} style={{width:"100%",borderRadius:8}} alt="計画"/>}
     </Modal>}
