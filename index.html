@@ -341,16 +341,16 @@ const SUPABASE_URL = "https://cxagugepnwivmestnnqk.supabase.co"; // 例: https:/
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN4YWd1Z2Vwbndpdm1lc3RubnFrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg1NDA2NTgsImV4cCI6MjEwNDExNjY1OH0.VCxIn0xKZiaR7sqAiiJVER8Fs4HmTylfPChFQWy6_g0"; // anon public key
 const SB_ON = SUPABASE_URL.length>10 && SUPABASE_KEY.length>10;
 const sbHead = ()=>({ "apikey":SUPABASE_KEY, "Authorization":"Bearer "+SUPABASE_KEY, "Content-Type":"application/json" });
-async function sbGet(){ const r=await fetch(`${SUPABASE_URL}/rest/v1/app_state?id=eq.1&select=data,updated_at`,{headers:sbHead()}); if(!r.ok) throw new Error("sbGet "+r.status); const j=await r.json(); return (j&&j[0])?j[0]:null; }
-async function sbSave(data,ts){ const body=JSON.stringify({id:1,data,updated_at:ts||new Date().toISOString()}); await fetch(`${SUPABASE_URL}/rest/v1/app_state`,{method:"POST",headers:{...sbHead(),"Prefer":"resolution=merge-duplicates,return=minimal"},body}); }
-async function sbInsertPhoto(rec){ const r=await fetch(`${SUPABASE_URL}/rest/v1/photos`,{method:"POST",headers:{...sbHead(),"Prefer":"return=minimal"},body:JSON.stringify(rec)}); if(!r.ok) throw new Error("photo insert "+r.status); }
-async function sbListPhotos(from,to){ let u=`${SUPABASE_URL}/rest/v1/photos?select=id,meta,created&order=created.desc&limit=300`; if(from) u+=`&created=gte.${from}T00:00:00`; if(to) u+=`&created=lte.${to}T23:59:59`; const r=await fetch(u,{headers:sbHead()}); if(!r.ok) throw new Error("photo list"); return await r.json(); }
-async function sbPhotoFull(id){ const r=await fetch(`${SUPABASE_URL}/rest/v1/photos?id=eq.${id}&select=id,meta,image,created`,{headers:sbHead()}); if(!r.ok) throw new Error("photo full"); const j=await r.json(); return j&&j[0]?j[0]:null; }
-async function sbDeletePhoto(id){ await fetch(`${SUPABASE_URL}/rest/v1/photos?id=eq.${id}`,{method:"DELETE",headers:sbHead()}); }
-async function sbInsertAttach(rec){ const r=await fetch(`${SUPABASE_URL}/rest/v1/attachments`,{method:"POST",headers:{...sbHead(),"Prefer":"return=minimal"},body:JSON.stringify(rec)}); if(!r.ok) throw new Error("attach insert "+r.status); }
-async function sbListAttach(){ const r=await fetch(`${SUPABASE_URL}/rest/v1/attachments?select=id,meta,created&order=created.desc&limit=100`,{headers:sbHead()}); if(!r.ok) throw new Error("attach list"); return await r.json(); }
-async function sbAttachFull(id){ const r=await fetch(`${SUPABASE_URL}/rest/v1/attachments?id=eq.${id}&select=id,meta,data,created`,{headers:sbHead()}); if(!r.ok) throw new Error("attach full"); const j=await r.json(); return j&&j[0]?j[0]:null; }
-async function sbDeleteAttach(id){ await fetch(`${SUPABASE_URL}/rest/v1/attachments?id=eq.${id}`,{method:"DELETE",headers:sbHead()}); }
+async function sbGet(){ const r=await authFetch(`${SUPABASE_URL}/rest/v1/app_state?id=eq.1&select=data,updated_at`); if(!r.ok) throw new Error("sbGet "+r.status); const j=await r.json(); return (j&&j[0])?j[0]:null; }
+async function sbSave(data,ts){ const body=JSON.stringify({id:1,data,updated_at:ts||new Date().toISOString()}); await authFetch(`${SUPABASE_URL}/rest/v1/app_state`,{method:"POST",headers:{"Prefer":"resolution=merge-duplicates,return=minimal"},body}); }
+async function sbInsertPhoto(rec){ const r=await authFetch(`${SUPABASE_URL}/rest/v1/photos`,{method:"POST",headers:{"Prefer":"return=minimal"},body:JSON.stringify(rec)}); if(!r.ok) throw new Error("photo insert "+r.status); }
+async function sbListPhotos(from,to){ let u=`${SUPABASE_URL}/rest/v1/photos?select=id,meta,created&order=created.desc&limit=300`; if(from) u+=`&created=gte.${from}T00:00:00`; if(to) u+=`&created=lte.${to}T23:59:59`; const r=await authFetch(u); if(!r.ok) throw new Error("photo list"); return await r.json(); }
+async function sbPhotoFull(id){ const r=await authFetch(`${SUPABASE_URL}/rest/v1/photos?id=eq.${id}&select=id,meta,image,created`); if(!r.ok) throw new Error("photo full"); const j=await r.json(); return j&&j[0]?j[0]:null; }
+async function sbDeletePhoto(id){ await authFetch(`${SUPABASE_URL}/rest/v1/photos?id=eq.${id}`,{method:"DELETE"}); }
+async function sbInsertAttach(rec){ const r=await authFetch(`${SUPABASE_URL}/rest/v1/attachments`,{method:"POST",headers:{"Prefer":"return=minimal"},body:JSON.stringify(rec)}); if(!r.ok) throw new Error("attach insert "+r.status); }
+async function sbListAttach(){ const r=await authFetch(`${SUPABASE_URL}/rest/v1/attachments?select=id,meta,created&order=created.desc&limit=100`); if(!r.ok) throw new Error("attach list"); return await r.json(); }
+async function sbAttachFull(id){ const r=await authFetch(`${SUPABASE_URL}/rest/v1/attachments?id=eq.${id}&select=id,meta,data,created`); if(!r.ok) throw new Error("attach full"); const j=await r.json(); return j&&j[0]?j[0]:null; }
+async function sbDeleteAttach(id){ await authFetch(`${SUPABASE_URL}/rest/v1/attachments?id=eq.${id}`,{method:"DELETE"}); }
 /* ===== 認証（Supabase Auth）：利用者情報は認証した職員だけがアクセス可 ===== */
 function authLoad(){ try{return JSON.parse(localStorage.getItem("mizuho_sb_auth")||"null");}catch(e){return null;} }
 function authSaveTok(o){ localStorage.setItem("mizuho_sb_auth", JSON.stringify(o)); }
@@ -904,6 +904,21 @@ function AlarmPopup({type,onClose}){
   </div>;
 }
 
+function AppAuthGate({onDone}){
+  const [email,setEmail]=useState(""); const [pw,setPw]=useState(""); const [err,setErr]=useState(""); const [l,setL]=useState(false);
+  const go=async()=>{ setL(true); setErr(""); try{ await sbLogin(email.trim(),pw); onDone(); }catch(e){ setErr("ログインできませんでした。メール／パスワードをご確認ください。"); } setL(false); };
+  return <div className="root"><StyleTag/><div className="top" style={{maxWidth:"420px",paddingTop:"36px"}}>
+    <div className="hero" style={{borderRadius:"24px"}}><div className="hero-title"><p className="pref">岐阜県瑞穂市</p><h1>ふれあいホームみずほ</h1><p className="sub">職員ログイン</p></div></div>
+    <section className="card">
+      <p className="hint">🔐 このアプリは職員専用です。事業所で共有のメールアドレスとパスワードでログインしてください（この端末に保持されます）。</p>
+      <Field label="メールアドレス" type="email" value={email} onChange={e=>setEmail(e.target.value)}/>
+      <Field label="パスワード" type="password" value={pw} onChange={e=>setPw(e.target.value)} onKeyDown={e=>e.key==="Enter"&&go()}/>
+      {err&&<p className="err">{err}</p>}
+      <div className="row-end"><Btn onClick={go} kind={l?"ghost2":"primary"}>{l?"確認中…":"ログイン"}</Btn></div>
+    </section>
+  </div></div>;
+}
+
 /* ================================ 本体 ================================ */
 function App(){
   const [data,setData]=useState(null);
@@ -916,6 +931,7 @@ function App(){
   const [hotaruOpen,setHotaruOpen]=useState(false);
   const [showInstall,setShowInstall]=useState(false);
   const tsRef=useRef(null);
+  const [sbAuthed,setSbAuthed]=useState(()=>!SB_ON||!!authLoad());
   const [alarm,setAlarm]=useState(null);
   const audioRef=useRef(null); const firedRef=useRef({});
   const playChime=()=>{ try{ const ac=audioRef.current; if(!ac) return; if(ac.state==="suspended") ac.resume(); const t0=ac.currentTime; [880,1108.73,1318.51].forEach((f,i)=>{ const o=ac.createOscillator(),g=ac.createGain(); o.type="sine"; o.frequency.value=f; o.connect(g); g.connect(ac.destination); const t=t0+i*0.18; g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(0.25,t+0.02); g.gain.exponentialRampToValueAtTime(0.0001,t+0.9); o.start(t); o.stop(t+0.95); }); }catch(e){} };
@@ -924,6 +940,7 @@ function App(){
   useEffect(()=>{ if(!alarm) return; playChime(); const iv=setInterval(playChime,2600); return ()=>clearInterval(iv); },[alarm]);
 
   useEffect(()=>{(async()=>{
+    if(SB_ON && !sbAuthed) return;
     let d=load();
     if(!d){
       const master=await sha256("mizuho2025");
@@ -949,8 +966,8 @@ function App(){
     const standalone=(window.matchMedia&&window.matchMedia("(display-mode: standalone)").matches)||window.navigator.standalone===true;
     if(!standalone && !localStorage.getItem("mizuho_install_done")) setShowInstall(true);
     if(SB_ON){ try{ const row=await sbGet(); if(row&&row.data&&Object.keys(row.data).length>0){ tsRef.current=row.updated_at||null; setData(row.data); } else { const ts=new Date().toISOString(); tsRef.current=ts; await sbSave(d,ts); } }catch(e){console.error("sb init",e);} }
-  })();},[]);
-  useEffect(()=>{ if(!SB_ON) return; const iv=setInterval(async()=>{ try{ const row=await sbGet(); if(row&&row.updated_at&&row.updated_at!==tsRef.current){ tsRef.current=row.updated_at; if(row.data&&Object.keys(row.data).length>0) setData(row.data); } }catch(e){} },12000); return ()=>clearInterval(iv); },[]);
+  })();},[sbAuthed]);
+  useEffect(()=>{ if(!SB_ON||!sbAuthed) return; const iv=setInterval(async()=>{ try{ const row=await sbGet(); if(row&&row.updated_at&&row.updated_at!==tsRef.current){ tsRef.current=row.updated_at; if(row.data&&Object.keys(row.data).length>0) setData(row.data); } }catch(e){} },12000); return ()=>clearInterval(iv); },[sbAuthed]);
 
   const persist=(next)=>{ setData(next); save(next); if(SB_ON){ const ts=new Date().toISOString(); tsRef.current=ts; sbSave(next,ts).catch(()=>{}); } };
   const logout=()=>{localStorage.removeItem("mizuho_session");setMe(null);};
@@ -959,6 +976,7 @@ function App(){
     else setErr("パスワードが違います。");};
   const dismissInstall=(never)=>{if(never)localStorage.setItem("mizuho_install_done","1");setShowInstall(false);};
 
+  if(SB_ON && !sbAuthed) return <AppAuthGate onDone={()=>setSbAuthed(true)}/>;
   if(!data) return <div style={{padding:40,color:"#C9788F"}}>読み込み中…</div>;
 
   return <div>
@@ -966,7 +984,7 @@ function App(){
       {alarm && <AlarmPopup type={alarm.type} onClose={()=>setAlarm(null)}/>}
     {me
       ? <Inside me={me} data={data} tab={tab} setTab={setTab} onLogout={logout} persist={persist}/>
-      : <Top data={data} season={season} onPick={a=>{setLogin(a);setErr("");}} onAdminReg={()=>setAdminReg(true)} onHotaru={()=>setHotaruOpen(true)}/>}
+      : <Top data={data} season={season} onPick={a=>{setLogin(a);setErr("");}} onAdminReg={()=>setAdminReg(true)} onHotaru={()=>setHotaruOpen(true)} onSbLogout={()=>{authClear();setSbAuthed(false);}}/>}
 
     {login && <Modal title={`${login.name} さん  ―  パスワード`} onClose={()=>{setLogin(null);setPw("");setErr("");}}>
       <p className="hint">🔒 このアプリの内容を見るにはパスワードが必要です。</p>
@@ -987,7 +1005,7 @@ function App(){
 }
 
 /* =============================== トップ =============================== */
-function Top({data,season,onPick,onAdminReg,onHotaru}){
+function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
   const latest=data.news[0];
   return <div className="top">
     <div className="hero">
@@ -1019,7 +1037,8 @@ function Top({data,season,onPick,onAdminReg,onHotaru}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.20〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.21〉</p>
+    <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
 
