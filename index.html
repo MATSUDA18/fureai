@@ -315,6 +315,7 @@
   .ho-att-thumb{width:60px;height:60px;object-fit:cover;border-radius:8px;cursor:pointer;}
   .ho-att-file{background:#FBEAEE;border:1px solid #F0D3DB;color:#C9788F;border-radius:10px;padding:6px 10px;font-size:12px;cursor:pointer;}
   .sup-thumb{width:36px;height:36px;object-fit:cover;border-radius:6px;cursor:pointer;}
+  .thumb-x{position:absolute;top:-6px;right:-6px;width:18px;height:18px;border-radius:50%;background:#C0392B;color:#fff;border:none;font-size:12px;line-height:1;cursor:pointer;}
   .nisshi{background:#fff;border:1px solid #F0D3DB;border-radius:12px;padding:16px;margin-top:8px;}
   .nisshi-head{text-align:center;font-weight:700;color:#B25E77;font-size:18px;margin-bottom:14px;}
   .nf{margin-bottom:10px;}
@@ -702,12 +703,14 @@ function Handover({me,data,persist}){
   const [showStatus,setShowStatus]=useState(null);
   const [newItem,setNewItem]=useState(""); const [note,setNote]=useState(data.supplyNote||"");
   const [pendingAtt,setPendingAtt]=useState([]); const [av,setAv]=useState(null); const [supPhotoFor,setSupPhotoFor]=useState(null);
-  const hoFileRef=useRef(null); const supFileRef=useRef(null);
+  const hoFileRef=useRef(null); const supFileRef=useRef(null); const noteFileRef=useRef(null);
   const readDU=(f)=>new Promise((rs,rj)=>{const fr=new FileReader();fr.onload=()=>rs(fr.result);fr.onerror=rj;fr.readAsDataURL(f);});
   const onHoFile=async(e)=>{ const f=e.target.files&&e.target.files[0]; e.target.value=""; if(!f)return; if(!SB_ON){flash("共有DBが必要です");return;} try{ const id=uid()+"_"+Date.now(); const isImg=/^image\//.test(f.type); let full,thumb=null,type; if(isImg){ full=await compressImage(f,1200,0.7); thumb=await compressImage(f,200,0.5); type="image"; } else { full=await readDU(f); type="file"; } await sbInsertAttach({id,meta:{kind:"handover",name:f.name,type,thumb},data:full,created:new Date().toISOString()}); setPendingAtt(p=>[...p,{id,name:f.name,type,thumb}]); flash("添付しました"); }catch(err){ flash("添付に失敗（attachments表の設定をご確認ください）"); } };
   const openHoImg=async(a)=>{ try{ const full=await sbAttachFull(a.id); if(full) setAv(full); }catch(e){} };
   const dlAtt=async(a)=>{ try{ const full=await sbAttachFull(a.id); if(!full)return; const link=document.createElement("a"); link.href=full.data; link.download=a.name||"file"; document.body.appendChild(link); link.click(); link.remove(); }catch(e){ flash("開けませんでした"); } };
   const onSupPhoto=async(e)=>{ const f=e.target.files&&e.target.files[0]; e.target.value=""; if(!f||!supPhotoFor)return; try{ const p=await compressImage(f,500,0.55); const idv=supPhotoFor; persist(Object.assign({},data,{supplyItems:(data.supplyItems||[]).map(i=>i.id===idv?Object.assign({},i,{photo:p}):i)})); setSupPhotoFor(null); }catch(err){} };
+  const onNotePhoto=async(e)=>{ const f=e.target.files&&e.target.files[0]; e.target.value=""; if(!f)return; if(!SB_ON){flash("共有DBが必要です");return;} try{ const id=uid()+"_"+Date.now(); const full=await compressImage(f,1200,0.7); const thumb=await compressImage(f,200,0.5); await sbInsertAttach({id,meta:{kind:"supply",name:f.name,type:"image",thumb},data:full,created:new Date().toISOString()}); persist(Object.assign({},data,{supplyNotePhotos:[...(data.supplyNotePhotos||[]),{id,name:f.name,thumb}]})); flash("写真を添付しました"); }catch(err){ flash("添付に失敗しました"); } };
+  const delNotePhoto=async(a)=>{ if(!confirm("この写真を外しますか？"))return; try{ await sbDeleteAttach(a.id); }catch(e){} persist(Object.assign({},data,{supplyNotePhotos:(data.supplyNotePhotos||[]).filter(x=>x.id!==a.id)})); };
   const hoDate=(ts)=>fmtDate(iso(new Date(ts)));
   const dt=(ts)=>{ const d=new Date(ts); return (d.getMonth()+1)+"/"+d.getDate()+" "+String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0"); };
   const list=(data.handovers||[]);
@@ -765,7 +768,9 @@ function Handover({me,data,persist}){
       <div className="composer"><textarea rows={1} value={newItem} placeholder="例：ペーパータオル" onChange={e=>setNewItem(e.target.value)}/><button className="send" onClick={addItem}>＋</button></div>
       <div className="rec-sub">備考</div>
       <Area label="" rows={3} value={note} onChange={e=>setNote(e.target.value)} placeholder="補充に関する自由メモ"/>
-      <div className="row-end"><Btn kind="ghost2" onClick={saveNote}>備考を保存</Btn></div>
+      <div className="row-between" style={{marginTop:2}}><button className="link-btn" onClick={()=>noteFileRef.current&&noteFileRef.current.click()}>📷 備考に写真を添付</button><Btn kind="ghost2" onClick={saveNote}>備考を保存</Btn></div>
+      <input ref={noteFileRef} type="file" accept="image/*" onChange={onNotePhoto} style={{display:"none"}}/>
+      {(data.supplyNotePhotos||[]).length>0&&<div className="ho-atts">{(data.supplyNotePhotos||[]).map(a=>(<div key={a.id} style={{position:"relative"}}><img className="ho-att-thumb" src={a.thumb} alt="" onClick={()=>openHoImg(a)}/><button className="thumb-x" onClick={()=>delNotePhoto(a)}>×</button></div>))}</div>}
     </>}
     <input ref={supFileRef} type="file" accept="image/*" onChange={onSupPhoto} style={{display:"none"}}/>
     {av&&<Modal title="添付" tint="#C9788F" onClose={()=>setAv(null)}>{av.meta&&av.meta.type==="pdf"?<embed src={av.data} type="application/pdf" style={{width:"100%",height:"60vh"}}/>:<img src={av.data} style={{width:"100%",borderRadius:8}} alt="添付"/>}</Modal>}
@@ -1060,7 +1065,7 @@ function App(){
       save(d);
     }
     // 旧データの補完
-    d.shifts=d.shifts||[]; d.philosophy=d.philosophy||""; d.materials=d.materials||[]; d.news=d.news||[]; d.hotaruUrl=d.hotaruUrl||""; d.timeline=d.timeline||[]; d.records=d.records||[]; d.recordItems=d.recordItems||REC_DEFAULT; d.dayPlans=d.dayPlans||{}; d.userList=d.userList||[]; d.handovers=d.handovers||[]; d.supplyItems=d.supplyItems||[]; d.supplyNote=d.supplyNote||"";
+    d.shifts=d.shifts||[]; d.philosophy=d.philosophy||""; d.materials=d.materials||[]; d.news=d.news||[]; d.hotaruUrl=d.hotaruUrl||""; d.timeline=d.timeline||[]; d.records=d.records||[]; d.recordItems=d.recordItems||REC_DEFAULT; d.dayPlans=d.dayPlans||{}; d.userList=d.userList||[]; d.handovers=d.handovers||[]; d.supplyItems=d.supplyItems||[]; d.supplyNote=d.supplyNote||""; d.supplyNotePhotos=d.supplyNotePhotos||[];
     if(localStorage.getItem("mizuho_staff_seeded")!=="1"){
       const have=new Set(d.accounts.map(a=>a.name));
       SEED_STAFF.forEach(s=>{ if(!have.has(s.name)) d.accounts.push({id:uid(),name:s.name,hash:s.hash,isAdmin:false}); });
@@ -1143,7 +1148,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.23〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.24〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
