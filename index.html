@@ -369,7 +369,11 @@ const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 const SB_ON = SUPABASE_URL.length>10 && SUPABASE_KEY.length>10;
 const sbHead = ()=>({ "apikey":SUPABASE_KEY, "Authorization":"Bearer "+SUPABASE_KEY, "Content-Type":"application/json" });
 async function sbGet(){ const r=await authFetch(`${SUPABASE_URL}/rest/v1/app_state?id=eq.1&select=data,updated_at`); if(!r.ok) throw new Error("sbGet "+r.status); const j=await r.json(); return (j&&j[0])?j[0]:null; }
-async function sbSave(data,ts){ const body=JSON.stringify({id:1,data,updated_at:ts||new Date().toISOString()}); await authFetch(`${SUPABASE_URL}/rest/v1/app_state`,{method:"POST",headers:{"Prefer":"resolution=merge-duplicates,return=minimal"},body}); }
+async function sbSave(data,ts){ const d2=Object.assign({},data); delete d2.records; const body=JSON.stringify({id:1,data:d2,updated_at:ts||new Date().toISOString()}); await authFetch(`${SUPABASE_URL}/rest/v1/app_state`,{method:"POST",headers:{"Prefer":"resolution=merge-duplicates,return=minimal"},body}); }
+async function recFetch(){ const r=await authFetch(`${SUPABASE_URL}/rest/v1/records?select=rec&order=ts.desc&limit=3000`); if(!r.ok) throw new Error("rec list "+r.status); const j=await r.json(); return j.map(x=>x.rec); }
+async function recAdd(rec){ const r=await authFetch(`${SUPABASE_URL}/rest/v1/records`,{method:"POST",headers:{"Prefer":"resolution=merge-duplicates,return=minimal"},body:JSON.stringify({id:rec.id,ts:rec.ts,rec})}); if(!r.ok) throw new Error("rec add "+r.status); }
+async function recUpdate(id,rec){ const r=await authFetch(`${SUPABASE_URL}/rest/v1/records?id=eq.${id}`,{method:"PATCH",headers:{"Prefer":"return=minimal"},body:JSON.stringify({ts:rec.ts,rec})}); if(!r.ok) throw new Error("rec upd "+r.status); }
+async function recDelete(id){ await authFetch(`${SUPABASE_URL}/rest/v1/records?id=eq.${id}`,{method:"DELETE"}); }
 async function sbInsertPhoto(rec){ const r=await authFetch(`${SUPABASE_URL}/rest/v1/photos`,{method:"POST",headers:{"Prefer":"return=minimal"},body:JSON.stringify(rec)}); if(!r.ok) throw new Error("photo insert "+r.status); }
 async function sbListPhotos(from,to){ let u=`${SUPABASE_URL}/rest/v1/photos?select=id,meta,created&order=created.desc&limit=300`; if(from) u+=`&created=gte.${from}T00:00:00`; if(to) u+=`&created=lte.${to}T23:59:59`; const r=await authFetch(u); if(!r.ok) throw new Error("photo list"); return await r.json(); }
 async function sbPhotoFull(id){ const r=await authFetch(`${SUPABASE_URL}/rest/v1/photos?id=eq.${id}&select=id,meta,image,created`); if(!r.ok) throw new Error("photo full"); const j=await r.json(); return j&&j[0]?j[0]:null; }
@@ -834,7 +838,7 @@ function Plans({me,data,persist}){
     </Modal>}
   </Section>;
 }
-function VitalsView({data,persist}){
+function VitalsView({data,persist,reload}){
   const users=Array.from(new Set([].concat(USERS4,(data.userList||[]),((data.records||[]).map(r=>r.user))))).filter(Boolean);
   const [user,setUser]=useState(users[0]||"利用者1");
   const [ed,setEd]=useState(null); const [toast,setToast]=useState("");
@@ -845,8 +849,8 @@ function VitalsView({data,persist}){
   const openNew=()=>{ const n=new Date(); setEd({id:"",y:n.getFullYear(),mo:n.getMonth()+1,da:n.getDate(),h:n.getHours(),mi:Math.floor(n.getMinutes()/5)*5,sys:"",dia:"",hr:"",temp:""}); };
   const openEdit=(r)=>{ const v=parseVit(r.item); const d=new Date(r.ts); setEd({id:r.id,y:d.getFullYear(),mo:d.getMonth()+1,da:d.getDate(),h:d.getHours(),mi:d.getMinutes(),sys:v.sys,dia:v.dia,hr:v.hr,temp:v.temp}); };
   const setE=(k,v)=>setEd(p=>Object.assign({},p,{[k]:v}));
-  const save=()=>{ const e=ed; const ts=new Date(e.y,e.mo-1,e.da,e.h,e.mi,0).toISOString(); const item=buildVitItem(e); const abn=vitAbn(e); let recs=(data.records||[]).slice(); if(e.id){ recs=recs.map(r=>r.id===e.id?Object.assign({},r,{ts,item,abn}):r); } else { recs.push({id:uid(),ts,user,item,abn}); } persist(Object.assign({},data,{records:recs})); setEd(null); flash("保存しました"); };
-  const del=(id)=>{ if(!confirm("この記録を削除しますか？"))return; persist(Object.assign({},data,{records:(data.records||[]).filter(r=>r.id!==id)})); };
+  const save=async()=>{ const e=ed; const ts=new Date(e.y,e.mo-1,e.da,e.h,e.mi,0).toISOString(); const item=buildVitItem(e); const abn=vitAbn(e); try{ if(e.id){ await recUpdate(e.id,{id:e.id,ts,user,item,abn}); } else { await recAdd({id:uid(),ts,user,item,abn}); } await reload(); setEd(null); flash("保存しました"); }catch(err){ flash("保存に失敗しました"); } };
+  const del=async(id)=>{ if(!confirm("この記録を削除しますか？"))return; try{ await recDelete(id); await reload(); }catch(e){} };
   const YEARS=[]; for(let y=2015;y<=new Date().getFullYear()+1;y++)YEARS.push(y); const MO=[]; for(let m=1;m<=12;m++)MO.push(m); const DA=[]; for(let dd=1;dd<=31;dd++)DA.push(dd); const HH=[]; for(let h=0;h<=23;h++)HH.push(h); const MI=[]; for(let m=0;m<60;m+=5)MI.push(m);
   return <Section title="バイタル一覧" note="利用者ごとの血圧・脈拍・体温の一覧です。記録タブの入力が自動反映されます。過去分の手入力・修正もできます。">
     <label className="field"><span>利用者</span><select value={user} onChange={e=>setUser(e.target.value)}>{users.map(u=><option key={u} value={u}>{u}</option>)}</select></label>
@@ -880,7 +884,7 @@ function VitalsView({data,persist}){
     {toast&&<div className="toast">{toast}</div>}
   </Section>;
 }
-function Records({me,data,persist}){
+function Records({me,data,persist,reload}){
   const items=data.recordItems||REC_DEFAULT;
   const [sel,setSel]=useState(["利用者1"]);
   const [date,setDate]=useState(()=>{const n=new Date();return (n.getHours()*60+n.getMinutes())<(15*60)?iso(addDays(n,-1)):iso(n);});
@@ -899,17 +903,17 @@ function Records({me,data,persist}){
   const _bs=new Date(date+"T15:00:00"); const _be=(()=>{const e=addDays(new Date(date+"T00:00:00"),1); e.setHours(15,0,0,0); return e;})();
   const log=(data.records||[]).filter(r=>{ const t=new Date(r.ts); return t>=_bs && t<_be; }).sort((a,b)=>b.ts.localeCompare(a.ts));
   const rplan=(data.dayPlans||{})[date]||{}; const dayUsers=(rplan.users&&rplan.users.length)?rplan.users:USERS4;
-  const pushRecords=(item,extra,tsOverride)=>{ if(sel.length===0){ flash("利用者を選んでください"); return false; } const ts=tsOverride||new Date().toISOString(); const recs=sel.map(u=>Object.assign({id:uid(),ts,user:u,item},extra||{})); persist({...data,records:[...(data.records||[]),...recs]}); return true; };
+  const pushRecords=async(item,extra,tsOverride)=>{ if(sel.length===0){ flash("利用者を選んでください"); return false; } const ts=tsOverride||new Date().toISOString(); const recs=sel.map(u=>Object.assign({id:uid(),ts,user:u,item},extra||{})); try{ for(const rc of recs) await recAdd(rc); await reload(); return true; }catch(e){ flash("保存に失敗しました"); return false; } };
   const bizTs=()=>{ const bd=new Date(mDate+"T00:00:00"); const cal=(+mH>=15)?bd:addDays(bd,1); cal.setHours(+mH,+mM,0,0); return cal.toISOString(); };
-  const addRecord=(item)=>{ if(pushRecords(item)) flash("記録："+sel.join("・")+" "+item); };
-  const addNote=()=>{ if(!note.trim())return; if(pushRecords(note.trim())){ flash("記録しました（現在時刻）"); setNote(""); } };
-  const addNoteAt=()=>{ if(!note.trim()){ flash("記録内容を入力してください"); return; } if(pushRecords(note.trim(),null,bizTs())){ flash("記録しました（指定時刻）"); setNote(""); } };
-  const delRec=(id)=>persist({...data,records:(data.records||[]).filter(r=>r.id!==id)});
-  const submitVit=()=>{ const v=vit; const item=buildVitItem(v); if(item==="🩺 "){ flash("数値を入力してください"); return; } const abn=vitAbn(v); if(pushRecords(item, abn?{abn:true}:null)){ if(abn){ setVit(null); setValert(v.re?"second":"first"); } else { flash("バイタルを記録しました"); setVit(null); } } };
+  const addRecord=async(item)=>{ if(await pushRecords(item)) flash("記録："+sel.join("・")+" "+item); };
+  const addNote=async()=>{ if(!note.trim())return; if(await pushRecords(note.trim())){ flash("記録しました（現在時刻）"); setNote(""); } };
+  const addNoteAt=async()=>{ if(!note.trim()){ flash("記録内容を入力してください"); return; } if(await pushRecords(note.trim(),null,bizTs())){ flash("記録しました（指定時刻）"); setNote(""); } };
+  const delRec=async(id)=>{ try{ await recDelete(id); await reload(); }catch(e){} };
+  const submitVit=async()=>{ const v=vit; const item=buildVitItem(v); if(item==="🩺 "){ flash("数値を入力してください"); return; } const abn=vitAbn(v); if(await pushRecords(item, abn?{abn:true}:null)){ if(abn){ setVit(null); setValert(v.re?"second":"first"); } else { flash("バイタルを記録しました"); setVit(null); } } };
   const loadPhotos=async()=>{ if(!SB_ON){ setPhotos([]); return; } try{ setPhotos(await sbListPhotos(af,at)); }catch(e){ setPhotos([]); } };
   useEffect(()=>{ if(view==="album"){ setPhotos(null); loadPhotos(); } },[view,af,at]);
   useEffect(()=>{ setSel(dayUsers.length?[dayUsers[0]]:["利用者1"]); },[date]);
-  const onFile=async(e)=>{ const f=e.target.files&&e.target.files[0]; e.target.value=""; if(!f)return; if(sel.length===0){ flash("先に利用者を選んでください"); return; } if(!SB_ON){ flash("写真の保存には共有DBの設定が必要です"); return; } setBusy(true); try{ const full=await compressImage(f,900,0.6); const thumb=await compressImage(f,160,0.5); const id=uid()+"_"+Date.now(); const ts=new Date().toISOString(); await sbInsertPhoto({id, meta:{users:sel, ts, thumb}, image:full, created:ts}); pushRecords("📷 写真",{photoId:id, thumb}); flash("写真を記録しました"); }catch(err){ flash("写真の保存に失敗（写真表の設定をご確認ください）"); } finally{ setBusy(false); } };
+  const onFile=async(e)=>{ const f=e.target.files&&e.target.files[0]; e.target.value=""; if(!f)return; if(sel.length===0){ flash("先に利用者を選んでください"); return; } if(!SB_ON){ flash("写真の保存には共有DBの設定が必要です"); return; } setBusy(true); try{ const full=await compressImage(f,900,0.6); const thumb=await compressImage(f,160,0.5); const id=uid()+"_"+Date.now(); const ts=new Date().toISOString(); await sbInsertPhoto({id, meta:{users:sel, ts, thumb}, image:full, created:ts}); await pushRecords("📷 写真",{photoId:id, thumb}); flash("写真を記録しました"); }catch(err){ flash("写真の保存に失敗（写真表の設定をご確認ください）"); } finally{ setBusy(false); } };
   const openFull=async(id)=>{ if(!id||!SB_ON)return; try{ const p=await sbPhotoFull(id); if(p) setPv(p); else flash("写真が見つかりません"); }catch(e){ flash("写真を開けませんでした"); } };
   const delPhoto=async(id)=>{ if(!confirm("この写真を削除しますか？"))return; try{ await sbDeletePhoto(id); setPhotos(p=>(p||[]).filter(x=>x.id!==id)); setPv(null); }catch(e){} };
   const addItem=()=>{ if(!newItem.trim())return; persist({...data,recordItems:[...items,newItem.trim()]}); setNewItem(""); };
@@ -1043,6 +1047,7 @@ function App(){
   const [showInstall,setShowInstall]=useState(false);
   const tsRef=useRef(null);
   const [sbAuthed,setSbAuthed]=useState(()=>!SB_ON||!!authLoad());
+  const refreshRecords=async()=>{ if(!SB_ON) return; try{ const rows=await recFetch(); setData(prev=>prev?Object.assign({},prev,{records:rows}):prev); }catch(e){} };
   const [alarm,setAlarm]=useState(null);
   const audioRef=useRef(null); const firedRef=useRef({});
   const playChime=()=>{ try{ const ac=audioRef.current; if(!ac) return; if(ac.state==="suspended") ac.resume(); const t0=ac.currentTime; [880,1108.73,1318.51].forEach((f,i)=>{ const o=ac.createOscillator(),g=ac.createGain(); o.type="sine"; o.frequency.value=f; o.connect(g); g.connect(ac.destination); const t=t0+i*0.18; g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(0.25,t+0.02); g.gain.exponentialRampToValueAtTime(0.0001,t+0.9); o.start(t); o.stop(t+0.95); }); }catch(e){} };
@@ -1076,9 +1081,9 @@ function App(){
     setData(d);
     const standalone=(window.matchMedia&&window.matchMedia("(display-mode: standalone)").matches)||window.navigator.standalone===true;
     if(!standalone && !localStorage.getItem("mizuho_install_done")) setShowInstall(true);
-    if(SB_ON){ try{ const row=await sbGet(); if(row&&row.data&&Object.keys(row.data).length>0){ tsRef.current=row.updated_at||null; setData(row.data); } else { const ts=new Date().toISOString(); tsRef.current=ts; await sbSave(d,ts); } }catch(e){console.error("sb init",e);} }
+    if(SB_ON){ try{ const row=await sbGet(); if(row&&row.data&&Object.keys(row.data).length>0){ let rd=row.data; if(!rd.recMigrated && (rd.records||[]).length){ try{ for(const rc of rd.records){ await recAdd(rc); } }catch(e){} rd=Object.assign({},rd,{recMigrated:true}); try{ await sbSave(rd,new Date().toISOString()); }catch(e){} } tsRef.current=row.updated_at||null; setData(rd); } else { const ts=new Date().toISOString(); tsRef.current=ts; await sbSave(d,ts); } await refreshRecords(); }catch(e){console.error("sb init",e);} }
   })();},[sbAuthed]);
-  useEffect(()=>{ if(!SB_ON||!sbAuthed) return; const iv=setInterval(async()=>{ try{ const row=await sbGet(); if(row&&row.updated_at&&row.updated_at!==tsRef.current){ tsRef.current=row.updated_at; if(row.data&&Object.keys(row.data).length>0) setData(row.data); } }catch(e){} },12000); return ()=>clearInterval(iv); },[sbAuthed]);
+  useEffect(()=>{ if(!SB_ON||!sbAuthed) return; const iv=setInterval(async()=>{ try{ const row=await sbGet(); if(row&&row.updated_at&&row.updated_at!==tsRef.current){ tsRef.current=row.updated_at; if(row.data&&Object.keys(row.data).length>0) setData(prev=>Object.assign({},row.data,{records:(prev&&prev.records)||[]})); } }catch(e){} try{ await refreshRecords(); }catch(e){} },12000); return ()=>clearInterval(iv); },[sbAuthed]);
 
   const persist=(next)=>{ setData(next); save(next); if(SB_ON){ const ts=new Date().toISOString(); tsRef.current=ts; sbSave(next,ts).catch(()=>{}); } };
   const logout=()=>{localStorage.removeItem("mizuho_session");setMe(null);};
@@ -1148,7 +1153,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.24〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.25〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
@@ -1215,8 +1220,8 @@ function Inside({me,data,tab,setTab,onLogout,persist}){
       {tab==="schedule"&&<Schedule me={me} data={data} persist={persist}/>}
       {tab==="handover"&&<Handover me={me} data={data} persist={persist}/>}
       {tab==="shifts"&&<Shifts me={me} data={data} persist={persist}/>}
-      {tab==="records"&&<Records me={me} data={data} persist={persist}/>}
-      {tab==="vitals"&&<VitalsView data={data} persist={persist}/>}
+      {tab==="records"&&<Records me={me} data={data} persist={persist} reload={refreshRecords}/>}
+      {tab==="vitals"&&<VitalsView data={data} persist={persist} reload={refreshRecords}/>}
       {tab==="plans"&&<Plans me={me} data={data} persist={persist}/>}
       {tab==="nisshi"&&<Nisshi me={me} data={data}/>}
       {tab==="work"&&<Work/>}
