@@ -1146,7 +1146,7 @@ function App(){
     {showInstall && <InstallPrompt onNever={()=>dismissInstall(true)} onLater={()=>dismissInstall(false)}/>}
       {alarm && <AlarmPopup type={alarm.type} onClose={()=>setAlarm(null)}/>}
     {me
-      ? <Inside me={me} data={data} tab={tab} setTab={setTab} onLogout={logout} persist={persist}/>
+      ? <Inside me={me} data={data} tab={tab} setTab={setTab} onLogout={logout} persist={persist} reload={refreshRecords}/>
       : <Top data={data} season={season} onPick={a=>{setLogin(a);setErr("");}} onAdminReg={()=>setAdminReg(true)} onHotaru={()=>setHotaruOpen(true)} onSbLogout={()=>{authClear();setSbAuthed(false);}}/>}
 
     {login && <Modal title={`${login.name} さん  ―  パスワード`} onClose={()=>{setLogin(null);setPw("");setErr("");}}>
@@ -1200,7 +1200,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.30〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.31〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
@@ -1253,7 +1253,7 @@ const TABS=[
   {id:"materials",label:"研修資料"},
   {id:"history",label:"あゆみ"},
 ];
-function Inside({me,data,tab,setTab,onLogout,persist}){
+function Inside({me,data,tab,setTab,onLogout,persist,reload}){
   const tabs=me.isAdmin?[...TABS,{id:"admin",label:"管理者パネル"}]:TABS;
   return <div className="inside">
     <header className="ins-head">
@@ -1267,8 +1267,8 @@ function Inside({me,data,tab,setTab,onLogout,persist}){
       {tab==="schedule"&&<Schedule me={me} data={data} persist={persist}/>}
       {tab==="handover"&&<Handover me={me} data={data} persist={persist}/>}
       {tab==="shifts"&&<Shifts me={me} data={data} persist={persist}/>}
-      {tab==="records"&&<Records me={me} data={data} persist={persist} reload={refreshRecords}/>}
-      {tab==="vitals"&&<VitalsView data={data} persist={persist} reload={refreshRecords}/>}
+      {tab==="records"&&<Records me={me} data={data} persist={persist} reload={reload}/>}
+      {tab==="vitals"&&<VitalsView data={data} persist={persist} reload={reload}/>}
       {tab==="plans"&&<Plans me={me} data={data} persist={persist}/>}
       {tab==="nisshi"&&<Nisshi me={me} data={data}/>}
       {tab==="work"&&<Work/>}
