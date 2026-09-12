@@ -702,7 +702,10 @@ function DayPlanModal({data,persist,date,onClose}){
   const [u,setU]=useState(()=>{ const a=(cur.users||[]).slice(0,4); while(a.length<4)a.push(""); return a; });
   const [s1,setS1]=useState(cur.s1||""); const [s2,setS2]=useState(cur.s2||""); const [newU,setNewU]=useState("");
   const addUser=()=>{ const n=newU.trim(); if(!n)return; if(!userList.includes(n)) persist({...data,userList:[...userList,n]}); setNewU(""); };
-  const save=()=>{ const users=u.map(x=>x.trim()).filter(Boolean).slice(0,4); persist({...data,dayPlans:Object.assign({},data.dayPlans||{},{[date]:{users,s1:s1.trim(),s2:s2.trim()}})}); onClose(); };
+  const save=()=>{ const users=u.map(x=>x.trim()).filter(Boolean).slice(0,4); let ns1=s1.trim(), ns2=s2.trim(); let shifts=(data.shifts||[]).slice();
+    const resolve=(role,nm)=>{ if(!nm) return nm; const idx=shifts.findIndex(s=>s.date===date&&s.role===role); if(idx>=0){ if(shifts[idx].name!==nm){ if(confirm("職員シフト（"+(role==="A"?"夜勤A":"夜勤B")+"）は「"+shifts[idx].name+"」です。\nOK＝この予定「"+nm+"」に統一 ／ キャンセル＝シフト「"+shifts[idx].name+"」に合わせる")){ shifts[idx]=Object.assign({},shifts[idx],{name:nm}); return nm; } else { return shifts[idx].name; } } return nm; } else { shifts.push({id:uid(),date,name:nm,role,start:"15:30",end:"09:30",note:""}); return nm; } };
+    ns1=resolve("A",ns1); ns2=resolve("B",ns2);
+    persist(Object.assign({},data,{dayPlans:Object.assign({},data.dayPlans||{},{[date]:{users,s1:ns1,s2:ns2}}),shifts})); onClose(); };
   return <Modal title={fmtDate(date)+" の利用者・支援員"} tint="#C9788F" onClose={onClose}>
     <p className="hint">この日（{fmtDate(date)} 15:30〜翌9:30）の担当と利用者を設定します。保存すると記録・タイムライン・日誌に反映されます。</p>
     <div className="rec-sub" style={{marginTop:0}}>支援員（夜勤A＝支援1／夜勤B＝支援2）</div>
@@ -1175,7 +1178,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.26〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.27〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
@@ -1622,8 +1625,12 @@ function Shifts({me,data,persist}){
   const label=`${weekStart.getMonth()+1}/${weekStart.getDate()} 〜 ${addDays(weekStart,6).getMonth()+1}/${addDays(weekStart,6).getDate()}`;
   const add=()=>{
     if(!form.name.trim())return;
-    persist({...data,shifts:[...data.shifts,{id:uid(),...form,name:form.name.trim()}]}); setOpen(false);
-    setForm({...form,note:""});
+    const nm=form.name.trim();
+    const shift={id:uid(),date:form.date,name:nm,role:form.role,start:form.start,end:form.end,note:form.note};
+    let dp=Object.assign({},data.dayPlans||{});
+    if(form.role==="A"||form.role==="B"){ const key=form.role==="A"?"s1":"s2"; const cur=Object.assign({},dp[form.date]||{}); if(cur[key]&&cur[key]!==nm){ if(confirm("この日の"+(form.role==="A"?"支援1":"支援2")+"は現在「"+cur[key]+"」です。「"+nm+"」に更新しますか？")){ cur[key]=nm; dp[form.date]=cur; } } else { cur[key]=nm; dp[form.date]=cur; } }
+    persist(Object.assign({},data,{shifts:[...(data.shifts||[]),shift],dayPlans:dp})); setOpen(false);
+    setForm(Object.assign({},form,{note:""}));
   };
   const remove=(id)=>{ if(!confirm("このシフトを削除しますか？"))return; persist({...data,shifts:data.shifts.filter(s=>s.id!==id)}); };
   return <Section title="シフト" note="職員の勤務予定です。管理者が登録・削除できます。">
