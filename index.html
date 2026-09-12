@@ -373,7 +373,7 @@ const SB_ON = SUPABASE_URL.length>10 && SUPABASE_KEY.length>10;
 const sbHead = ()=>({ "apikey":SUPABASE_KEY, "Authorization":"Bearer "+SUPABASE_KEY, "Content-Type":"application/json" });
 async function sbGet(){ const r=await authFetch(`${SUPABASE_URL}/rest/v1/app_state?id=eq.1&select=data,updated_at`); if(!r.ok) throw new Error("sbGet "+r.status); const j=await r.json(); return (j&&j[0])?j[0]:null; }
 async function sbSave(data,ts){ const d2=Object.assign({},data); delete d2.records; const body=JSON.stringify({id:1,data:d2,updated_at:ts||new Date().toISOString()}); await authFetch(`${SUPABASE_URL}/rest/v1/app_state`,{method:"POST",headers:{"Prefer":"resolution=merge-duplicates,return=minimal"},body}); }
-async function recFetch(){ const r=await authFetch(`${SUPABASE_URL}/rest/v1/records?select=rec&order=ts.desc&limit=3000`); if(!r.ok) throw new Error("rec list "+r.status); const j=await r.json(); return j.map(x=>x.rec); }
+async function recFetch(){ const r=await authFetch(`${SUPABASE_URL}/rest/v1/records?select=rec&order=ts.desc&limit=3000`); if(!r.ok) throw new Error("rec list "+r.status); const j=await r.json(); return j.map(x=>x.rec).filter(Boolean); }
 async function recAdd(rec){ const r=await authFetch(`${SUPABASE_URL}/rest/v1/records`,{method:"POST",headers:{"Prefer":"resolution=merge-duplicates,return=minimal"},body:JSON.stringify({id:rec.id,ts:rec.ts,rec})}); if(!r.ok) throw new Error("rec add "+r.status); }
 async function recUpdate(id,rec){ const r=await authFetch(`${SUPABASE_URL}/rest/v1/records?id=eq.${id}`,{method:"PATCH",headers:{"Prefer":"return=minimal"},body:JSON.stringify({ts:rec.ts,rec})}); if(!r.ok) throw new Error("rec upd "+r.status); }
 async function recDelete(id){ await authFetch(`${SUPABASE_URL}/rest/v1/records?id=eq.${id}`,{method:"DELETE"}); }
@@ -429,7 +429,7 @@ const REC_MINS=(()=>{const a=[];for(let m=0;m<60;m+=5)a.push(m);return a;})();
 const REC_GROUPS=[
   {g:"バイタル・測定", items:["血糖値測定"]},
   {g:"服薬", items:["服薬"]},
-  {g:"食事・水分", items:["食事","水分補給"]},
+  {g:"食事・水分", items:["食事","水分補給","メニュー"]},
   {g:"排泄", items:["トイレ（小）","トイレ（大）"]},
   {g:"症状", items:["くしゃみ","せき","鼻水"]},
   {g:"生活・活動", items:["起床","就寝","入浴","巡回","来所","帰宅"]},
@@ -444,6 +444,7 @@ async function sha256(t){
   catch{ let h=0; for(let i=0;i<t.length;i++) h=(h*31+t.charCodeAt(i))|0; return "x"+(h>>>0).toString(16); }
 }
 const uid=()=>Math.random().toString(36).slice(2,9);
+function ageFrom(b){ if(!b) return ""; const d=new Date(b); if(isNaN(d.getTime())) return ""; const t=new Date(); let a=t.getFullYear()-d.getFullYear(); const m=t.getMonth()-d.getMonth(); if(m<0||(m===0&&t.getDate()<d.getDate())) a--; return a<0?"":a; }
 const today=()=>{const d=new Date();return `${d.getFullYear()}.${d.getMonth()+1}.${d.getDate()}`;};
 const SEED_STAFF=[
   {name:"宇野 晶子",hash:"dd1492fb13d56a4f2d3b5892b075f63415516dc935b7cf9dedb6d80437ab02e3"},
@@ -914,7 +915,8 @@ function Records({me,data,persist,reload}){
   const [view,setView]=useState("log"); const [photos,setPhotos]=useState(null);
   const [busy,setBusy]=useState(false); const [pv,setPv]=useState(null);
   const [editItems,setEditItems]=useState(false); const [newItem,setNewItem]=useState("");
-  const [vit,setVit]=useState(null); const [valert,setValert]=useState(null); const [sp,setSp]=useState(null);
+  const [vit,setVit]=useState(null); const [valert,setValert]=useState(null); const [sp,setSp]=useState(null); const [edRec,setEdRec]=useState(null);
+  const EY=[]; for(let y=2015;y<=new Date().getFullYear()+1;y++)EY.push(y); const EMO=[]; for(let m=1;m<=12;m++)EMO.push(m); const EDA=[]; for(let dd=1;dd<=31;dd++)EDA.push(dd); const EHH=[]; for(let h=0;h<=23;h++)EHH.push(h); const EMI=[]; for(let m=0;m<60;m+=5)EMI.push(m);
   const [af,setAf]=useState(iso(addDays(new Date(),-7))); const [at,setAt]=useState(iso(new Date()));
   const [dpOpen,setDpOpen]=useState(false);
   const fileRef=useRef(null);
@@ -926,12 +928,15 @@ function Records({me,data,persist,reload}){
   const rplan=(data.dayPlans||{})[date]||{}; const dayUsers=(rplan.users&&rplan.users.length)?rplan.users:USERS4;
   const pushRecords=async(item,extra,tsOverride)=>{ if(sel.length===0){ flash("利用者を選んでください"); return false; } const ts=tsOverride||new Date().toISOString(); const recs=sel.map(u=>Object.assign({id:uid(),ts,user:u,item},extra||{})); try{ for(const rc of recs) await recAdd(rc); await reload(); return true; }catch(e){ flash("保存に失敗しました"); return false; } };
   const bizTs=()=>{ const bd=new Date(mDate+"T00:00:00"); const cal=(+mH>=15)?bd:addDays(bd,1); cal.setHours(+mH,+mM,0,0); return cal.toISOString(); };
-  const tapItem=(it)=>{ if(it==="巡回") setSp({type:"patrol",checks:{},val:""}); else if(it==="服薬") setSp({type:"med",checks:{},val:""}); else if(it==="血糖値測定") setSp({type:"glu",checks:{},val:""}); else addRecord(it); };
-  const submitSp=async()=>{ let item=""; if(sp.type==="patrol"){ const c=PATROL_OPTS.filter(o=>sp.checks[o]); if(!c.length){flash("項目を選んでください");return;} item="巡回："+c.join("・"); } else if(sp.type==="med"){ const c=MED_OPTS.filter(o=>sp.checks[o]); if(!c.length){flash("項目を選んでください");return;} item="服薬："+c.join("・"); } else { if(!sp.val){flash("数値を入力してください");return;} item="血糖値 "+sp.val+" mg/dL"; } if(await pushRecords(item)){ flash("記録しました"); setSp(null); } };
+  const tapItem=(it)=>{ if(it==="巡回") setSp({type:"patrol",checks:{},val:""}); else if(it==="服薬") setSp({type:"med",checks:{},val:""}); else if(it==="血糖値測定") setSp({type:"glu",checks:{},val:""}); else if(it==="メニュー") setSp({type:"menu",checks:{},val:""}); else addRecord(it); };
+  const submitSp=async()=>{ let item=""; if(sp.type==="patrol"){ const c=PATROL_OPTS.filter(o=>sp.checks[o]); if(!c.length){flash("項目を選んでください");return;} item="巡回："+c.join("・"); } else if(sp.type==="med"){ const c=MED_OPTS.filter(o=>sp.checks[o]); if(!c.length){flash("項目を選んでください");return;} item="服薬："+c.join("・"); } else if(sp.type==="glu"){ if(!sp.val){flash("数値を入力してください");return;} item="血糖値 "+sp.val+" mg/dL"; } else { const meals=["晩","朝"].filter(m=>sp.checks[m]); if(!meals.length){flash("晩か朝を選んでください");return;} if(!sp.val.trim()){flash("メニューを入力してください");return;} item="メニュー（"+meals.join("・")+"）："+sp.val.trim(); } if(await pushRecords(item)){ flash("記録しました"); setSp(null); } };
   const addRecord=async(item)=>{ if(await pushRecords(item)) flash("記録："+sel.join("・")+" "+item); };
   const addNote=async()=>{ if(!note.trim())return; if(await pushRecords(note.trim())){ flash("記録しました（現在時刻）"); setNote(""); } };
   const addNoteAt=async()=>{ if(!note.trim()){ flash("記録内容を入力してください"); return; } if(await pushRecords(note.trim(),null,bizTs())){ flash("記録しました（指定時刻）"); setNote(""); } };
   const delRec=async(id)=>{ try{ await recDelete(id); await reload(); }catch(e){} };
+  const openEditRec=(r)=>{ const d=new Date(r.ts); setEdRec({id:r.id,user:r.user,abn:r.abn,thumb:r.thumb,photoId:r.photoId,y:d.getFullYear(),mo:d.getMonth()+1,da:d.getDate(),h:d.getHours(),mi:d.getMinutes(),item:r.item||""}); };
+  const setER=(k,v)=>setEdRec(p=>Object.assign({},p,{[k]:v}));
+  const saveEditRec=async()=>{ const e=edRec; if(!(e.item||"").trim()){flash("内容を入力してください");return;} const ts=new Date(e.y,e.mo-1,e.da,e.h,e.mi,0).toISOString(); const rec={id:e.id,ts,user:e.user,item:e.item.trim()}; if(e.abn)rec.abn=true; if(e.thumb)rec.thumb=e.thumb; if(e.photoId)rec.photoId=e.photoId; try{ await recUpdate(e.id,rec); await reload(); setEdRec(null); flash("修正しました"); }catch(err){ flash("修正に失敗しました"); } };
   const submitVit=async()=>{ const v=vit; const item=buildVitItem(v); if(item==="🩺 "){ flash("数値を入力してください"); return; } const abn=vitAbn(v); if(await pushRecords(item, abn?{abn:true}:null)){ if(abn){ setVit(null); setValert(v.re?"second":"first"); } else { flash("バイタルを記録しました"); setVit(null); } } };
   const loadPhotos=async()=>{ if(!SB_ON){ setPhotos([]); return; } try{ setPhotos(await sbListPhotos(af,at)); }catch(e){ setPhotos([]); } };
   useEffect(()=>{ if(view==="album"){ setPhotos(null); loadPhotos(); } },[view,af,at]);
@@ -950,7 +955,7 @@ function Records({me,data,persist,reload}){
     </div>
     {view==="log"&&<>
       <div className="rec-quick">
-        <button className="recbtn vit" onClick={()=>setVit({sys:"",dia:"",hr:"",temp:""})}>🩺 血圧・体温</button>
+        <button className="recbtn vit" onClick={()=>setVit({sys:"",dia:"",hr:"",temp:""})}>🩺 バイタル測定（血圧・体温）</button>
         <button className="recbtn cam" onClick={()=>fileRef.current&&fileRef.current.click()} disabled={busy}>📷 写真</button>
       </div>
       {REC_GROUPS.map(grp=>(<div key={grp.g} className="rec-group"><div className="rec-gtitle">{grp.g}</div><div className="rec-items">{grp.items.slice().sort((a,b)=>a.localeCompare(b,"ja")).map(it=>(<button key={it} className="recbtn" onClick={()=>tapItem(it)}>{it}</button>))}</div></div>))}
@@ -989,7 +994,7 @@ function Records({me,data,persist,reload}){
         <span className="rec-time">{hm(r.ts)}</span><span className="chip">{r.user}</span>
         {r.thumb&&<img className="rec-thumb" src={r.thumb} alt="写真" onClick={()=>openFull(r.photoId)}/>}
         <span className={"rec-item"+(r.abn?" abn":"")}>{r.item}</span>
-        <button className="mini-del" onClick={()=>delRec(r.id)}>🗑</button></div>))}</div>
+        <button className="mini-key" onClick={()=>openEditRec(r)}>✏️</button><button className="mini-del" onClick={()=>delRec(r.id)}>🗑</button></div>))}</div>
     </>}
     {view==="album"&&<div>
       <div className="album-filter">
@@ -1003,7 +1008,7 @@ function Records({me,data,persist,reload}){
     </div>}
     {dpOpen&&<DayPlanModal data={data} persist={persist} date={date} onClose={()=>setDpOpen(false)}/>}
     {toast&&<div className="toast">{toast}</div>}
-    {vit&&<Modal title="🩺 血圧・体温の記録" tint="#C9788F" onClose={()=>setVit(null)}>
+    {vit&&<Modal title="🩺 バイタル測定（血圧・体温）" tint="#C9788F" onClose={()=>setVit(null)}>
       <p className="hint">数値だけ入力してください（単位は自動で付きます）。来所時・起床時に測定。</p>
       <div className="vit-grid">
         <label className="field"><span>最高血圧</span><div className="unitwrap"><input type="number" inputMode="decimal" value={vit.sys} onChange={e=>setVit({...vit,sys:e.target.value})}/><em>mmHg</em></div></label>
@@ -1023,9 +1028,23 @@ function Records({me,data,persist,reload}){
       <p className="hint">再測定でも基準範囲外でした。いったんこの数値で記録します。以降の再測定は不要ですが、日中にご本人の様子がおかしい・体調不良の際は、必ず再測定してください。</p>
       <div className="row-end"><Btn onClick={()=>setValert(null)}>確認しました</Btn></div>
     </Modal>}
-    {sp&&<Modal title={sp.type==="patrol"?"巡回の記録":(sp.type==="med"?"服薬の記録":"血糖値の記録")} tint="#C9788F" onClose={()=>setSp(null)}>
-      {sp.type==="glu"?<label className="field"><span>血糖値</span><div className="unitwrap"><input type="number" inputMode="decimal" value={sp.val} onChange={e=>setSp(Object.assign({},sp,{val:e.target.value}))}/><em>mg/dL</em></div></label>:<div className="chk-grid" style={{gridTemplateColumns:"repeat(2,1fr)"}}>{(sp.type==="patrol"?PATROL_OPTS:MED_OPTS).map(o=><label className="chk" key={o}><input type="checkbox" checked={!!sp.checks[o]} onChange={e=>setSp(Object.assign({},sp,{checks:Object.assign({},sp.checks,{[o]:e.target.checked})}))}/>{o}</label>)}</div>}
+    {sp&&<Modal title={sp.type==="patrol"?"巡回の記録":sp.type==="med"?"服薬の記録":sp.type==="glu"?"血糖値の記録":"食事メニューの記録"} tint="#C9788F" onClose={()=>setSp(null)}>
+      {sp.type==="glu"?<label className="field"><span>血糖値</span><div className="unitwrap"><input type="number" inputMode="decimal" value={sp.val} onChange={e=>setSp(Object.assign({},sp,{val:e.target.value}))}/><em>mg/dL</em></div></label>:sp.type==="menu"?<><div className="chk-row"><label className="chk"><input type="checkbox" checked={!!sp.checks["晩"]} onChange={e=>setSp(Object.assign({},sp,{checks:Object.assign({},sp.checks,{"晩":e.target.checked})}))}/>晩</label><label className="chk"><input type="checkbox" checked={!!sp.checks["朝"]} onChange={e=>setSp(Object.assign({},sp,{checks:Object.assign({},sp.checks,{"朝":e.target.checked})}))}/>朝</label></div><Area label="食事メニュー" rows={3} value={sp.val} onChange={e=>setSp(Object.assign({},sp,{val:e.target.value}))} placeholder="例：ごはん、味噌汁、焼き魚 …"/></>:<div className="chk-grid" style={{gridTemplateColumns:"repeat(2,1fr)"}}>{(sp.type==="patrol"?PATROL_OPTS:MED_OPTS).map(o=><label className="chk" key={o}><input type="checkbox" checked={!!sp.checks[o]} onChange={e=>setSp(Object.assign({},sp,{checks:Object.assign({},sp.checks,{[o]:e.target.checked})}))}/>{o}</label>)}</div>}
       <div className="row-end"><Btn onClick={submitSp}>記録する</Btn></div>
+    </Modal>}
+    {edRec&&<Modal title="記録の修正" tint="#C9788F" onClose={()=>setEdRec(null)}>
+      <p className="hint">時刻と内容を修正できます。</p>
+      <div className="chk-grid" style={{gridTemplateColumns:"repeat(3,1fr)"}}>
+        <label className="field"><span>年</span><select value={edRec.y} onChange={e=>setER("y",+e.target.value)}>{EY.map(y=><option key={y} value={y}>{y}</option>)}</select></label>
+        <label className="field"><span>月</span><select value={edRec.mo} onChange={e=>setER("mo",+e.target.value)}>{EMO.map(m=><option key={m} value={m}>{m}</option>)}</select></label>
+        <label className="field"><span>日</span><select value={edRec.da} onChange={e=>setER("da",+e.target.value)}>{EDA.map(dd=><option key={dd} value={dd}>{dd}</option>)}</select></label>
+      </div>
+      <div className="chk-grid" style={{gridTemplateColumns:"repeat(2,1fr)"}}>
+        <label className="field"><span>時</span><select value={edRec.h} onChange={e=>setER("h",+e.target.value)}>{EHH.map(h=><option key={h} value={h}>{h}時</option>)}</select></label>
+        <label className="field"><span>分</span><select value={edRec.mi} onChange={e=>setER("mi",+e.target.value)}>{EMI.map(m=><option key={m} value={m}>{String(m).padStart(2,"0")}分</option>)}</select></label>
+      </div>
+      <Area label="内容" rows={3} value={edRec.item} onChange={e=>setER("item",e.target.value)}/>
+      <div className="row-end"><Btn onClick={saveEditRec}>修正を保存</Btn></div>
     </Modal>}
     {pv&&<Modal title="記録写真" tint="#C9788F" onClose={()=>setPv(null)}>
       <img src={pv.image} style={{width:"100%",borderRadius:12}} alt="記録写真"/>
@@ -1181,7 +1200,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.28〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.29〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
@@ -1501,7 +1520,7 @@ function ResidentForm({init,onCancel,onSave}){
     <div className="nf"><label>ふりがな</label><input value={d.furigana||""} onChange={e=>set("furigana",e.target.value)}/></div>
     <div className="nf2">
       <div className="nf"><label>性別</label><div className="chk-row"><label className="chk"><input type="radio" name="sex" checked={d.sex==="男性"} onChange={()=>set("sex","男性")}/>男性</label><label className="chk"><input type="radio" name="sex" checked={d.sex==="女性"} onChange={()=>set("sex","女性")}/>女性</label></div></div>
-      <div className="nf"><label>年齢</label><select value={d.age||""} onChange={e=>set("age",e.target.value)}><option value="">選択</option>{AGES.map(a=><option key={a} value={a}>{a}歳</option>)}</select></div>
+      <div className="nf"><label>生年月日</label><input type="date" value={d.birth||""} onChange={e=>set("birth",e.target.value)}/>{d.birth&&<div className="tiny">年齢：{ageFrom(d.birth)}歳</div>}</div>
     </div>
     <div className="nf2">
       <div className="nf"><label>手帳</label><select value={d.techo||""} onChange={e=>set("techo",e.target.value)}>{TECHO_OPTS.map(t=><option key={t} value={t}>{t||"選択"}</option>)}</select></div>
@@ -1585,7 +1604,7 @@ function ResidentDetail({me,res,onBack,onEdit,onDel,onChange}){
       {me.isAdmin&&(addN?<div className="tl-editpanel"><Field label="連絡元（例：ご家族／本部）" value={nfrom} onChange={e=>setNfrom(e.target.value)}/><Area label="内容" rows={2} value={ntext} onChange={e=>setNtext(e.target.value)}/><div className="row-end"><Btn onClick={addNotice}>追加</Btn><Btn kind="ghost2" onClick={()=>setAddN(false)}>閉じる</Btn></div></div>:<button className="link-btn" onClick={()=>setAddN(true)}>＋ お知らせ・注意を追加</button>)}
       <div className="res-sec">基本情報</div>
       <div className="res-table">
-        <Row k="性別" v={d.sex}/><Row k="年齢" v={d.age?d.age+"歳":""}/><Row k="手帳" v={d.techo}/><Row k="区分" v={d.kubun?("区分"+d.kubun):""}/><Row k="障害名" v={d.disability}/><Row k="家族構成" v={fam.join("・")}/><Row k="持病" v={d.illness}/>
+        <Row k="性別" v={d.sex}/><Row k="生年月日" v={d.birth||""}/><Row k="年齢" v={d.birth?(ageFrom(d.birth)+"歳"):(d.age?d.age+"歳":"")}/><Row k="手帳" v={d.techo}/><Row k="区分" v={d.kubun?("区分"+d.kubun):""}/><Row k="障害名" v={d.disability}/><Row k="家族構成" v={fam.join("・")}/><Row k="持病" v={d.illness}/>
       </div>
       <div className="res-sec">アレルギー・薬</div>
       <div className="res-table"><Row k="アレルギー" v={alg?("あり"+((d.allergy&&d.allergy.detail)?"（"+d.allergy.detail+"）":"")):"なし"}/><Row k="服薬管理" v={d.medManage==="self"?"自己管理":(d.medManage==="staff"?"スタッフ管理":"")}/></div>
@@ -1848,7 +1867,13 @@ function AdminPanel({data,persist}){
   </Section>;
 }
 
-ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+class ErrorBoundary extends React.Component{
+  constructor(p){ super(p); this.state={err:null}; }
+  static getDerivedStateFromError(e){ return {err:e}; }
+  componentDidCatch(e,i){ console.error("app error",e,i); }
+  render(){ if(this.state.err) return <div style={{padding:"24px",color:"#5A4A50",fontFamily:"system-ui"}}><h2 style={{color:"#B25E77"}}>表示でエラーが発生しました</h2><p>お手数ですが、ページを再読み込みしてください。直らない時はこの画面を教えてください。</p><button className="btn primary" onClick={()=>location.reload()}>再読み込み</button></div>; return this.props.children; }
+}
+ReactDOM.createRoot(document.getElementById("root")).render(<ErrorBoundary><App/></ErrorBoundary>);
 </script>
 </body>
 </html>
