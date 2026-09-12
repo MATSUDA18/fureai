@@ -698,6 +698,9 @@ function buildVitItem(v){ const parts=[]; if(v.sys&&v.dia) parts.push(v.sys+"mmH
 function vitAbn(v){ const sys=parseFloat(v.sys),dia=parseFloat(v.dia),temp=parseFloat(v.temp); return !!((v.sys&&sys>=140)||(v.dia&&dia>=90)||(v.temp&&temp>=37.5)); }
 function DayPlanModal({data,persist,date,onClose}){
   const accounts=data.accounts||[]; const userList=data.userList||[];
+  const [resNames,setResNames]=useState([]);
+  useEffect(()=>{ (async()=>{ if(!SB_ON) return; try{ const rows=await resList(); setResNames(rows.map(r=>r.data&&r.data.name).filter(Boolean)); }catch(e){} })(); },[]);
+  const allUsers=Array.from(new Set([].concat(resNames,userList).filter(Boolean)));
   const cur=(data.dayPlans||{})[date]||{};
   const [u,setU]=useState(()=>{ const a=(cur.users||[]).slice(0,4); while(a.length<4)a.push(""); return a; });
   const [s1,setS1]=useState(cur.s1||""); const [s2,setS2]=useState(cur.s2||""); const [newU,setNewU]=useState("");
@@ -712,9 +715,9 @@ function DayPlanModal({data,persist,date,onClose}){
     <label className="field"><span>支援1（A夜勤）</span><select value={s1} onChange={e=>setS1(e.target.value)}><option value="">（未設定）</option>{accounts.map(a=><option key={a.id} value={a.name}>{a.name}</option>)}</select></label>
     <label className="field"><span>支援2（B夜勤）</span><select value={s2} onChange={e=>setS2(e.target.value)}><option value="">（未設定）</option>{accounts.map(a=><option key={a.id} value={a.name}>{a.name}</option>)}</select></label>
     <div className="rec-sub">利用者（最大4名・キャンセルは選ばない）</div>
-    {u.map((v,i)=>(<label className="field" key={i}><span>利用者{i+1}</span><select value={v} onChange={e=>{const nv=e.target.value; setU(p=>p.map((x,j)=>j===i?nv:x));}}><option value="">（なし）</option>{userList.map(n=><option key={n} value={n}>{n}</option>)}</select></label>))}
+    {u.map((v,i)=>(<label className="field" key={i}><span>利用者{i+1}</span><select value={v} onChange={e=>{const nv=e.target.value; setU(p=>p.map((x,j)=>j===i?nv:x));}}><option value="">（なし）</option>{allUsers.map(n=><option key={n} value={n}>{n}</option>)}</select></label>))}
     <div className="composer" style={{marginTop:4}}><textarea rows={1} value={newU} placeholder="リストに無い利用者名を追加" onChange={e=>setNewU(e.target.value)}/><button className="send" onClick={addUser} title="利用者名を追加">＋</button></div>
-    <p className="tiny">「＋」で利用者名をリストに追加できます（次回から上の一覧で選べます）。</p>
+    <p className="tiny">利用者名は「利用者情報」で登録した方が一覧に出ます。無い方は「＋」で一時的に追加できます。</p>
     <div className="row-end"><Btn onClick={save}>保存</Btn></div>
   </Modal>;
 }
@@ -1178,7 +1181,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.27〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.28〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
