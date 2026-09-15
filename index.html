@@ -219,6 +219,9 @@
   .rec-quick{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;}
   .rec-group{margin-bottom:6px;}
   .rec-gtitle{font-size:11px;color:#94808A;font-weight:700;margin:6px 0 4px;}
+  .cat-row{display:flex;align-items:center;gap:6px;background:#fff;border:1px solid #F0D3DB;border-radius:8px;padding:6px 8px;margin-bottom:4px;}
+  .cat-name{flex:1;font-size:13px;color:#5A4A50;}
+  .cat-sel{font-size:11px;padding:4px;border:1px solid #F0D3DB;border-radius:6px;background:#FCF4F5;max-width:120px;}
   .recbtn.cam{background:#EAF3E6;border-color:#CFE3C6;color:#5B8A45;}
   .rec-log{display:flex;flex-direction:column;gap:6px;margin-top:6px;}
   .rec-row{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #F0D3DB;border-radius:10px;padding:8px 10px;}
@@ -230,6 +233,7 @@
   .thumb img{width:100%;height:100px;object-fit:cover;display:block;}
   .thumb span{font-size:10px;color:#94808A;padding:4px 6px;background:#fff;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .rec-thumb{width:40px;height:40px;object-fit:cover;border-radius:8px;cursor:pointer;}
+  .noSave{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;pointer-events:auto;}
   .album-filter{display:flex;gap:12px;margin-bottom:12px;flex-wrap:wrap;}
   .album-filter label{font-size:12px;color:#C9788F;font-weight:700;display:flex;flex-direction:column;gap:4px;}
   .album-filter input{padding:8px;border:1px solid #F0D3DB;border-radius:8px;background:#FCF4F5;font-size:14px;}
@@ -909,14 +913,15 @@ function VitalsView({data,persist,reload}){
   </Section>;
 }
 function Records({me,data,persist,reload}){
-  const items=data.recordItems||[]; const customItems=items.filter(x=>!REC_BUILTIN[x]);
+  const cats=(data.recCats&&data.recCats.length)?data.recCats:(()=>{const c=REC_GROUPS.map(g=>g.g); if(!c.includes("その他"))c.push("その他"); return c;})();
+  const rItems=(data.recItems&&data.recItems.length)?data.recItems:(()=>{const a=[]; REC_GROUPS.forEach(g=>g.items.forEach(n=>a.push({id:g.g+"_"+n,name:n,cat:g.g}))); (data.recordItems||[]).forEach(n=>{ if(!REC_BUILTIN[n]&&!a.find(x=>x.name===n)) a.push({id:"c_"+n,name:n,cat:"その他"}); }); return a;})();
   const [sel,setSel]=useState(["利用者1"]);
   const [date,setDate]=useState(()=>{const n=new Date();return (n.getHours()*60+n.getMinutes())<(15*60)?iso(addDays(n,-1)):iso(n);});
   const [note,setNote]=useState(""); const [toast,setToast]=useState("");
   const [useTime,setUseTime]=useState(false); const [mDate,setMDate]=useState(iso(new Date())); const [mH,setMH]=useState("16"); const [mM,setMM]=useState("00");
   const [view,setView]=useState("log"); const [photos,setPhotos]=useState(null);
   const [busy,setBusy]=useState(false); const [pv,setPv]=useState(null);
-  const [editItems,setEditItems]=useState(false); const [newItem,setNewItem]=useState("");
+  const [editItems,setEditItems]=useState(false); const [newItem,setNewItem]=useState(""); const [newCat,setNewCat]=useState(""); const [newItemCat,setNewItemCat]=useState("");
   const [vit,setVit]=useState(null); const [valert,setValert]=useState(null); const [sp,setSp]=useState(null); const [edRec,setEdRec]=useState(null);
   const EY=[]; for(let y=2015;y<=new Date().getFullYear()+1;y++)EY.push(y); const EMO=[]; for(let m=1;m<=12;m++)EMO.push(m); const EDA=[]; for(let dd=1;dd<=31;dd++)EDA.push(dd); const EHH=[]; for(let h=0;h<=23;h++)EHH.push(h); const EMI=[]; for(let m=0;m<60;m+=5)EMI.push(m);
   const [af,setAf]=useState(iso(addDays(new Date(),-7))); const [at,setAt]=useState(iso(new Date()));
@@ -946,8 +951,14 @@ function Records({me,data,persist,reload}){
   const onFile=async(e)=>{ const f=e.target.files&&e.target.files[0]; e.target.value=""; if(!f)return; if(sel.length===0){ flash("先に利用者を選んでください"); return; } if(!SB_ON){ flash("写真の保存には共有DBの設定が必要です"); return; } setBusy(true); try{ const full=await compressImage(f,900,0.6); const thumb=await compressImage(f,160,0.5); const id=uid()+"_"+Date.now(); const ts=new Date().toISOString(); await sbInsertPhoto({id, meta:{users:sel, ts, thumb}, image:full, created:ts}); await pushRecords("📷 写真",{photoId:id, thumb}); flash("写真を記録しました"); }catch(err){ flash("写真の保存に失敗（写真表の設定をご確認ください）"); } finally{ setBusy(false); } };
   const openFull=async(id)=>{ if(!id||!SB_ON)return; try{ const p=await sbPhotoFull(id); if(p) setPv(p); else flash("写真が見つかりません"); }catch(e){ flash("写真を開けませんでした"); } };
   const delPhoto=async(id)=>{ if(!confirm("この写真を削除しますか？"))return; try{ await sbDeletePhoto(id); setPhotos(p=>(p||[]).filter(x=>x.id!==id)); setPv(null); }catch(e){} };
-  const addItem=()=>{ if(!newItem.trim())return; persist({...data,recordItems:[...items,newItem.trim()]}); setNewItem(""); };
-  const delItem=(it)=>persist({...data,recordItems:items.filter(x=>x!==it)});
+  const catMove=(i,dir)=>{ const c=cats.slice(); const j=i+dir; if(j<0||j>=c.length)return; const t=c[i];c[i]=c[j];c[j]=t; persist({...data,recCats:c,recItems:rItems}); };
+  const catRename=(cat)=>{ const nn=prompt("カテゴリー名",cat); if(!nn||!nn.trim()||nn.trim()===cat)return; const nm=nn.trim(); persist({...data,recCats:cats.map(x=>x===cat?nm:x),recItems:rItems.map(x=>x.cat===cat?Object.assign({},x,{cat:nm}):x)}); };
+  const catDel=(cat)=>{ if(!confirm("カテゴリー「"+cat+"」を削除しますか？（中の項目は他へ移動します）"))return; let nc=cats.filter(x=>x!==cat); let to=nc[0]||"その他"; if(!nc.includes(to)) nc.push(to); persist({...data,recCats:nc,recItems:rItems.map(x=>x.cat===cat?Object.assign({},x,{cat:to}):x)}); };
+  const catAdd=()=>{ const nm=newCat.trim(); if(!nm||cats.includes(nm))return; persist({...data,recCats:[...cats,nm],recItems:rItems}); setNewCat(""); };
+  const itemAdd=()=>{ const nm=newItem.trim(); if(!nm)return; const cat=newItemCat||cats[0]||"その他"; persist({...data,recCats:cats,recItems:[...rItems,{id:uid(),name:nm,cat}]}); setNewItem(""); };
+  const itemDel=(id)=>persist({...data,recItems:rItems.filter(x=>x.id!==id),recCats:cats});
+  const itemMove=(id,dir)=>{ const arr=rItems.slice(); const idx=arr.findIndex(x=>x.id===id); if(idx<0)return; const cat=arr[idx].cat; let j=idx+dir; while(j>=0&&j<arr.length&&arr[j].cat!==cat) j+=dir; if(j<0||j>=arr.length)return; const t=arr[idx];arr[idx]=arr[j];arr[j]=t; persist({...data,recItems:arr,recCats:cats}); };
+  const itemSetCat=(id,cat)=>persist({...data,recItems:rItems.map(x=>x.id===id?Object.assign({},x,{cat}):x),recCats:cats});
   return <Section title="記録" note="利用者を選び、項目をタップすると時刻つきで記録されます。写真も残せます。あとで「まとめ」の材料になります。">
     <button className="time-toggle" style={{marginTop:0,marginBottom:8}} onClick={()=>setDpOpen(true)}>👥 この日の利用者・支援員を設定</button>
     <div className="rec-users">{dayUsers.map(u=>(<button key={u} className={"ruser "+(sel.includes(u)?"on":"")} onClick={()=>toggleUser(u)}>{u}</button>))}</div>
@@ -960,8 +971,8 @@ function Records({me,data,persist,reload}){
         <button className="recbtn vit" onClick={()=>setVit({sys:"",dia:"",hr:"",temp:""})}>🩺 バイタル測定（血圧・体温）</button>
         <button className="recbtn cam" onClick={()=>fileRef.current&&fileRef.current.click()} disabled={busy}>📷 写真</button>
       </div>
-      {REC_GROUPS.map(grp=>(<div key={grp.g} className="rec-group"><div className="rec-gtitle">{grp.g}</div><div className="rec-items">{grp.items.slice().sort((a,b)=>a.localeCompare(b,"ja")).map(it=>(<button key={it} className="recbtn" onClick={()=>tapItem(it)}>{it}</button>))}</div></div>))}
-      {customItems.length>0&&<div className="rec-group"><div className="rec-gtitle">追加項目</div><div className="rec-items">{customItems.slice().sort((a,b)=>a.localeCompare(b,"ja")).map(it=>(<button key={it} className="recbtn" onClick={()=>tapItem(it)}>{it}</button>))}</div></div>}
+      {cats.map(cat=>{ const list=rItems.filter(i=>i.cat===cat); if(!list.length) return null; return <div key={cat} className="rec-group"><div className="rec-gtitle">{cat}</div><div className="rec-items">{list.map(i=>(<button key={i.id} className="recbtn" onClick={()=>tapItem(i.name)}>{i.name}</button>))}</div></div>; })}
+      {(function(){ const orphans=rItems.filter(i=>!cats.includes(i.cat)); if(!orphans.length) return null; return <div className="rec-group"><div className="rec-gtitle">その他</div><div className="rec-items">{orphans.map(i=>(<button key={i.id} className="recbtn" onClick={()=>tapItem(i.name)}>{i.name}</button>))}</div></div>; })()}
       <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={onFile} style={{display:"none"}}/>
       <div className="rec-sub">自由に記録</div>
       <div className="composer">
@@ -982,8 +993,14 @@ function Records({me,data,persist,reload}){
       </div>}
       {me.isAdmin&&<div style={{marginTop:8}}><button className="link-btn" onClick={()=>setEditItems(!editItems)}>{editItems?"項目の編集を閉じる":"項目を編集（管理者）"}</button></div>}
       {editItems&&me.isAdmin&&<div className="tl-editpanel">
-        <div className="composer"><textarea rows={1} value={newItem} placeholder="新しい項目名" onChange={e=>setNewItem(e.target.value)}/><button className="send" onClick={addItem}>＋</button></div>
-        <div className="rec-items" style={{marginTop:8}}>{customItems.map(it=>(<span key={it} className="chip" style={{padding:"6px 10px"}}>{it} <button className="mini-del" onClick={()=>delItem(it)}>×</button></span>))}</div>
+        <div className="rec-gtitle">カテゴリー（↑↓で並び替え・✎で名前変更）</div>
+        {cats.map((c,i)=>(<div key={c} className="cat-row"><span className="cat-name">{c}</span><button className="mini-key" onClick={()=>catMove(i,-1)}>↑</button><button className="mini-key" onClick={()=>catMove(i,1)}>↓</button><button className="mini-key" onClick={()=>catRename(c)}>✎</button><button className="mini-del" onClick={()=>catDel(c)}>🗑</button></div>))}
+        <div className="composer" style={{marginTop:6}}><textarea rows={1} value={newCat} placeholder="新しいカテゴリー名" onChange={e=>setNewCat(e.target.value)}/><button className="send" onClick={catAdd}>＋</button></div>
+        <div className="rec-gtitle" style={{marginTop:12}}>項目を追加</div>
+        <div className="composer"><textarea rows={1} value={newItem} placeholder="新しい項目名" onChange={e=>setNewItem(e.target.value)}/><button className="send" onClick={itemAdd}>＋</button></div>
+        <select value={newItemCat} onChange={e=>setNewItemCat(e.target.value)} style={{width:"100%",padding:"10px",border:"1px solid #F0D3DB",borderRadius:"10px",marginTop:"6px",background:"#FCF4F5"}}><option value="">カテゴリー：{cats[0]||"その他"}</option>{cats.map(c=><option key={c} value={c}>{c}</option>)}</select>
+        <div className="rec-gtitle" style={{marginTop:12}}>項目の並び替え・移動・削除</div>
+        {cats.map(cat=>{ const list=rItems.filter(i=>i.cat===cat); if(!list.length) return null; return <div key={cat} style={{marginBottom:"8px"}}><div className="tiny" style={{fontWeight:700,color:"#C9788F"}}>{cat}</div>{list.map(i=>(<div key={i.id} className="cat-row"><span className="cat-name">{i.name}</span><button className="mini-key" onClick={()=>itemMove(i.id,-1)}>↑</button><button className="mini-key" onClick={()=>itemMove(i.id,1)}>↓</button><select className="cat-sel" value={i.cat} onChange={e=>itemSetCat(i.id,e.target.value)}>{cats.map(c=><option key={c} value={c}>{c}</option>)}</select><button className="mini-del" onClick={()=>itemDel(i.id)}>🗑</button></div>))}</div>; })}
       </div>}
       <div className="tl-datenav" style={{marginTop:14}}>
         <button className="link-btn" onClick={()=>setDate(iso(addDays(new Date(date+"T00:00:00"),-1)))}>‹ 前の勤務</button>
@@ -994,7 +1011,7 @@ function Records({me,data,persist,reload}){
       {log.length===0&&<p className="empty">まだ記録がありません。</p>}
       <div className="rec-log">{log.map(r=>(<div key={r.id} className="rec-row">
         <span className="rec-time">{hm(r.ts)}</span><span className="chip">{r.user}</span>
-        {r.thumb&&<img className="rec-thumb" src={r.thumb} alt="写真" onClick={()=>openFull(r.photoId)}/>}
+        {r.thumb&&<img className="rec-thumb noSave" draggable={false} onContextMenu={e=>e.preventDefault()} src={r.thumb} alt="写真" onClick={()=>openFull(r.photoId)}/>}
         <span className={"rec-item"+(r.abn?" abn":"")}>{r.item}</span>
         <button className="mini-key" onClick={()=>openEditRec(r)}>✏️</button><button className="mini-del" onClick={()=>delRec(r.id)}>🗑</button></div>))}</div>
     </>}
@@ -1006,7 +1023,7 @@ function Records({me,data,persist,reload}){
       {photos===null&&<p className="empty">読み込み中…</p>}
       {photos!==null&&photos.length===0&&<p className="empty">この期間の写真はありません。</p>}
       <div className="album">{(photos||[]).map(p=>(<button key={p.id} className="thumb" onClick={()=>openFull(p.id)}>
-        <img src={p.meta&&p.meta.thumb?p.meta.thumb:""} alt="記録写真"/><span>{p.meta&&p.meta.users?p.meta.users.join("・"):""} {p.created?(p.created.slice(5,10)+" "+hm(p.created)):""}</span></button>))}</div>
+        <img className="noSave" draggable={false} onContextMenu={e=>e.preventDefault()} src={p.meta&&p.meta.thumb?p.meta.thumb:""} alt="記録写真"/><span>{p.meta&&p.meta.users?p.meta.users.join("・"):""} {p.created?(p.created.slice(5,10)+" "+hm(p.created)):""}</span></button>))}</div>
     </div>}
     {dpOpen&&<DayPlanModal data={data} persist={persist} date={date} onClose={()=>setDpOpen(false)}/>}
     {toast&&<div className="toast">{toast}</div>}
@@ -1049,7 +1066,7 @@ function Records({me,data,persist,reload}){
       <div className="row-end"><Btn onClick={saveEditRec}>修正を保存</Btn></div>
     </Modal>}
     {pv&&<Modal title="記録写真" tint="#C9788F" onClose={()=>setPv(null)}>
-      <img src={pv.image} style={{width:"100%",borderRadius:12}} alt="記録写真"/>
+      <img className="noSave" draggable={false} onContextMenu={e=>e.preventDefault()} src={pv.image} style={{width:"100%",borderRadius:12}} alt="記録写真"/>
       <p className="hint" style={{marginTop:10}}>{pv.meta&&pv.meta.users?pv.meta.users.join("・"):""}　{pv.created?new Date(pv.created).toLocaleString():""}</p>
       <div className="row-end"><Btn kind="ghost2" onClick={()=>delPhoto(pv.id)}>削除</Btn></div>
     </Modal>}
@@ -1202,7 +1219,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.32〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.33〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
