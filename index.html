@@ -433,9 +433,11 @@ const REC_GROUPS=[
   {g:"排泄", items:["トイレ（小）","トイレ（大）"]},
   {g:"症状", items:["くしゃみ","せき","鼻水"]},
   {g:"生活・活動", items:["起床","就寝","入浴","巡回","来所","帰宅"]},
+  {g:"介助", items:["介助"]},
   {g:"その他", items:["様子・特記"]},
 ];
 const REC_BUILTIN=(()=>{const s={};REC_GROUPS.forEach(g=>g.items.forEach(i=>{s[i]=1;}));["バイタル測定"].forEach(i=>{s[i]=1;});return s;})();
+const CARE_OPTS=["排泄","入浴","食事","更衣","口腔ケア","その他"];
 const PATROL_OPTS=["仰臥位","横臥位（右下）","横臥位（左下）","うつ伏せ","入眠中","熟睡","いびきあり","起きている","電気ついている","テレビついている","電気消す","テレビ消す","常夜灯にする","室温異常なし","室温高い","室温低い","室温調整","扉が開いたら起きられた"];
 const MED_OPTS=["内服確認","外用薬塗布","点眼（右）","点眼（左）","点眼（両方）","インスリン注射確認"];
 async function sha256(t){
@@ -719,7 +721,7 @@ function DayPlanModal({data,persist,date,onClose}){
     {u.map((v,i)=>(<label className="field" key={i}><span>利用者{i+1}</span><select value={v} onChange={e=>{const nv=e.target.value; setU(p=>p.map((x,j)=>j===i?nv:x));}}><option value="">（なし）</option>{allUsers.map(n=><option key={n} value={n}>{n}</option>)}</select></label>))}
     <div className="composer" style={{marginTop:4}}><textarea rows={1} value={newU} placeholder="リストに無い利用者名を追加" onChange={e=>setNewU(e.target.value)}/><button className="send" onClick={addUser} title="利用者名を追加">＋</button></div>
     <p className="tiny">利用者名は「利用者情報」で登録した方が一覧に出ます。無い方は「＋」で一時的に追加できます。</p>
-    <div className="row-end"><Btn onClick={save}>保存</Btn></div>
+    <div className="row-end"><Btn kind="ghost2" onClick={onClose}>閉じる</Btn><Btn onClick={save}>保存</Btn></div>
   </Modal>;
 }
 function Handover({me,data,persist}){
@@ -926,10 +928,10 @@ function Records({me,data,persist,reload}){
   const _bs=new Date(date+"T15:00:00"); const _be=(()=>{const e=addDays(new Date(date+"T00:00:00"),1); e.setHours(15,0,0,0); return e;})();
   const log=(data.records||[]).filter(r=>r&&r.ts).filter(r=>{ const t=new Date(r.ts); return t>=_bs && t<_be; }).sort((a,b)=>String(b.ts||"").localeCompare(String(a.ts||"")));
   const rplan=(data.dayPlans||{})[date]||{}; const dayUsers=(rplan.users&&rplan.users.length)?rplan.users:USERS4;
-  const pushRecords=async(item,extra,tsOverride)=>{ if(sel.length===0){ flash("利用者を選んでください"); return false; } const ts=tsOverride||new Date().toISOString(); const recs=sel.map(u=>Object.assign({id:uid(),ts,user:u,item},extra||{})); try{ for(const rc of recs) await recAdd(rc); await reload(); return true; }catch(e){ flash("保存に失敗しました"); return false; } };
+  const pushRecords=async(item,extra,tsOverride)=>{ if(sel.length===0){ flash("利用者を選んでください"); return false; } const ts=tsOverride||new Date().toISOString(); const targets=sel.filter(u=>dayUsers.includes(u)); if(!targets.length){ flash("利用者を選んでください"); return false; } const recs=targets.map(u=>Object.assign({id:uid(),ts,user:u,item},extra||{})); try{ for(const rc of recs) await recAdd(rc); await reload(); return true; }catch(e){ flash("保存に失敗しました"); return false; } };
   const bizTs=()=>{ const bd=new Date(mDate+"T00:00:00"); const cal=(+mH>=15)?bd:addDays(bd,1); cal.setHours(+mH,+mM,0,0); return cal.toISOString(); };
-  const tapItem=(it)=>{ if(it==="巡回") setSp({type:"patrol",checks:{},val:""}); else if(it==="服薬") setSp({type:"med",checks:{},val:""}); else if(it==="血糖値測定") setSp({type:"glu",checks:{},val:""}); else if(it==="メニュー") setSp({type:"menu",checks:{},val:""}); else addRecord(it); };
-  const submitSp=async()=>{ let item=""; if(sp.type==="patrol"){ const c=PATROL_OPTS.filter(o=>sp.checks[o]); if(!c.length){flash("項目を選んでください");return;} item="巡回："+c.join("・"); } else if(sp.type==="med"){ const c=MED_OPTS.filter(o=>sp.checks[o]); if(!c.length){flash("項目を選んでください");return;} item="服薬："+c.join("・"); } else if(sp.type==="glu"){ if(!sp.val){flash("数値を入力してください");return;} item="血糖値 "+sp.val+" mg/dL"; } else { const meals=["晩","朝"].filter(m=>sp.checks[m]); if(!meals.length){flash("晩か朝を選んでください");return;} if(!sp.val.trim()){flash("メニューを入力してください");return;} item="メニュー（"+meals.join("・")+"）："+sp.val.trim(); } if(await pushRecords(item)){ flash("記録しました"); setSp(null); } };
+  const tapItem=(it)=>{ if(it==="巡回") setSp({type:"patrol",checks:{},val:""}); else if(it==="服薬") setSp({type:"med",checks:{},val:""}); else if(it==="血糖値測定") setSp({type:"glu",checks:{},val:""}); else if(it==="メニュー") setSp({type:"menu",checks:{},val:""}); else if(it==="介助") setSp({type:"care",checks:{},level:"部分介助",val:""}); else addRecord(it); };
+  const submitSp=async()=>{ let item=""; if(sp.type==="patrol"){ const c=PATROL_OPTS.filter(o=>sp.checks[o]); if(!c.length){flash("項目を選んでください");return;} item="巡回："+c.join("・"); } else if(sp.type==="med"){ const c=MED_OPTS.filter(o=>sp.checks[o]); if(!c.length){flash("項目を選んでください");return;} item="服薬："+c.join("・"); } else if(sp.type==="glu"){ if(!sp.val){flash("数値を入力してください");return;} item="血糖値 "+sp.val+" mg/dL"; } else if(sp.type==="care"){ const types=CARE_OPTS.filter(o=>sp.checks[o]); if(!types.length){flash("介助の種類を選んでください");return;} item="介助（"+types.join("・")+"／"+(sp.level||"部分介助")+"）："+(sp.val||"").trim(); } else { const meals=["晩","朝"].filter(m=>sp.checks[m]); if(!meals.length){flash("晩か朝を選んでください");return;} if(!sp.val.trim()){flash("メニューを入力してください");return;} item="メニュー（"+meals.join("・")+"）："+sp.val.trim(); } if(await pushRecords(item)){ flash("記録しました"); setSp(null); } };
   const addRecord=async(item)=>{ if(await pushRecords(item)) flash("記録："+sel.join("・")+" "+item); };
   const addNote=async()=>{ if(!note.trim())return; if(await pushRecords(note.trim())){ flash("記録しました（現在時刻）"); setNote(""); } };
   const addNoteAt=async()=>{ if(!note.trim()){ flash("記録内容を入力してください"); return; } if(await pushRecords(note.trim(),null,bizTs())){ flash("記録しました（指定時刻）"); setNote(""); } };
@@ -940,7 +942,7 @@ function Records({me,data,persist,reload}){
   const submitVit=async()=>{ const v=vit; const item=buildVitItem(v); if(item==="🩺 "){ flash("数値を入力してください"); return; } const abn=vitAbn(v); if(await pushRecords(item, abn?{abn:true}:null)){ if(abn){ setVit(null); setValert(v.re?"second":"first"); } else { flash("バイタルを記録しました"); setVit(null); } } };
   const loadPhotos=async()=>{ if(!SB_ON){ setPhotos([]); return; } try{ setPhotos(await sbListPhotos(af,at)); }catch(e){ setPhotos([]); } };
   useEffect(()=>{ if(view==="album"){ setPhotos(null); loadPhotos(); } },[view,af,at]);
-  useEffect(()=>{ setSel(dayUsers.length?[dayUsers[0]]:["利用者1"]); },[date]);
+  useEffect(()=>{ setSel(dayUsers.length?[dayUsers[0]]:["利用者1"]); },[date, dayUsers.join("|")]);
   const onFile=async(e)=>{ const f=e.target.files&&e.target.files[0]; e.target.value=""; if(!f)return; if(sel.length===0){ flash("先に利用者を選んでください"); return; } if(!SB_ON){ flash("写真の保存には共有DBの設定が必要です"); return; } setBusy(true); try{ const full=await compressImage(f,900,0.6); const thumb=await compressImage(f,160,0.5); const id=uid()+"_"+Date.now(); const ts=new Date().toISOString(); await sbInsertPhoto({id, meta:{users:sel, ts, thumb}, image:full, created:ts}); await pushRecords("📷 写真",{photoId:id, thumb}); flash("写真を記録しました"); }catch(err){ flash("写真の保存に失敗（写真表の設定をご確認ください）"); } finally{ setBusy(false); } };
   const openFull=async(id)=>{ if(!id||!SB_ON)return; try{ const p=await sbPhotoFull(id); if(p) setPv(p); else flash("写真が見つかりません"); }catch(e){ flash("写真を開けませんでした"); } };
   const delPhoto=async(id)=>{ if(!confirm("この写真を削除しますか？"))return; try{ await sbDeletePhoto(id); setPhotos(p=>(p||[]).filter(x=>x.id!==id)); setPv(null); }catch(e){} };
@@ -1028,8 +1030,8 @@ function Records({me,data,persist,reload}){
       <p className="hint">再測定でも基準範囲外でした。いったんこの数値で記録します。以降の再測定は不要ですが、日中にご本人の様子がおかしい・体調不良の際は、必ず再測定してください。</p>
       <div className="row-end"><Btn onClick={()=>setValert(null)}>確認しました</Btn></div>
     </Modal>}
-    {sp&&<Modal title={sp.type==="patrol"?"巡回の記録":sp.type==="med"?"服薬の記録":sp.type==="glu"?"血糖値の記録":"食事メニューの記録"} tint="#C9788F" onClose={()=>setSp(null)}>
-      {sp.type==="glu"?<label className="field"><span>血糖値</span><div className="unitwrap"><input type="number" inputMode="decimal" value={sp.val} onChange={e=>setSp(Object.assign({},sp,{val:e.target.value}))}/><em>mg/dL</em></div></label>:sp.type==="menu"?<><div className="chk-row"><label className="chk"><input type="checkbox" checked={!!sp.checks["晩"]} onChange={e=>setSp(Object.assign({},sp,{checks:Object.assign({},sp.checks,{"晩":e.target.checked})}))}/>晩</label><label className="chk"><input type="checkbox" checked={!!sp.checks["朝"]} onChange={e=>setSp(Object.assign({},sp,{checks:Object.assign({},sp.checks,{"朝":e.target.checked})}))}/>朝</label></div><Area label="食事メニュー" rows={3} value={sp.val} onChange={e=>setSp(Object.assign({},sp,{val:e.target.value}))} placeholder="例：ごはん、味噌汁、焼き魚 …"/></>:<div className="chk-grid" style={{gridTemplateColumns:"repeat(2,1fr)"}}>{(sp.type==="patrol"?PATROL_OPTS:MED_OPTS).map(o=><label className="chk" key={o}><input type="checkbox" checked={!!sp.checks[o]} onChange={e=>setSp(Object.assign({},sp,{checks:Object.assign({},sp.checks,{[o]:e.target.checked})}))}/>{o}</label>)}</div>}
+    {sp&&<Modal title={sp.type==="patrol"?"巡回の記録":sp.type==="med"?"服薬の記録":sp.type==="glu"?"血糖値の記録":sp.type==="care"?"介助の記録":"食事メニューの記録"} tint="#C9788F" onClose={()=>setSp(null)}>
+      {sp.type==="glu"?<label className="field"><span>血糖値</span><div className="unitwrap"><input type="number" inputMode="decimal" value={sp.val} onChange={e=>setSp(Object.assign({},sp,{val:e.target.value}))}/><em>mg/dL</em></div></label>:sp.type==="menu"?<><div className="chk-row"><label className="chk"><input type="checkbox" checked={!!sp.checks["晩"]} onChange={e=>setSp(Object.assign({},sp,{checks:Object.assign({},sp.checks,{"晩":e.target.checked})}))}/>晩</label><label className="chk"><input type="checkbox" checked={!!sp.checks["朝"]} onChange={e=>setSp(Object.assign({},sp,{checks:Object.assign({},sp.checks,{"朝":e.target.checked})}))}/>朝</label></div><Area label="食事メニュー" rows={3} value={sp.val} onChange={e=>setSp(Object.assign({},sp,{val:e.target.value}))} placeholder="例：ごはん、味噌汁、焼き魚 …"/></>:sp.type==="care"?<><div className="chk-grid" style={{gridTemplateColumns:"repeat(3,1fr)"}}>{CARE_OPTS.map(o=><label className="chk" key={o}><input type="checkbox" checked={!!sp.checks[o]} onChange={e=>setSp(Object.assign({},sp,{checks:Object.assign({},sp.checks,{[o]:e.target.checked})}))}/>{o}</label>)}</div><div className="chk-row" style={{marginTop:8}}><label className="chk"><input type="radio" name="carelv" checked={sp.level!=="全介助"} onChange={()=>setSp(Object.assign({},sp,{level:"部分介助"}))}/>部分介助</label><label className="chk"><input type="radio" name="carelv" checked={sp.level==="全介助"} onChange={()=>setSp(Object.assign({},sp,{level:"全介助"}))}/>全介助</label></div><Area label="内容" rows={3} value={sp.val} onChange={e=>setSp(Object.assign({},sp,{val:e.target.value}))}/></>:<div className="chk-grid" style={{gridTemplateColumns:"repeat(2,1fr)"}}>{(sp.type==="patrol"?PATROL_OPTS:MED_OPTS).map(o=><label className="chk" key={o}><input type="checkbox" checked={!!sp.checks[o]} onChange={e=>setSp(Object.assign({},sp,{checks:Object.assign({},sp.checks,{[o]:e.target.checked})}))}/>{o}</label>)}</div>}
       <div className="row-end"><Btn onClick={submitSp}>記録する</Btn></div>
     </Modal>}
     {edRec&&<Modal title="記録の修正" tint="#C9788F" onClose={()=>setEdRec(null)}>
@@ -1200,7 +1202,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.31〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.32〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
@@ -1523,7 +1525,7 @@ function ResidentForm({init,onCancel,onSave}){
       <div className="nf"><label>生年月日</label><input type="date" value={d.birth||""} onChange={e=>set("birth",e.target.value)}/>{d.birth&&<div className="tiny">年齢：{ageFrom(d.birth)}歳</div>}</div>
     </div>
     <div className="nf2">
-      <div className="nf"><label>手帳</label><select value={d.techo||""} onChange={e=>set("techo",e.target.value)}>{TECHO_OPTS.map(t=><option key={t} value={t}>{t||"選択"}</option>)}</select></div>
+      <div className="nf"><label>手帳</label><select value={d.techo||""} onChange={e=>set("techo",e.target.value)}>{TECHO_OPTS.map(t=><option key={t} value={t}>{t||"選択"}</option>)}</select>{d.techo==="療育手帳"&&<select value={d.techoGrade||""} onChange={e=>set("techoGrade",e.target.value)} style={{marginTop:"6px"}}><option value="">程度を選択</option>{["A1","A2","B1","B2"].map(g=><option key={g} value={g}>{g}</option>)}</select>}</div>
       <div className="nf"><label>区分</label><select value={d.kubun||""} onChange={e=>set("kubun",e.target.value)}>{KUBUN_OPTS.map(k=><option key={k} value={k}>{k?("区分"+k):"選択"}</option>)}</select></div>
     </div>
     <div className="nf"><label>障害名</label><input value={d.disability||""} onChange={e=>set("disability",e.target.value)}/></div>
@@ -1544,6 +1546,7 @@ function ResidentForm({init,onCancel,onSave}){
     <div className="nf"><label>持病</label><textarea rows={2} value={d.illness||""} onChange={e=>set("illness",e.target.value)}/></div>
     <div className="nf"><label>アレルギー</label><div className="chk-row"><label className="chk"><input type="radio" name="alg" checked={!(d.allergy&&d.allergy.has)} onChange={()=>setAllergy("has",false)}/>なし</label><label className="chk"><input type="radio" name="alg" checked={!!(d.allergy&&d.allergy.has)} onChange={()=>setAllergy("has",true)}/>あり</label></div></div>
     {d.allergy&&d.allergy.has&&<div className="nf"><label>アレルギーの詳しい内容</label><textarea rows={2} value={(d.allergy&&d.allergy.detail)||""} onChange={e=>setAllergy("detail",e.target.value)}/></div>}
+    <div className="nf"><label>服薬</label><div className="chk-row"><label className="chk"><input type="radio" name="hasmed" checked={d.hasMed==="あり"} onChange={()=>set("hasMed","あり")}/>あり</label><label className="chk"><input type="radio" name="hasmed" checked={d.hasMed==="なし"} onChange={()=>set("hasMed","なし")}/>なし</label></div></div>
     <div className="nf"><label>服薬の管理</label><div className="chk-row"><label className="chk"><input type="radio" name="mm" checked={d.medManage==="self"} onChange={()=>set("medManage","self")}/>自己管理</label><label className="chk"><input type="radio" name="mm" checked={d.medManage==="staff"} onChange={()=>set("medManage","staff")}/>スタッフ管理</label></div></div>
     <div className="res-sec2">お薬（最大4種類）</div>
     {(d.meds||[]).map((m,i)=>(<div className="med-card" key={i}>
@@ -1565,7 +1568,7 @@ function ResidentForm({init,onCancel,onSave}){
     </div>))}
     {(d.emergency||[]).length<3&&<button className="time-toggle" onClick={addEmg}>＋ 連絡先を追加</button>}
     <div className="res-sec">その他</div>
-    <div className="nf"><label>得意</label><textarea rows={2} value={d.strong||""} onChange={e=>set("strong",e.target.value)}/></div>
+    <div className="nf"><label>得意・好きなこと</label><textarea rows={2} value={d.strong||""} onChange={e=>set("strong",e.target.value)}/></div>
     <div className="nf"><label>苦手</label><textarea rows={2} value={d.weak||""} onChange={e=>set("weak",e.target.value)}/></div>
     <div className="nf"><label>家族の希望</label><textarea rows={2} value={d.familyHope||""} onChange={e=>set("familyHope",e.target.value)}/></div>
     <div className="nf"><label>本人の将来ビジョン</label><textarea rows={2} value={d.vision||""} onChange={e=>set("vision",e.target.value)}/></div>
@@ -1604,10 +1607,10 @@ function ResidentDetail({me,res,onBack,onEdit,onDel,onChange}){
       {me.isAdmin&&(addN?<div className="tl-editpanel"><Field label="連絡元（例：ご家族／本部）" value={nfrom} onChange={e=>setNfrom(e.target.value)}/><Area label="内容" rows={2} value={ntext} onChange={e=>setNtext(e.target.value)}/><div className="row-end"><Btn onClick={addNotice}>追加</Btn><Btn kind="ghost2" onClick={()=>setAddN(false)}>閉じる</Btn></div></div>:<button className="link-btn" onClick={()=>setAddN(true)}>＋ お知らせ・注意を追加</button>)}
       <div className="res-sec">基本情報</div>
       <div className="res-table">
-        <Row k="性別" v={d.sex}/><Row k="生年月日" v={d.birth||""}/><Row k="年齢" v={d.birth?(ageFrom(d.birth)+"歳"):(d.age?d.age+"歳":"")}/><Row k="手帳" v={d.techo}/><Row k="区分" v={d.kubun?("区分"+d.kubun):""}/><Row k="障害名" v={d.disability}/><Row k="家族構成" v={fam.join("・")}/><Row k="持病" v={d.illness}/>
+        <Row k="性別" v={d.sex}/><Row k="生年月日" v={d.birth||""}/><Row k="年齢" v={d.birth?(ageFrom(d.birth)+"歳"):(d.age?d.age+"歳":"")}/><Row k="手帳" v={d.techo?(d.techo+(d.techoGrade?("（"+d.techoGrade+"）"):"")):""}/><Row k="区分" v={d.kubun?("区分"+d.kubun):""}/><Row k="障害名" v={d.disability}/><Row k="家族構成" v={fam.join("・")}/><Row k="持病" v={d.illness}/>
       </div>
       <div className="res-sec">アレルギー・薬</div>
-      <div className="res-table"><Row k="アレルギー" v={alg?("あり"+((d.allergy&&d.allergy.detail)?"（"+d.allergy.detail+"）":"")):"なし"}/><Row k="服薬管理" v={d.medManage==="self"?"自己管理":(d.medManage==="staff"?"スタッフ管理":"")}/></div>
+      <div className="res-table"><Row k="アレルギー" v={alg?("あり"+((d.allergy&&d.allergy.detail)?"（"+d.allergy.detail+"）":"")):"なし"}/><Row k="服薬" v={d.hasMed}/><Row k="服薬管理" v={d.medManage==="self"?"自己管理":(d.medManage==="staff"?"スタッフ管理":"")}/></div>
       {(d.meds||[]).map((m,i)=>(<div className="med-card" key={i}>
         <div className="row-between"><b>💊 {m.name||("お薬"+(i+1))}</b>{m.photo&&<img className="med-thumb" src={m.photo} alt="薬" onClick={()=>setMv(m.photo)}/>}</div>
         <div className="tiny" style={{marginTop:4}}>タイミング：{timingStr(m)}</div>
@@ -1617,7 +1620,7 @@ function ResidentDetail({me,res,onBack,onEdit,onDel,onChange}){
       <div className="res-sec">緊急連絡先</div>
       {(d.emergency&&d.emergency.length)?(d.emergency||[]).map((c,i)=>(<div className="plan-row" key={i}><span>{c.relation}{c.name?"（"+c.name+"）":""}</span><a className="btn ghost2" href={"tel:"+(c.phone||"")}>📞 {c.phone||"—"}</a></div>)):<p className="tiny">未登録</p>}
       <div className="res-sec">得意・苦手・希望</div>
-      <div className="res-table"><Row k="得意" v={d.strong}/><Row k="苦手" v={d.weak}/><Row k="家族の希望" v={d.familyHope}/><Row k="将来ビジョン" v={d.vision}/></div>
+      <div className="res-table"><Row k="得意・好きなこと" v={d.strong}/><Row k="苦手" v={d.weak}/><Row k="家族の希望" v={d.familyHope}/><Row k="将来ビジョン" v={d.vision}/></div>
       <div className="res-sec">対応アドバイス</div>
       <p className="res-advice">{d.advice||"（未入力）"}</p>
       <div className="res-sec">個別訓練計画</div>
@@ -1626,6 +1629,7 @@ function ResidentDetail({me,res,onBack,onEdit,onDel,onChange}){
       <div className="res-sec2">今年度（{curNendo}年度）</div>
       {curP.length===0?<p className="tiny">今年度の計画はまだありません。</p>:curP.map(p=>(<div key={p.id} className="plan-row"><button className="link-btn" onClick={()=>openPlan(p.id)}>📄 {(p.meta&&p.meta.name)||"計画"}</button>{me.isAdmin&&<button className="mini-del" onClick={()=>delPlan(p.id)}>🗑</button>}</div>))}
       {arch.length>0&&<><button className="link-btn" style={{marginTop:8}} onClick={()=>setShowArch(!showArch)}>{showArch?"過去の計画を閉じる":"過去の計画（アーカイブ）を見る"}</button>{showArch&&arch.map(p=>(<div key={p.id} className="plan-row"><button className="link-btn" onClick={()=>openPlan(p.id)}>📄 {(p.meta&&p.meta.year)}年度：{(p.meta&&p.meta.name)||"計画"}</button>{me.isAdmin&&<button className="mini-del" onClick={()=>delPlan(p.id)}>🗑</button>}</div>))}</>}
+    <div className="row-between" style={{marginTop:16}}><button className="link-btn" onClick={onBack}>‹ 一覧へ戻る</button></div>
     </div>
     {showNotice&&(d.notices&&d.notices.length>0)&&<Modal title={(d.name||"")+" 様 へのお知らせ"} tint="#E4577A" onClose={()=>setShowNotice(false)}>
       {(d.notices).map(n=>(<div key={n.id} className="notice-item"><span>{n.date}{n.from?"／"+n.from:""}</span><p>{n.text}</p></div>))}
