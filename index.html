@@ -644,10 +644,33 @@ function Nisshi({me,data}){
   };
   const toExcel=()=>{
     if(!window.XLSX){ setErr("Excel機能の読み込みに失敗しました。少し待って再度お試しください。"); return; }
-    let rows=[["ふれあいホームみずほ 利用日誌"],["利用者名",f.name+" 様"],["期間",f.period],["記入者",f.writer],[],["バイタル（来所）",f.vitals1],["バイタル（起床）",f.vitals2],["排尿",f.urine],["排便",f.stool],["投薬",f.medication],["担当職員",f.staff],[],["プログラム",""]];
-    (f.program||"").split("\n").forEach(l=>{ if(l.trim()) rows.push(["",l]); });
-    rows=rows.concat([[],["夕食メニュー",f.dinnerMenu],["夕食量",f.dinnerAmount],["朝食メニュー",f.breakfastMenu],["朝食量",f.breakfastAmount],[],["利用のご様子",f.appearance],["特記事項",f.special],["次回へのお願い",f.nextRequest]]);
-    const ws=XLSX.utils.aoa_to_sheet(rows); ws["!cols"]=[{wch:16},{wch:64}];
+    const A=[]; const M=[]; // rows, merges
+    const add=(r)=>{ A.push(r); return A.length-1; };
+    let r0=add(["ふれあいホーム 利用日誌"]); M.push({s:{r:r0,c:0},e:{r:r0,c:5}});
+    add([]);
+    r0=add(["利用者名", f.name+" 様", "", "", "記入者", f.writer]); M.push({s:{r:r0,c:1},e:{r:r0,c:3}});
+    r0=add(["期間", f.period]); M.push({s:{r:r0,c:1},e:{r:r0,c:5}});
+    add([]);
+    add(["バイタル", "測定時間・体温・血圧・脈拍"]);
+    r0=add(["  来所時", f.vitals1]); M.push({s:{r:r0,c:1},e:{r:r0,c:5}});
+    r0=add(["  起床時", f.vitals2]); M.push({s:{r:r0,c:1},e:{r:r0,c:5}});
+    r0=add(["排尿", f.urine, "", "排便", f.stool]); 
+    r0=add(["投薬", f.medication, "", "担当職員", f.staff]);
+    r0=add(["他利用者", ""]);
+    add([]);
+    add(["【プログラム】時間ごとの行動"]);
+    (f.program||"").split("\n").forEach(l=>{ if(l.trim()){ const rr=add(["", l]); M.push({s:{r:rr,c:1},e:{r:rr,c:5}}); } });
+    add([]);
+    add(["【サービス内容】食事メニュー・食事量・体調変化"]);
+    r0=add(["夕食メニュー", f.dinnerMenu, "", "夕食量", f.dinnerAmount]);
+    r0=add(["朝食メニュー", f.breakfastMenu, "", "朝食量", f.breakfastAmount]);
+    add([]);
+    add(["【利用のご様子】"]);
+    (f.appearance||"").split("\n").forEach(l=>{ const rr=add(["", l]); M.push({s:{r:rr,c:1},e:{r:rr,c:5}}); });
+    add([]);
+    r0=add(["特記事項", f.special]); M.push({s:{r:r0,c:1},e:{r:r0,c:5}});
+    r0=add(["次回へのお願い", f.nextRequest]); M.push({s:{r:r0,c:1},e:{r:r0,c:5}});
+    const ws=XLSX.utils.aoa_to_sheet(A); ws["!cols"]=[{wch:14},{wch:24},{wch:2},{wch:12},{wch:12},{wch:16}]; ws["!merges"]=M;
     const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,"利用日誌");
     XLSX.writeFile(wb, "利用日誌_"+f.name+"_"+date+".xlsx");
   };
@@ -1219,7 +1242,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.33〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.34〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
@@ -1542,7 +1565,7 @@ function ResidentForm({init,onCancel,onSave}){
       <div className="nf"><label>生年月日</label><input type="date" value={d.birth||""} onChange={e=>set("birth",e.target.value)}/>{d.birth&&<div className="tiny">年齢：{ageFrom(d.birth)}歳</div>}</div>
     </div>
     <div className="nf2">
-      <div className="nf"><label>手帳</label><select value={d.techo||""} onChange={e=>set("techo",e.target.value)}>{TECHO_OPTS.map(t=><option key={t} value={t}>{t||"選択"}</option>)}</select>{d.techo==="療育手帳"&&<select value={d.techoGrade||""} onChange={e=>set("techoGrade",e.target.value)} style={{marginTop:"6px"}}><option value="">程度を選択</option>{["A1","A2","B1","B2"].map(g=><option key={g} value={g}>{g}</option>)}</select>}</div>
+      <div className="nf"><label>手帳</label><select value={d.techo||""} onChange={e=>set("techo",e.target.value)}>{TECHO_OPTS.map(t=><option key={t} value={t}>{t||"選択"}</option>)}</select>{(d.techo==="療育手帳"||d.techo==="精神障害者保健福祉手帳")&&<select value={d.techoGrade||""} onChange={e=>set("techoGrade",e.target.value)} style={{marginTop:"6px"}}><option value="">{d.techo==="療育手帳"?"程度を選択":"級を選択"}</option>{(d.techo==="療育手帳"?["A1","A2","B1","B2"]:["1級","2級","3級"]).map(g=><option key={g} value={g}>{g}</option>)}</select>}</div>
       <div className="nf"><label>区分</label><select value={d.kubun||""} onChange={e=>set("kubun",e.target.value)}>{KUBUN_OPTS.map(k=><option key={k} value={k}>{k?("区分"+k):"選択"}</option>)}</select></div>
     </div>
     <div className="nf"><label>障害名</label><input value={d.disability||""} onChange={e=>set("disability",e.target.value)}/></div>
@@ -1597,10 +1620,10 @@ function ResidentDetail({me,res,onBack,onEdit,onDel,onChange}){
   const d=res.data||{}; const alg=!!(d.allergy&&d.allergy.has);
   const [showNotice,setShowNotice]=useState((d.notices&&d.notices.length>0));
   const [nfrom,setNfrom]=useState(""); const [ntext,setNtext]=useState(""); const [addN,setAddN]=useState(false);
-  const [plans,setPlans]=useState(null); const [pv,setPv]=useState(null); const [mv,setMv]=useState(null); const [showArch,setShowArch]=useState(false);
+  const [plans,setPlans]=useState(null); const [pv,setPv]=useState(null); const [mv,setMv]=useState(null); const [showArch,setShowArch]=useState(false); const [latestPlan,setLatestPlan]=useState(null);
   const [py,setPy]=useState(String(nendoOf())); const fileRef=useRef(null); const [busy,setBusy]=useState(false); const [toast,setToast]=useState(""); const [cropSrc,setCropSrc]=useState(null); const pendName=useRef("");
   const flash=(m)=>{ setToast(m); setTimeout(()=>setToast(""),1800); };
-  const loadPlans=async()=>{ try{ const l=await rfList(res.id); l.sort((a,b)=>String((b.meta&&b.meta.year)||"").localeCompare(String((a.meta&&a.meta.year)||""))); setPlans(l); }catch(e){ setPlans([]); } };
+  const loadPlans=async()=>{ try{ const l=await rfList(res.id); l.sort((a,b)=>String((b.meta&&b.meta.year)||"").localeCompare(String((a.meta&&a.meta.year)||"")) || String((b.created||"")).localeCompare(String(a.created||""))); setPlans(l); if(l[0]){ try{ setLatestPlan(await rfFull(l[0].id)); }catch(e){ setLatestPlan(null); } } else setLatestPlan(null); }catch(e){ setPlans([]); } };
   useEffect(()=>{ loadPlans(); },[res.id]);
   const curNendo=nendoOf();
   const curP=(plans||[]).filter(p=>String(p.meta&&p.meta.year)===String(curNendo));
@@ -1643,9 +1666,12 @@ function ResidentDetail({me,res,onBack,onEdit,onDel,onChange}){
       <div className="res-sec">個別訓練計画</div>
       {me.isAdmin&&<div className="tl-editpanel"><div className="wheel"><input type="number" value={py} onChange={e=>setPy(e.target.value)} placeholder="年度（西暦）" style={{flex:1,padding:"12px",border:"1px solid #F0D3DB",borderRadius:"10px"}}/><button className="recbtn cam" onClick={()=>fileRef.current&&fileRef.current.click()} disabled={busy}>⬆ PDF/写真</button></div><input ref={fileRef} type="file" accept="image/*,application/pdf" onChange={onFile} style={{display:"none"}}/><p className="tiny">年度（西暦）を入れて計画を追加（過去分も可）。</p></div>}
       {plans===null&&<p className="empty">読み込み中…</p>}
-      <div className="res-sec2">今年度（{curNendo}年度）</div>
-      {curP.length===0?<p className="tiny">今年度の計画はまだありません。</p>:curP.map(p=>(<div key={p.id} className="plan-row"><button className="link-btn" onClick={()=>openPlan(p.id)}>📄 {(p.meta&&p.meta.name)||"計画"}</button>{me.isAdmin&&<button className="mini-del" onClick={()=>delPlan(p.id)}>🗑</button>}</div>))}
-      {arch.length>0&&<><button className="link-btn" style={{marginTop:8}} onClick={()=>setShowArch(!showArch)}>{showArch?"過去の計画を閉じる":"過去の計画（アーカイブ）を見る"}</button>{showArch&&arch.map(p=>(<div key={p.id} className="plan-row"><button className="link-btn" onClick={()=>openPlan(p.id)}>📄 {(p.meta&&p.meta.year)}年度：{(p.meta&&p.meta.name)||"計画"}</button>{me.isAdmin&&<button className="mini-del" onClick={()=>delPlan(p.id)}>🗑</button>}</div>))}</>}
+      {plans&&plans.length>0&&<div className="res-sec2">最新（{(plans[0].meta&&plans[0].meta.year)?plans[0].meta.year+"年度":""}）</div>}
+      {plans&&plans[0]&&<div style={{marginBottom:8}}>
+        {(latestPlan&&latestPlan.id===plans[0].id)?((latestPlan.meta&&latestPlan.meta.type==="pdf")?<><embed src={latestPlan.data} type="application/pdf" style={{width:"100%",height:"60vh",borderRadius:"10px"}}/><div className="row-end" style={{marginTop:6}}><a className="btn ghost2" href={latestPlan.data} target="_blank" rel="noreferrer">大きく開く ↗</a></div></>:<img className="att-big" src={latestPlan.data} alt="最新の個別訓練計画" onClick={()=>setPv({meta:latestPlan.meta,data:latestPlan.data})}/>):<p className="tiny">読み込み中…</p>}
+        <div className="tiny" style={{marginTop:4}}>{(plans[0].meta&&plans[0].meta.name)||"計画"}{me.isAdmin&&<button className="mini-del" style={{marginLeft:8}} onClick={()=>delPlan(plans[0].id)}>🗑</button>}</div>
+      </div>}
+      {plans&&plans.length>1&&<><button className="link-btn" style={{marginTop:4}} onClick={()=>setShowArch(!showArch)}>{showArch?"過去の計画を閉じる":"過去の計画（アーカイブ）を見る"}</button>{showArch&&plans.slice(1).map(p=>(<div key={p.id} className="plan-row"><button className="link-btn" onClick={()=>openPlan(p.id)}>📄 {(p.meta&&p.meta.year)?p.meta.year+"年度：":""}{(p.meta&&p.meta.name)||"計画"}</button>{me.isAdmin&&<button className="mini-del" onClick={()=>delPlan(p.id)}>🗑</button>}</div>))}</>}
     <div className="row-between" style={{marginTop:16}}><button className="link-btn" onClick={onBack}>‹ 一覧へ戻る</button></div>
     </div>
     {showNotice&&(d.notices&&d.notices.length>0)&&<Modal title={(d.name||"")+" 様 へのお知らせ"} tint="#E4577A" onClose={()=>setShowNotice(false)}>
