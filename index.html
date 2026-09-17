@@ -644,35 +644,42 @@ function Nisshi({me,data}){
   };
   const toExcel=()=>{
     if(!window.XLSX){ setErr("Excel機能の読み込みに失敗しました。少し待って再度お試しください。"); return; }
-    const A=[]; const M=[]; // rows, merges
-    const add=(r)=>{ A.push(r); return A.length-1; };
-    let r0=add(["ふれあいホーム 利用日誌"]); M.push({s:{r:r0,c:0},e:{r:r0,c:5}});
-    add([]);
-    r0=add(["利用者名", f.name+" 様", "", "", "記入者", f.writer]); M.push({s:{r:r0,c:1},e:{r:r0,c:3}});
-    r0=add(["期間", f.period]); M.push({s:{r:r0,c:1},e:{r:r0,c:5}});
-    add([]);
-    add(["バイタル", "測定時間・体温・血圧・脈拍"]);
-    r0=add(["  来所時", f.vitals1]); M.push({s:{r:r0,c:1},e:{r:r0,c:5}});
-    r0=add(["  起床時", f.vitals2]); M.push({s:{r:r0,c:1},e:{r:r0,c:5}});
-    r0=add(["排尿", f.urine, "", "排便", f.stool]); 
-    r0=add(["投薬", f.medication, "", "担当職員", f.staff]);
-    r0=add(["他利用者", ""]);
-    add([]);
-    add(["【プログラム】時間ごとの行動"]);
-    (f.program||"").split("\n").forEach(l=>{ if(l.trim()){ const rr=add(["", l]); M.push({s:{r:rr,c:1},e:{r:rr,c:5}}); } });
-    add([]);
-    add(["【サービス内容】食事メニュー・食事量・体調変化"]);
-    r0=add(["夕食メニュー", f.dinnerMenu, "", "夕食量", f.dinnerAmount]);
-    r0=add(["朝食メニュー", f.breakfastMenu, "", "朝食量", f.breakfastAmount]);
-    add([]);
-    add(["【利用のご様子】"]);
-    (f.appearance||"").split("\n").forEach(l=>{ const rr=add(["", l]); M.push({s:{r:rr,c:1},e:{r:rr,c:5}}); });
-    add([]);
-    r0=add(["特記事項", f.special]); M.push({s:{r:r0,c:1},e:{r:r0,c:5}});
-    r0=add(["次回へのお願い", f.nextRequest]); M.push({s:{r:r0,c:1},e:{r:r0,c:5}});
-    const ws=XLSX.utils.aoa_to_sheet(A); ws["!cols"]=[{wch:14},{wch:24},{wch:2},{wch:12},{wch:12},{wch:16}]; ws["!merges"]=M;
-    const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,"利用日誌");
-    XLSX.writeFile(wb, "利用日誌_"+f.name+"_"+date+".xlsx");
+    const XU=XLSX.utils; const ws={}; const S=(a,v)=>{ ws[a]={t:"s",v:(v==null?"":String(v))}; };
+    const pvit=(s)=>{ s=s||""; const tm=s.match(/(\d{1,2}[:：]\d{2})/); const tp=s.match(/体温\s*([\d.]+)/); const bp=s.match(/(\d{2,3})\s*[\/／]\s*(\d{2,3})/); const pu=s.match(/(\d{2,3})\s*回/); return {time:tm?tm[1]:"", temp:tp?tp[1]:"", bp:bp?(bp[1]+"/"+bp[2]):"", pulse:pu?pu[1]:""}; };
+    const v1=pvit(f.vitals1), v2=pvit(f.vitals2);
+    S("B1","ふれあいホームみずほ　利用日誌");
+    S("I3","利用者名"); S("K3",(f.name||"")+"　様");
+    S("B6","年月日"); S("C6",f.period||"");
+    S("B7","バイタル記録");
+    S("C7","測定時間（"+(v1.time||"　：　")+"）"); S("F7","体温："); S("G7",(v1.temp||"")+"度"); S("I7","血圧"); S("J7",v1.bp||"　/　"); S("K7","脈拍 "+(v1.pulse||"")+" 回/分");
+    S("C8","測定時間（"+(v2.time||"　：　")+"）"); S("F8","体温："); S("G8",(v2.temp||"")+"度"); S("I8","血圧"); S("J8",v2.bp||"　/　"); S("K8","脈拍 "+(v2.pulse||"")+" 回/分");
+    S("B9","排泄記録"); S("C9","排尿（ー/＋）　"+(f.urine||"")); S("C10","排便（ー/＋）　"+(f.stool||""));
+    S("B11","投薬"); S("C11",f.medication||"");
+    S("B12","担当職員"); S("C12",f.staff||"");
+    S("B13","他利用者"); S("C13","");
+    S("B15","【サービス内容】食事メニュー・食事量・体調変化・その他");
+    S("B16","プログラム"); S("F16","特記事項");
+    const hours=["16:00","17:00","18:00","19:00","20:00","21:00","22:00","23:00","0:00","1:00","2:00","3:00","4:00","5:00","6:00","7:00","8:00","9:00"];
+    const hourRow={16:17,17:18,18:19,19:20,20:21,21:22,22:23,23:24,0:25,1:26,2:27,3:28,4:29,5:30,6:31,7:32,8:33,9:34};
+    hours.forEach((h,i)=>S("B"+(17+i),h));
+    const prog={}; (f.program||"").split("\n").forEach(l=>{ l=l.trim(); if(!l)return; const m=l.match(/^(\d{1,2})[:：]/); const h=m?parseInt(m[1],10):null; if(h!=null&&hourRow[h]!=null){ prog[h]=(prog[h]?prog[h]+" / ":"")+l; } else { prog._=(prog._?prog._+" / ":"")+l; } });
+    if(prog._){ prog[16]=(prog[16]?prog[16]+" / ":"")+prog._; }
+    Object.keys(hourRow).forEach(h=>{ if(prog[h]) S("C"+hourRow[h], prog[h]); });
+    S("F17","【夕食】"+(f.dinnerMenu||"")+(f.dinnerAmount?"（"+f.dinnerAmount+"）":""));
+    S("F18","【朝食】"+(f.breakfastMenu||"")+(f.breakfastAmount?"（"+f.breakfastAmount+"）":""));
+    S("F19","【特記】"+(f.special||""));
+    S("B36","【利用のご様子】"); S("B37",f.appearance||"");
+    S("B43","【次回へのお願い】"); S("D43",f.nextRequest||"");
+    S("I47","記入者名　"+(f.writer||""));
+    ws["!ref"]="A1:L48";
+    const mg=["B1:K1","C6:K6","B7:B8","G7:H7","G8:H8","B9:B10","C9:K9","C10:K10","C11:K11","C12:K12","C13:K13","B16:E16","F16:K16","B36:C36","B37:K37","B38:K38","B39:K39","B40:K40","B41:K41","B43:C43","D43:K43","B44:K44","B45:K45","I47:K47"];
+    for(let r=17;r<=34;r++){ mg.push("C"+r+":E"+r); mg.push("F"+r+":K"+r); }
+    ws["!merges"]=mg.map(a=>XU.decode_range(a));
+    ws["!cols"]=[{wch:3.6},{wch:12.5},{wch:22},{wch:4.8},{wch:4.4},{wch:4.7},{wch:5.8},{wch:4.6},{wch:10.9},{wch:24.7},{wch:40.7},{wch:2.5}];
+    const rows=[]; for(let i=0;i<48;i++){ let h=29.1; if(i<2)h=36; else if(i===2)h=24; else if(i===45)h=15; else if(i===46)h=24; rows[i]={hpt:h}; }
+    ws["!rows"]=rows;
+    const wb=XU.book_new(); XU.book_append_sheet(wb,ws,"利用日誌");
+    XLSX.writeFile(wb,"利用日誌_"+(f.name||"")+"_"+date+".xlsx");
   };
   return <Section title="日誌まとめ" note="利用者と日付を選び、その日の記録からAIが「利用のご様子」などを下書きします。内容を確認・修正して、印刷やExcel出力ができます。">
     <div className="rec-users" style={{gridTemplateColumns:"repeat(4,1fr)"}}>{dayUsers.map(u=>(<button key={u} className={"ruser "+(user===u?"on":"")} onClick={()=>{setUser(u);}}>{u}</button>))}</div>
@@ -1242,7 +1249,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.34〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.35〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
