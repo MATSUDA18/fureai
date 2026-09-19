@@ -642,7 +642,15 @@ function Nisshi({me,data}){
     }catch(e){ setErr("接続に失敗しました。通信状況をご確認ください。"); }
     setLoading(false);
   };
-  const toExcel=()=>{
+  const toExcel=async()=>{
+    try{
+      const res=await authFetch(SUPABASE_URL+"/functions/v1/nisshi-excel",{method:"POST",body:JSON.stringify(Object.assign({},f,{date}))});
+      if(!res.ok){ let m=""; try{ m=(await res.json()).error||""; }catch(e){} throw new Error("func "+res.status+" "+m); }
+      const blob=await res.blob();
+      const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="利用日誌_"+(f.name||"")+"_"+date+".xlsx"; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+    }catch(e){ setErr("サーバー出力に失敗しました（"+String(e&&e.message||e)+"）。簡易版で出力します。"); toExcelLocal(); }
+  };
+  const toExcelLocal=()=>{
     if(!window.XLSX){ setErr("Excel機能の読み込みに失敗しました。少し待って再度お試しください。"); return; }
     const XU=XLSX.utils; const ws={}; const S=(a,v)=>{ ws[a]={t:"s",v:(v==null?"":String(v))}; };
     const pvit=(s)=>{ s=s||""; const tm=s.match(/(\d{1,2}[:：]\d{2})/); const tp=s.match(/体温\s*([\d.]+)/); const bp=s.match(/(\d{2,3})\s*[\/／]\s*(\d{2,3})/); const pu=s.match(/(\d{2,3})\s*回/); return {time:tm?tm[1]:"", temp:tp?tp[1]:"", bp:bp?(bp[1]+"/"+bp[2]):"", pulse:pu?pu[1]:""}; };
@@ -1249,7 +1257,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.35〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.36〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
