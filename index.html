@@ -412,6 +412,10 @@ async function rfInsert(rec){ const r=await authFetch(`${SUPABASE_URL}/rest/v1/r
 async function rfList(rid){ const r=await authFetch(`${SUPABASE_URL}/rest/v1/resident_files?resident_id=eq.${rid}&select=id,meta,created`); if(!r.ok) throw new Error("rf list"); return await r.json(); }
 async function rfFull(id){ const r=await authFetch(`${SUPABASE_URL}/rest/v1/resident_files?id=eq.${id}&select=id,meta,data`); const j=await r.json(); return j&&j[0]?j[0]:null; }
 async function rfDelete(id){ await authFetch(`${SUPABASE_URL}/rest/v1/resident_files?id=eq.${id}`,{method:"DELETE"}); }
+async function nsSave(rec){ const r=await authFetch(`${SUPABASE_URL}/rest/v1/nisshi`,{method:"POST",headers:{"Prefer":"resolution=merge-duplicates,return=minimal"},body:JSON.stringify(rec)}); if(!r.ok) throw new Error("ns save "+r.status); }
+async function nsList(){ const r=await authFetch(`${SUPABASE_URL}/rest/v1/nisshi?select=id,user_name,biz_date,sex,keywords,created&order=biz_date.desc&limit=800`); if(!r.ok) throw new Error("ns list"); return await r.json(); }
+async function nsGet(id){ const r=await authFetch(`${SUPABASE_URL}/rest/v1/nisshi?id=eq.${id}&select=id,data`); const j=await r.json(); return j&&j[0]?j[0]:null; }
+async function nsDelete(id){ await authFetch(`${SUPABASE_URL}/rest/v1/nisshi?id=eq.${id}`,{method:"DELETE"}); }
 const nendoOf=(d)=>{ d=d||new Date(); return (d.getMonth()+1>=4)?d.getFullYear():d.getFullYear()-1; };
 function compressImage(file,max,q){ max=max||800; q=q||0.55; return new Promise((res,rej)=>{ const fr=new FileReader(); fr.onload=()=>{ const img=new Image(); img.onload=()=>{ let w=img.width,h=img.height; if(w>h&&w>max){h=Math.round(h*max/w);w=max;} else if(h>max){w=Math.round(w*max/h);h=max;} const c=document.createElement("canvas"); c.width=w;c.height=h; c.getContext("2d").drawImage(img,0,0,w,h); res(c.toDataURL("image/jpeg",q)); }; img.onerror=rej; img.src=fr.result; }; fr.onerror=rej; fr.readAsDataURL(file); }); }
 
@@ -617,6 +621,16 @@ function Nisshi({me,data}){
   const [f,setF]=useState(null);
   const [loading,setLoading]=useState(false); const [err,setErr]=useState("");
   const apiKey=localStorage.getItem("mizuho_api_key")||"";
+  const [mode,setMode]=useState("edit");
+  const [nrows,setNrows]=useState(null); const [qName,setQName]=useState(""); const [qFrom,setQFrom]=useState(""); const [qTo,setQTo]=useState(""); const [qSex,setQSex]=useState(""); const [qText,setQText]=useState("");
+  const [resSex,setResSex]=useState({}); const [toast2,setToast2]=useState("");
+  const flash2=(m)=>{ setToast2(m); setTimeout(()=>setToast2(""),1800); };
+  useEffect(()=>{ (async()=>{ if(!SB_ON)return; try{ const rows=await resList(); const m={}; rows.forEach(r=>{ if(r.data&&r.data.name) m[r.data.name]=r.data.sex||""; }); setResSex(m); }catch(e){} })(); },[]);
+  const loadNs=async()=>{ if(!SB_ON){setNrows([]);return;} try{ setNrows(await nsList()); }catch(e){ setNrows([]); } };
+  useEffect(()=>{ if(mode==="search"&&nrows===null) loadNs(); },[mode]);
+  const results=(nrows||[]).filter(r=>{ if(qName&&!((r.user_name||"").includes(qName)))return false; if(qSex&&r.sex!==qSex)return false; if(qFrom&&(r.biz_date||"")<qFrom)return false; if(qTo&&(r.biz_date||"")>qTo)return false; if(qText&&!((r.keywords||"").includes(qText)))return false; return true; });
+  const openNs=async(row)=>{ try{ const full=await nsGet(row.id); if(full&&full.data){ setF(full.data); setDate(row.biz_date||date); setUser(row.user_name||user); setMode("edit"); } }catch(e){} };
+  const delNs=async(id)=>{ if(!confirm("この日誌を削除しますか？"))return; try{ await nsDelete(id); loadNs(); }catch(e){} };
   const hm=(ts)=>{ const d=new Date(ts); return String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0"); };
   const start=new Date(date+"T15:00:00"); const end=(()=>{ const e=addDays(new Date(date+"T00:00:00"),1); e.setHours(15,0,0,0); return e; })();
   const recs=(data.records||[]).filter(r=>r.user===user && new Date(r.ts)>=start && new Date(r.ts)<end).sort((a,b)=>String(a.ts||"").localeCompare(String(b.ts||"")));
@@ -624,6 +638,7 @@ function Nisshi({me,data}){
   const nplan=(data.dayPlans||{})[date]||{}; const dayUsers=(nplan.users&&nplan.users.length)?nplan.users:USERS4;
   const buildInitial=(obj)=>Object.assign({name:user,period:fmtDate(date)+" 16:00 〜 翌朝",writer:me.name,vitals1:"",vitals2:"",urine:"",stool:"",medication:"",staff:[nplan.s1,nplan.s2].filter(Boolean).join("・"),program:recText,dinnerMenu:"",dinnerAmount:"",breakfastMenu:"",breakfastAmount:"",appearance:"",special:"",nextRequest:""}, obj||{}, {name:user,period:fmtDate(date)+" 16:00 〜 翌朝"});
   const emptyForm=()=>{ setErr(""); setF(buildInitial({program:recText})); };
+  const saveNisshi=async()=>{ if(!f)return; if(!SB_ON){flash2("共有DBが必要です");return;} try{ const id="ns_"+(f.name||"user")+"_"+date; const kw=[f.name,f.appearance,f.special,f.program,f.staff,f.dinnerMenu,f.breakfastMenu,f.vitals1].filter(Boolean).join(" "); await nsSave({id,user_name:f.name||"",biz_date:date,sex:(resSex[f.name]||""),keywords:kw,data:f,created:new Date().toISOString()}); flash2("日誌を保存しました"); }catch(e){ setErr("保存に失敗（nisshi表の設定をご確認ください）"); } };
   const setField=(k,v)=>setF(p=>Object.assign({},p,{[k]:v}));
   const genDraft=async()=>{
     if(!apiKey){ setErr("AI下書きには、AI相談と同じAPIキーの設定が必要です（AI相談タブの「AIの設定」から）。"); return; }
@@ -689,7 +704,27 @@ function Nisshi({me,data}){
     const wb=XU.book_new(); XU.book_append_sheet(wb,ws,"利用日誌");
     XLSX.writeFile(wb,"利用日誌_"+(f.name||"")+"_"+date+".xlsx");
   };
-  return <Section title="日誌まとめ" note="利用者と日付を選び、その日の記録からAIが「利用のご様子」などを下書きします。内容を確認・修正して、印刷やExcel出力ができます。">
+  return <Section title="日誌まとめ" note="利用者と日付を選び、その日の記録からAIが「利用のご様子」などを下書きします。作成後は保存でき、あとから検索できます。">
+    <div className="tl-modes" style={{marginBottom:12}}>
+      <button className={"seg "+(mode==="edit"?"on":"")} onClick={()=>setMode("edit")}>作成</button>
+      <button className={"seg "+(mode==="search"?"on":"")} onClick={()=>setMode("search")}>過去の日誌を検索</button>
+    </div>
+    {mode==="search"&&<div>
+      <div className="tl-editpanel">
+        <div className="nf"><label>名前（姓・名どちらでも）</label><input value={qName} onChange={e=>setQName(e.target.value)} placeholder="例：伊藤 / 弘隆"/></div>
+        <div className="nf2"><div className="nf"><label>期間（開始）</label><input type="date" value={qFrom} onChange={e=>setQFrom(e.target.value)}/></div><div className="nf"><label>期間（終了）</label><input type="date" value={qTo} onChange={e=>setQTo(e.target.value)}/></div></div>
+        <div className="nf"><label>性別</label><div className="chk-row"><label className="chk"><input type="radio" name="qsex" checked={qSex===""} onChange={()=>setQSex("")}/>指定なし</label><label className="chk"><input type="radio" name="qsex" checked={qSex==="男性"} onChange={()=>setQSex("男性")}/>男性</label><label className="chk"><input type="radio" name="qsex" checked={qSex==="女性"} onChange={()=>setQSex("女性")}/>女性</label></div></div>
+        <div className="nf"><label>フリーテキスト（内容から検索）</label><input value={qText} onChange={e=>setQText(e.target.value)} placeholder="例：入浴、笑顔、発熱 など"/></div>
+        <p className="tiny">日付を1日だけ絞りたいときは、開始と終了を同じ日にしてください。</p>
+      </div>
+      {nrows===null&&<p className="empty">読み込み中…</p>}
+      {nrows!==null&&results.length===0&&<p className="empty">該当する日誌がありません。</p>}
+      <div className="rec-log">{results.map(r=>(<div key={r.id} className="rec-row">
+        <span className="rec-time">{r.biz_date}</span><span className="chip">{r.user_name}</span>{r.sex&&<span className="tiny">{r.sex}</span>}
+        <span className="rec-item"><button className="link-btn" onClick={()=>openNs(r)}>開く</button></span>
+        <button className="mini-del" onClick={()=>delNs(r.id)}>🗑</button></div>))}</div>
+    </div>}
+    {mode==="edit"&&<>
     <div className="rec-users" style={{gridTemplateColumns:"repeat(4,1fr)"}}>{dayUsers.map(u=>(<button key={u} className={"ruser "+(user===u?"on":"")} onClick={()=>{setUser(u);}}>{u}</button>))}</div>
     <div className="tl-datenav">
       <button className="link-btn" onClick={()=>setDate(iso(addDays(new Date(date+"T00:00:00"),-1)))}>‹ 前日</button>
@@ -722,10 +757,13 @@ function Nisshi({me,data}){
       <div className="nf"><label>特記事項</label><textarea rows={3} value={f.special} onChange={e=>setField("special",e.target.value)}/></div>
       <div className="nf"><label>次回へのお願い</label><input value={f.nextRequest} onChange={e=>setField("nextRequest",e.target.value)}/></div>
       <div className="n-actions no-print">
+        <Btn onClick={saveNisshi}>💾 保存</Btn>
         <Btn onClick={()=>window.print()}>🖨 印刷</Btn>
         <Btn kind="ghost2" onClick={toExcel}>⬇ Excel出力</Btn>
       </div>
     </div>}
+    </>}
+    {toast2&&<div className="toast">{toast2}</div>}
   </Section>;
 }
 function CropModal({src,onCancel,onDone}){
@@ -852,7 +890,7 @@ function Plans({me,data,persist}){
   const [list,setList]=useState(null); const [busy,setBusy]=useState(false); const [av,setAv]=useState(null); const [newest,setNewest]=useState(null); const [showArch,setShowArch]=useState(false);
   const [kind,setKind]=useState("両方（利用者＋シフト）"); const [month,setMonth]=useState(iso(new Date()).slice(0,7));
   const [toast,setToast]=useState(""); const fileRef=useRef(null);
-  const [d,setD]=useState(iso(new Date())); const [dpOpen,setDpOpen]=useState(false);
+  const [d,setD]=useState(()=>{const n=new Date();return (n.getHours()*60+n.getMinutes())<(15*60)?iso(addDays(n,-1)):iso(n);}); const [dpOpen,setDpOpen]=useState(false);
   const flash=(m)=>{ setToast(m); setTimeout(()=>setToast(""),1800); };
   const loadList=async()=>{ if(!SB_ON){setList([]);return;} try{ const l=await sbListAttach(); setList(l); const shown=l.filter(a=>!(a.meta&&a.meta.kind==="handover")); if(shown[0]){ try{ setNewest(await sbAttachFull(shown[0].id)); }catch(e){ setNewest(null);} } else setNewest(null); }catch(e){ setList([]); } };
   useEffect(()=>{ if(list===null) loadList(); },[]);
@@ -890,7 +928,9 @@ function Plans({me,data,persist}){
       <input ref={fileRef} type="file" accept="image/*,application/pdf" onChange={onAttach} style={{display:"none"}}/>
     </div>}
     {sub==="day"&&<div>
-      <div className="tl-datenav"><button className="link-btn" onClick={()=>setD(iso(addDays(new Date(d+"T00:00:00"),-1)))}>‹ 前日</button><b>{fmtDate(d)}</b><button className="link-btn" onClick={()=>setD(iso(addDays(new Date(d+"T00:00:00"),1)))}>翌日 ›</button></div>
+      <button className="time-toggle" style={{marginTop:0,marginBottom:10}} onClick={()=>setSub("files")}>‹ 戻る（資料の登録へ）</button>
+      <div className="tl-datenav"><button className="link-btn" onClick={()=>setD(iso(addDays(new Date(d+"T00:00:00"),-1)))}>‹ 前の勤務</button><b>{fmtDate(d)}（勤務）</b><button className="link-btn" onClick={()=>setD(iso(addDays(new Date(d+"T00:00:00"),1)))}>次の勤務 ›</button></div>
+      <p className="tiny">この設定は「タイムスケジュール」「職員シフト」「記録」「日誌」に反映されます（同じ勤務日で確認してください）。</p>
       <div className="rec-sub" style={{marginTop:8}}>現在の設定</div>
       <p>利用者：{(cur.users&&cur.users.length)?cur.users.join("・"):"未設定"}</p>
       <p>支援1（A）：{cur.s1||"未設定"}　／　支援2（B）：{cur.s2||"未設定"}</p>
@@ -953,7 +993,7 @@ function VitalsView({data,persist,reload}){
 function Records({me,data,persist,reload}){
   const cats=(data.recCats&&data.recCats.length)?data.recCats:(()=>{const c=REC_GROUPS.map(g=>g.g); if(!c.includes("その他"))c.push("その他"); return c;})();
   const rItems=(data.recItems&&data.recItems.length)?data.recItems:(()=>{const a=[]; REC_GROUPS.forEach(g=>g.items.forEach(n=>a.push({id:g.g+"_"+n,name:n,cat:g.g}))); (data.recordItems||[]).forEach(n=>{ if(!REC_BUILTIN[n]&&!a.find(x=>x.name===n)) a.push({id:"c_"+n,name:n,cat:"その他"}); }); return a;})();
-  const [sel,setSel]=useState(["利用者1"]);
+  const [sel,setSel]=useState([]);
   const [date,setDate]=useState(()=>{const n=new Date();return (n.getHours()*60+n.getMinutes())<(15*60)?iso(addDays(n,-1)):iso(n);});
   const [note,setNote]=useState(""); const [toast,setToast]=useState("");
   const [useTime,setUseTime]=useState(false); const [mDate,setMDate]=useState(iso(new Date())); const [mH,setMH]=useState("16"); const [mM,setMM]=useState("00");
@@ -985,7 +1025,7 @@ function Records({me,data,persist,reload}){
   const submitVit=async()=>{ const v=vit; const item=buildVitItem(v); if(item==="🩺 "){ flash("数値を入力してください"); return; } const abn=vitAbn(v); if(await pushRecords(item, abn?{abn:true}:null)){ if(abn){ setVit(null); setValert(v.re?"second":"first"); } else { flash("バイタルを記録しました"); setVit(null); } } };
   const loadPhotos=async()=>{ if(!SB_ON){ setPhotos([]); return; } try{ setPhotos(await sbListPhotos(af,at)); }catch(e){ setPhotos([]); } };
   useEffect(()=>{ if(view==="album"){ setPhotos(null); loadPhotos(); } },[view,af,at]);
-  useEffect(()=>{ setSel(dayUsers.length?[dayUsers[0]]:["利用者1"]); },[date, dayUsers.join("|")]);
+  useEffect(()=>{ setSel([]); },[date, dayUsers.join("|")]);
   const onFile=async(e)=>{ const f=e.target.files&&e.target.files[0]; e.target.value=""; if(!f)return; if(sel.length===0){ flash("先に利用者を選んでください"); return; } if(!SB_ON){ flash("写真の保存には共有DBの設定が必要です"); return; } setBusy(true); try{ const full=await compressImage(f,900,0.6); const thumb=await compressImage(f,160,0.5); const id=uid()+"_"+Date.now(); const ts=new Date().toISOString(); await sbInsertPhoto({id, meta:{users:sel, ts, thumb}, image:full, created:ts}); await pushRecords("📷 写真",{photoId:id, thumb}); flash("写真を記録しました"); }catch(err){ flash("写真の保存に失敗（写真表の設定をご確認ください）"); } finally{ setBusy(false); } };
   const openFull=async(id)=>{ if(!id||!SB_ON)return; try{ const p=await sbPhotoFull(id); if(p) setPv(p); else flash("写真が見つかりません"); }catch(e){ flash("写真を開けませんでした"); } };
   const delPhoto=async(id)=>{ if(!confirm("この写真を削除しますか？"))return; try{ await sbDeletePhoto(id); setPhotos(p=>(p||[]).filter(x=>x.id!==id)); setPv(null); }catch(e){} };
@@ -1257,7 +1297,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.36〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.37〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
