@@ -416,6 +416,8 @@ async function nsSave(rec){ const r=await authFetch(`${SUPABASE_URL}/rest/v1/nis
 async function nsList(){ const r=await authFetch(`${SUPABASE_URL}/rest/v1/nisshi?select=id,user_name,biz_date,sex,keywords,created&order=biz_date.desc&limit=800`); if(!r.ok) throw new Error("ns list"); return await r.json(); }
 async function nsGet(id){ const r=await authFetch(`${SUPABASE_URL}/rest/v1/nisshi?id=eq.${id}&select=id,data`); const j=await r.json(); return j&&j[0]?j[0]:null; }
 async function nsDelete(id){ await authFetch(`${SUPABASE_URL}/rest/v1/nisshi?id=eq.${id}`,{method:"DELETE"}); }
+async function logAccess(name,event){ try{ await authFetch(`${SUPABASE_URL}/rest/v1/access_log`,{method:"POST",headers:{"Prefer":"return=minimal"},body:JSON.stringify({id:uid()+"_"+Date.now(),name:name||"",event:event||"open",ts:new Date().toISOString()})}); }catch(e){} }
+async function alFetch(){ const r=await authFetch(`${SUPABASE_URL}/rest/v1/access_log?select=name,event,ts&order=ts.desc&limit=500`); if(!r.ok) throw new Error("al"); return await r.json(); }
 const nendoOf=(d)=>{ d=d||new Date(); return (d.getMonth()+1>=4)?d.getFullYear():d.getFullYear()-1; };
 function compressImage(file,max,q){ max=max||800; q=q||0.55; return new Promise((res,rej)=>{ const fr=new FileReader(); fr.onload=()=>{ const img=new Image(); img.onload=()=>{ let w=img.width,h=img.height; if(w>h&&w>max){h=Math.round(h*max/w);w=max;} else if(h>max){w=Math.round(w*max/h);h=max;} const c=document.createElement("canvas"); c.width=w;c.height=h; c.getContext("2d").drawImage(img,0,0,w,h); res(c.toDataURL("image/jpeg",q)); }; img.onerror=rej; img.src=fr.result; }; fr.onerror=rej; fr.readAsDataURL(file); }); }
 
@@ -1221,7 +1223,7 @@ function App(){
       localStorage.setItem("mizuho_staff_seeded","1"); save(d);
     }
     try{ const ses=JSON.parse(localStorage.getItem("mizuho_session")||"null");
-      if(ses&&ses.exp>Date.now()){ const acc=d.accounts.find(a=>a.id===ses.id); if(acc) setMe(acc); } }catch(e){}
+      if(ses&&ses.exp>Date.now()){ const acc=d.accounts.find(a=>a.id===ses.id); if(acc){ setMe(acc); if(SB_ON) logAccess(acc.name,"開いた"); } } }catch(e){}
     setData(d);
     const standalone=(window.matchMedia&&window.matchMedia("(display-mode: standalone)").matches)||window.navigator.standalone===true;
     if(!standalone && !localStorage.getItem("mizuho_install_done")) setShowInstall(true);
@@ -1232,7 +1234,7 @@ function App(){
   const persist=(next)=>{ setData(next); save(next); if(SB_ON){ const ts=new Date().toISOString(); tsRef.current=ts; sbSave(next,ts).catch(()=>{}); } };
   const logout=()=>{localStorage.removeItem("mizuho_session");setMe(null);};
   const doLogin=async()=>{const h=await sha256(pw);
-    if(login&&h===login.hash){localStorage.setItem("mizuho_session",JSON.stringify({id:login.id,exp:Date.now()+86400000}));setMe(login);setLogin(null);setPw("");setErr("");setTab("schedule");}
+    if(login&&h===login.hash){localStorage.setItem("mizuho_session",JSON.stringify({id:login.id,exp:Date.now()+86400000}));if(SB_ON)logAccess(login.name,"ログイン");setMe(login);setLogin(null);setPw("");setErr("");setTab("schedule");}
     else setErr("パスワードが違います。");};
   const dismissInstall=(never)=>{if(never)localStorage.setItem("mizuho_install_done","1");setShowInstall(false);};
 
@@ -1297,7 +1299,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.37〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.38〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
@@ -1898,6 +1900,9 @@ function AdminPanel({data,persist}){
   const [hotaru,setHotaru]=useState(data.hotaruUrl||""); const [phil,setPhil]=useState(data.philosophy||"");
   const [pwFor,setPwFor]=useState(null); const [np1,setNp1]=useState(""); const [np2,setNp2]=useState("");
   const [m1,setM1]=useState(""); const [m2,setM2]=useState("");
+  const [alog,setAlog]=useState(null); const [alShow,setAlShow]=useState(false);
+  const loadAlog=async()=>{ try{ setAlog(await alFetch()); }catch(e){ setAlog([]); } };
+  const alDT=(ts)=>{ const d=new Date(ts); return (d.getMonth()+1)+"/"+d.getDate()+" "+String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0"); };
   const add=async()=>{
     if(!name.trim())return setMsg("お名前を入力してください。");
     if(p1.length<4)return setMsg("パスワードは4文字以上にしてください。");
@@ -1960,6 +1965,14 @@ function AdminPanel({data,persist}){
     <Field label="新しい登録用パスワード" type="password" value={m1} onChange={e=>setM1(e.target.value)}/>
     <Field label="もう一度" type="password" value={m2} onChange={e=>setM2(e.target.value)}/>
     <div className="row-end"><Btn kind="ghost2" onClick={saveMaster}>変更する</Btn></div>
+    <h3 className="blk">📋 アクセスログ（誰がいつ開いたか）</h3>
+    <p className="tiny">職員が名前を選んで開くたびに記録が残ります（削除されず蓄積されます）。</p>
+    {!alShow?<div className="row-end"><Btn kind="ghost2" onClick={()=>{setAlShow(true); if(alog===null) loadAlog();}}>ログを表示</Btn></div>:<>
+      <div className="row-between"><button className="link-btn" onClick={loadAlog}>更新</button><button className="link-btn" onClick={()=>setAlShow(false)}>閉じる</button></div>
+      {alog===null&&<p className="empty">読み込み中…</p>}
+      {alog!==null&&alog.length===0&&<p className="empty">記録がありません。</p>}
+      <div className="rec-log">{(alog||[]).map((r,i)=>(<div key={i} className="rec-row"><span className="rec-time">{alDT(r.ts)}</span><span className="chip">{r.name}</span><span className="rec-item">{r.event}</span></div>))}</div>
+    </>}
     {msg&&<p className="ok">{msg}</p>}
     {pwFor&&<Modal title={`${pwFor.name} さんのパスワード変更`} tint="#C9788F" onClose={()=>{setPwFor(null);setNp1("");setNp2("");}}>
       <Field label="新しいパスワード" type="password" value={np1} autoFocus onChange={e=>setNp1(e.target.value)}/>
