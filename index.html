@@ -38,6 +38,7 @@
   .news-main{display:flex;flex-direction:column;}
   .news-main b{color:#5A4A50;font-size:14px;}
   .news-main em{color:#94808A;font-style:normal;font-size:11px;margin-top:2px;}
+  .news-body{background:#fff;border:1px solid #F0D3DB;border-radius:14px;padding:14px 16px;margin:6px 0 4px;color:#5A4A50;font-size:14px;line-height:1.7;box-shadow:0 6px 16px rgba(228,87,122,.10);}
 
   .card{background:#fff;border-radius:20px;padding:18px;margin-top:16px;box-shadow:0 6px 20px rgba(201,120,143,.10);border:1px solid #F0D3DB;}
   .card h2{display:flex;align-items:center;gap:8px;margin:0 0 14px;font-size:16px;color:#C9788F;}
@@ -1277,6 +1278,10 @@ function App(){
 /* =============================== トップ =============================== */
 function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
   const latest=data.news[0];
+  const [showNews,setShowNews]=useState(false);
+  const [newsRead,setNewsRead]=useState(()=>localStorage.getItem("mizuho_news_read")||"");
+  const hasNews=latest&&newsRead!==latest.id;
+  const markRead=()=>{ if(latest){ localStorage.setItem("mizuho_news_read",latest.id); setNewsRead(latest.id); setShowNews(false); } };
   return <div className="top">
     <div className="hero">
       <Petals season={season}/>
@@ -1287,10 +1292,17 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
         <p className="sub">{season.name}のトップページ</p>
       </div>
     </div>
-    <button className="news" onClick={()=>onPick(data.accounts[0])}>
-      <span className="news-badge">🔔 新着</span>
-      <span className="news-main"><b>{latest?latest.title:"お知らせはまだありません"}</b>{latest&&<em>{latest.date}</em>}</span>
-    </button>
+    {hasNews&&<div>
+      <button className="news" onClick={()=>setShowNews(s=>!s)}>
+        <span className="news-badge">🔔 新着</span>
+        <span className="news-main"><b>{latest.title}</b><em>{latest.date}</em></span>
+        <span className="tiny" style={{marginLeft:"auto"}}>{showNews?"▲":"▼"}</span>
+      </button>
+      {showNews&&<div className="news-body">
+        {latest.body&&<p>{latest.body}</p>}
+        <div className="row-end"><button className="link-btn" onClick={markRead}>確認しました（次から表示しない）</button></div>
+      </div>}
+    </div>}
     <section className="card">
       <h2>👥 ログインする方を選んでください</h2>
       <div className="name-grid">
@@ -1307,7 +1319,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.40〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.41〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
