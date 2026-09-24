@@ -830,6 +830,8 @@ function Handover({me,data,persist}){
   const [toast,setToast]=useState(""); const flash=(m)=>{setToast(m);setTimeout(()=>setToast(""),1600);};
   const [showStatus,setShowStatus]=useState(null);
   const [newItem,setNewItem]=useState(""); const [note,setNote]=useState(data.supplyNote||"");
+  const [openSupCats,setOpenSupCats]=useState({}); const [editSup,setEditSup]=useState(false);
+  const [nCat,setNCat]=useState(""); const [nItemCat,setNItemCat]=useState(""); const [nVars,setNVars]=useState("");
   const [pendingAtt,setPendingAtt]=useState([]); const [av,setAv]=useState(null); const [supPhotoFor,setSupPhotoFor]=useState(null);
   const hoFileRef=useRef(null); const supFileRef=useRef(null); const noteFileRef=useRef(null);
   const readDU=(f)=>new Promise((rs,rj)=>{const fr=new FileReader();fr.onload=()=>rs(fr.result);fr.onerror=rj;fr.readAsDataURL(f);});
@@ -848,9 +850,20 @@ function Handover({me,data,persist}){
   const targeted=(h)=>{ if(h.from!=="hq")return false; if(h.scope==="all")return true; if(h.scope==="day"){ const p=(data.dayPlans||{})[h.day]||{}; return me.name===p.s1||me.name===p.s2; } return false; };
   const needConfirm=(h)=>targeted(h)&&!(h.confirmedBy&&h.confirmedBy[me.id]);
   const items=data.supplyItems||[];
-  const addItem=()=>{ if(!newItem.trim())return; persist(Object.assign({},data,{supplyItems:[...items,{id:uid(),name:newItem.trim()}]})); setNewItem(""); };
+  const supCats=(data.supplyCats&&data.supplyCats.length)?data.supplyCats:["清掃用具関係","衛生関連","食品関連","調味料関係","その他"];
+  const toggleSupCat=(c)=>setOpenSupCats(p=>Object.assign({},p,{[c]:!p[c]}));
+  const openAllSup=()=>{ const o={}; supCats.forEach(c=>o[c]=true); setOpenSupCats(o); };
+  const closeAllSup=()=>setOpenSupCats({});
+  const scMove=(i,dir)=>{ const c=supCats.slice(); const j=i+dir; if(j<0||j>=c.length)return; const t=c[i];c[i]=c[j];c[j]=t; persist(Object.assign({},data,{supplyCats:c,supplyItems:items})); };
+  const scRename=(cat)=>{ const nn=prompt("カテゴリー名",cat); if(!nn||!nn.trim()||nn.trim()===cat)return; const nm=nn.trim(); persist(Object.assign({},data,{supplyCats:supCats.map(x=>x===cat?nm:x),supplyItems:items.map(x=>((x.cat||"その他")===cat)?Object.assign({},x,{cat:nm}):x)})); };
+  const scDel=(cat)=>{ if(!confirm("カテゴリー「"+cat+"」を削除しますか？（中の品目は他へ移動します）"))return; let nc=supCats.filter(x=>x!==cat); let to=nc[0]||"その他"; if(!nc.includes(to))nc.push(to); persist(Object.assign({},data,{supplyCats:nc,supplyItems:items.map(x=>((x.cat||"その他")===cat)?Object.assign({},x,{cat:to}):x)})); };
+  const scAdd=()=>{ const nm=nCat.trim(); if(!nm||supCats.includes(nm))return; persist(Object.assign({},data,{supplyCats:[...supCats,nm],supplyItems:items})); setNCat(""); };
+  const addItem=()=>{ if(!newItem.trim())return; const cat=nItemCat||supCats[0]||"その他"; const vars=nVars.split(/[、,]/).map(s=>s.trim()).filter(Boolean); persist(Object.assign({},data,{supplyCats:supCats,supplyItems:[...items,{id:uid(),name:newItem.trim(),cat,variants:vars}]})); setNewItem(""); setNVars(""); };
+  const siMove=(id,dir)=>{ const arr=items.slice(); const idx=arr.findIndex(x=>x.id===id); if(idx<0)return; const cat=(arr[idx].cat||"その他"); let j=idx+dir; while(j>=0&&j<arr.length&&(arr[j].cat||"その他")!==cat) j+=dir; if(j<0||j>=arr.length)return; const t=arr[idx];arr[idx]=arr[j];arr[j]=t; persist(Object.assign({},data,{supplyItems:arr,supplyCats:supCats})); };
+  const siSetCat=(id,cat)=>persist(Object.assign({},data,{supplyItems:items.map(x=>x.id===id?Object.assign({},x,{cat}):x),supplyCats:supCats}));
+  const setVariant=(it,v)=>persist(Object.assign({},data,{supplyItems:items.map(i=>i.id===it.id?Object.assign({},i,{wantVariant:v}):i)}));
   const delItem=(id)=>{ if(!confirm("この品目を削除しますか？"))return; persist(Object.assign({},data,{supplyItems:items.filter(i=>i.id!==id)})); };
-  const toggleWant=(it)=>{ const now=new Date().toISOString(); const upd=it.want?{want:false}:{want:true,wantBy:me.name,wantAt:now,done:false,doneAt:null}; persist(Object.assign({},data,{supplyItems:items.map(i=>i.id===it.id?Object.assign({},i,upd):i)})); };
+  const toggleWant=(it)=>{ if(!it.want && it.variants && it.variants.length>0 && !it.wantVariant){ flash("種類を選んでください"); return; } const now=new Date().toISOString(); const upd=it.want?{want:false}:{want:true,wantBy:me.name,wantAt:now,done:false,doneAt:null}; persist(Object.assign({},data,{supplyItems:items.map(i=>i.id===it.id?Object.assign({},i,upd):i)})); };
   const markDone=(it)=>{ persist(Object.assign({},data,{supplyItems:items.map(i=>i.id===it.id?Object.assign({},i,{done:true,doneAt:new Date().toISOString(),want:false}):i)})); };
   const clearDone=(it)=>{ persist(Object.assign({},data,{supplyItems:items.map(i=>i.id===it.id?Object.assign({},i,{done:false,doneAt:null}):i)})); };
   const saveNote=()=>{ persist(Object.assign({},data,{supplyNote:note})); flash("備考を保存しました"); };
@@ -882,18 +895,33 @@ function Handover({me,data,persist}){
     </>}
     {sub==="sup"&&<>
       <div className="rec-sub" style={{marginTop:0}}>補充品リスト（希望する物にチェック）</div>
+      {me.isAdmin&&<div className="row-end" style={{marginBottom:4}}><button className="link-btn" onClick={()=>setEditSup(!editSup)}>{editSup?"編集を閉じる":"カテゴリー・品目を編集"}</button></div>}
+      <div className="row-between" style={{margin:"2px 0 8px"}}><button className="link-btn" onClick={openAllSup}>すべて開く</button><button className="link-btn" onClick={closeAllSup}>すべて閉じる</button></div>
       {items.length===0&&<p className="empty">品目がありません。下で登録できます。</p>}
-      {items.map(it=>(<div key={it.id} className="sup-row">
-        <label className="chk" style={{flex:1}}><input type="checkbox" checked={!!it.want} onChange={()=>toggleWant(it)}/>{it.name}</label>
-        {it.photo&&<img className="sup-thumb" src={it.photo} alt="" onClick={()=>setAv({data:it.photo,meta:{type:"image"}})}/>}
-        <button className="mini-key" onClick={()=>{setSupPhotoFor(it.id);supFileRef.current&&supFileRef.current.click();}} title="写真">📷</button>
-        {it.done?<span className="sup-done">済 {dt(it.doneAt)}</span>:(it.want?<span className="sup-want">希望 {it.wantBy}</span>:null)}
-        {me.isAdmin&&it.want&&!it.done&&<button className="btn ghost2" onClick={()=>markDone(it)}>済みにする</button>}
-        {me.isAdmin&&it.done&&<button className="link-btn" onClick={()=>clearDone(it)}>戻す</button>}
-        {me.isAdmin&&<button className="mini-del" onClick={()=>delItem(it.id)}>🗑</button>}
-      </div>))}
+      {supCats.map(cat=>{ const list=items.filter(i=>(i.cat||"その他")===cat); if(!list.length) return null; const op=!!openSupCats[cat]; return <div key={cat} className="rec-group">
+        <button className="cat-head" onClick={()=>toggleSupCat(cat)}><span>{op?"▼":"▶"} {cat}</span><span className="tiny">{list.filter(x=>x.want&&!x.done).length>0?"希望"+list.filter(x=>x.want&&!x.done).length+"／":""}{list.length}</span></button>
+        {op&&<div>{list.map(it=>(<div key={it.id} className="sup-row">
+          <label className="chk" style={{flex:1}}><input type="checkbox" checked={!!it.want} onChange={()=>toggleWant(it)}/>{it.name}</label>
+          {it.variants&&it.variants.length>0&&<select className="cat-sel" value={it.wantVariant||""} onChange={e=>setVariant(it,e.target.value)}><option value="">種類</option>{it.variants.map(v=><option key={v} value={v}>{v}</option>)}</select>}
+          {it.photo&&<img className="sup-thumb" src={it.photo} alt="" onClick={()=>setAv({data:it.photo,meta:{type:"image"}})}/>}
+          <button className="mini-key" onClick={()=>{setSupPhotoFor(it.id);supFileRef.current&&supFileRef.current.click();}} title="写真">📷</button>
+          {it.done?<span className="sup-done">済 {dt(it.doneAt)}</span>:(it.want?<span className="sup-want">希望 {it.wantBy}{it.wantVariant?"（"+it.wantVariant+"）":""}</span>:null)}
+          {me.isAdmin&&it.want&&!it.done&&<button className="btn ghost2" onClick={()=>markDone(it)}>済</button>}
+          {me.isAdmin&&it.done&&<button className="link-btn" onClick={()=>clearDone(it)}>戻す</button>}
+          {me.isAdmin&&editSup&&<><button className="mini-key" onClick={()=>siMove(it.id,-1)}>↑</button><button className="mini-key" onClick={()=>siMove(it.id,1)}>↓</button><select className="cat-sel" value={it.cat||"その他"} onChange={e=>siSetCat(it.id,e.target.value)}>{supCats.map(c=><option key={c} value={c}>{c}</option>)}</select></>}
+          {me.isAdmin&&<button className="mini-del" onClick={()=>delItem(it.id)}>🗑</button>}
+        </div>))}</div>}
+      </div>; })}
+      {editSup&&me.isAdmin&&<div className="tl-editpanel">
+        <div className="rec-gtitle">カテゴリー（↑↓並び替え・✎名前変更）</div>
+        {supCats.map((c,i)=>(<div key={c} className="cat-row"><span className="cat-name">{c}</span><button className="mini-key" onClick={()=>scMove(i,-1)}>↑</button><button className="mini-key" onClick={()=>scMove(i,1)}>↓</button><button className="mini-key" onClick={()=>scRename(c)}>✎</button><button className="mini-del" onClick={()=>scDel(c)}>🗑</button></div>))}
+        <div className="composer" style={{marginTop:6}}><textarea rows={1} value={nCat} placeholder="新しいカテゴリー名（例：食品関連）" onChange={e=>setNCat(e.target.value)}/><button className="send" onClick={scAdd}>＋</button></div>
+      </div>}
       <div className="rec-sub">品目を追加（スタッフも可）</div>
-      <div className="composer"><textarea rows={1} value={newItem} placeholder="例：ペーパータオル" onChange={e=>setNewItem(e.target.value)}/><button className="send" onClick={addItem}>＋</button></div>
+      <div className="composer"><textarea rows={1} value={newItem} placeholder="品目名（例：ジャム）" onChange={e=>setNewItem(e.target.value)}/><button className="send" onClick={addItem}>＋</button></div>
+      <select value={nItemCat} onChange={e=>setNItemCat(e.target.value)} style={{width:"100%",padding:"10px",border:"1px solid #F0D3DB",borderRadius:"10px",marginTop:"6px",background:"#FCF4F5"}}><option value="">カテゴリー：{supCats[0]}</option>{supCats.map(c=><option key={c} value={c}>{c}</option>)}</select>
+      <input value={nVars} onChange={e=>setNVars(e.target.value)} placeholder="種類（任意・例：いちご、ブルーベリー、マーマレード）" style={{width:"100%",padding:"10px",border:"1px solid #F0D3DB",borderRadius:"10px",marginTop:"6px"}}/>
+      <p className="tiny">「種類」を入れると、その品目に選択肢が付きます（例：ジャム→いちご/ブルーベリー…）。読点「、」かカンマ「,」で区切ってください。</p>
       <div className="rec-sub">備考</div>
       <Area label="" rows={3} value={note} onChange={e=>setNote(e.target.value)} placeholder="補充に関する自由メモ"/>
       <div className="row-between" style={{marginTop:2}}><button className="link-btn" onClick={()=>noteFileRef.current&&noteFileRef.current.click()}>📷 備考に写真を添付</button><Btn kind="ghost2" onClick={saveNote}>備考を保存</Btn></div>
@@ -1334,7 +1362,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.42〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.43〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
