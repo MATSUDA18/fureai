@@ -39,6 +39,11 @@
   .news-main b{color:#5A4A50;font-size:14px;}
   .news-main em{color:#94808A;font-style:normal;font-size:11px;margin-top:2px;}
   .news-body{background:#fff;border:1px solid #F0D3DB;border-radius:14px;padding:14px 16px;margin:6px 0 4px;color:#5A4A50;font-size:14px;line-height:1.7;box-shadow:0 6px 16px rgba(228,87,122,.10);}
+  .sync-note{background:#FFF6E9;border:1px solid #F3D9A8;border-radius:14px;padding:12px 14px;margin:0 0 14px;color:#6B5638;}
+  .sync-note b{color:#B25E77;}
+  .sync-note ul{margin:8px 0 6px;padding-left:18px;}
+  .sync-note li{font-size:13.5px;line-height:1.9;}
+  .sync-note .tiny{color:#8A745A;display:block;margin-top:4px;}
 
   .card{background:#fff;border-radius:20px;padding:18px;margin-top:16px;box-shadow:0 6px 20px rgba(201,120,143,.10);border:1px solid #F0D3DB;}
   .card h2{display:flex;align-items:center;gap:8px;margin:0 0 14px;font-size:16px;color:#C9788F;}
@@ -799,7 +804,16 @@ function DayPlanModal({data,persist,date,onClose}){
     ns1=resolve("A",ns1); ns2=resolve("B",ns2);
     persist(Object.assign({},data,{dayPlans:Object.assign({},data.dayPlans||{},{[date]:{users,s1:ns1,s2:ns2}}),shifts})); onClose(); };
   return <Modal title={fmtDate(date)+" の利用者・支援員"} tint="#C9788F" onClose={onClose}>
-    <p className="hint">この日（{fmtDate(date)} 15:30〜翌9:30）の担当と利用者を設定します。保存すると記録・タイムライン・日誌に反映されます。</p>
+    <div className="sync-note">
+      <b>💡 ここで設定すると、下の4か所へ自動で反映されます</b>
+      <ul>
+        <li>① <b>タイムスケジュール</b>（支援1・支援2の名前）</li>
+        <li>② <b>職員シフト</b>（夜勤A＝支援1／夜勤B＝支援2）</li>
+        <li>③ <b>記録</b>（利用者の選択ボタン）</li>
+        <li>④ <b>日誌まとめ</b>（利用者・担当）</li>
+      </ul>
+      <span className="tiny">※ 対象は「{fmtDate(date)} 15:30〜翌9:30」の勤務です。反映を見るときは<b>同じ勤務日</b>で確認してください。逆に、タイムスケジュールや職員シフトで入力しても、ここへ反映されます。</span>
+    </div>
     <div className="rec-sub" style={{marginTop:0}}>支援員（夜勤A＝支援1／夜勤B＝支援2）</div>
     <label className="field"><span>支援1（A夜勤）</span><select value={s1} onChange={e=>setS1(e.target.value)}><option value="">（未設定）</option>{accounts.map(a=><option key={a.id} value={a.name}>{a.name}</option>)}</select></label>
     <label className="field"><span>支援2（B夜勤）</span><select value={s2} onChange={e=>setS2(e.target.value)}><option value="">（未設定）</option>{accounts.map(a=><option key={a.id} value={a.name}>{a.name}</option>)}</select></label>
@@ -1048,7 +1062,8 @@ function Records({me,data,persist,reload}){
   const itemMove=(id,dir)=>{ const arr=rItems.slice(); const idx=arr.findIndex(x=>x.id===id); if(idx<0)return; const cat=arr[idx].cat; let j=idx+dir; while(j>=0&&j<arr.length&&arr[j].cat!==cat) j+=dir; if(j<0||j>=arr.length)return; const t=arr[idx];arr[idx]=arr[j];arr[j]=t; persist({...data,recItems:arr,recCats:cats}); };
   const itemSetCat=(id,cat)=>persist({...data,recItems:rItems.map(x=>x.id===id?Object.assign({},x,{cat}):x),recCats:cats});
   return <Section title="記録" note="利用者を選び、項目をタップすると時刻つきで記録されます。写真も残せます。あとで「まとめ」の材料になります。">
-    <button className="time-toggle" style={{marginTop:0,marginBottom:8}} onClick={()=>setDpOpen(true)}>👥 この日の利用者・支援員を設定</button>
+    <button className="time-toggle" style={{marginTop:0,marginBottom:4}} onClick={()=>setDpOpen(true)}>👥 この日の利用者・支援員を設定</button>
+    <p className="tiny" style={{textAlign:"center",marginBottom:8,color:"#B0895A"}}>💡 ここで設定すると、シフト・タイムスケジュール・日誌にも反映されます</p>
     <div className="rec-users">{dayUsers.map(u=>(<button key={u} className={"ruser "+(sel.includes(u)?"on":"")} onClick={()=>toggleUser(u)}>{u}</button>))}</div>
     <div className="tl-modes" style={{marginBottom:12}}>
       <button className={"seg "+(view==="log"?"on":"")} onClick={()=>setView("log")}>記録</button>
@@ -1319,7 +1334,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.41〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.42〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
