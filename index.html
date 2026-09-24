@@ -1168,7 +1168,7 @@ function AlarmPopup({type,onClose}){
 function AppAuthGate({onDone}){
   const [email,setEmail]=useState(""); const [pw,setPw]=useState(""); const [err,setErr]=useState(""); const [l,setL]=useState(false);
   const go=async()=>{ setL(true); setErr(""); try{ await sbLogin(email.trim(),pw); onDone(); }catch(e){ setErr("ログインできませんでした。メール／パスワードをご確認ください。"); } setL(false); };
-  return <div className="root"><StyleTag/><div className="top" style={{maxWidth:"420px",paddingTop:"36px"}}>
+  return <div className="root"><div className="top" style={{maxWidth:"420px",paddingTop:"36px"}}>
     <div className="hero" style={{borderRadius:"24px"}}><div className="hero-title"><p className="pref">岐阜県瑞穂市</p><h1>ふれあいホームみずほ</h1><p className="sub">職員ログイン</p></div></div>
     <section className="card">
       <p className="hint">🔐 このアプリは職員専用です。事業所で共有のメールアドレスとパスワードでログインしてください（この端末に保持されます）。</p>
@@ -1299,7 +1299,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.38〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.39〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
