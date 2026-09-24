@@ -220,6 +220,8 @@
   .rec-group{margin-bottom:6px;}
   .rec-gtitle{font-size:11px;color:#94808A;font-weight:700;margin:6px 0 4px;}
   .cat-row{display:flex;align-items:center;gap:6px;background:#fff;border:1px solid #F0D3DB;border-radius:8px;padding:6px 8px;margin-bottom:4px;}
+  .cat-head{width:100%;display:flex;align-items:center;justify-content:space-between;background:linear-gradient(180deg,#FCEAF0,#FADCE6);border:1px solid #F0C6D5;border-radius:12px;padding:12px 14px;font-weight:700;color:#B25E77;font-size:15px;cursor:pointer;margin:0;}
+  .cat-head:active{filter:brightness(0.98);}
   .cat-name{flex:1;font-size:13px;color:#5A4A50;}
   .cat-sel{font-size:11px;padding:4px;border:1px solid #F0D3DB;border-radius:6px;background:#FCF4F5;max-width:120px;}
   .recbtn.cam{background:#EAF3E6;border-color:#CFE3C6;color:#5B8A45;}
@@ -362,6 +364,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.24.4/babel.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script type="text/babel" data-presets="react">
 const {useState,useEffect,useRef,useMemo} = React;
 
@@ -1001,7 +1004,10 @@ function Records({me,data,persist,reload}){
   const [useTime,setUseTime]=useState(false); const [mDate,setMDate]=useState(iso(new Date())); const [mH,setMH]=useState("16"); const [mM,setMM]=useState("00");
   const [view,setView]=useState("log"); const [photos,setPhotos]=useState(null);
   const [busy,setBusy]=useState(false); const [pv,setPv]=useState(null);
-  const [editItems,setEditItems]=useState(false); const [newItem,setNewItem]=useState(""); const [newCat,setNewCat]=useState(""); const [newItemCat,setNewItemCat]=useState("");
+  const [editItems,setEditItems]=useState(false); const [newItem,setNewItem]=useState(""); const [newCat,setNewCat]=useState(""); const [newItemCat,setNewItemCat]=useState(""); const [openCats,setOpenCats]=useState({});
+  const toggleCat=(c)=>setOpenCats(p=>Object.assign({},p,{[c]:!p[c]}));
+  const openAllCats=()=>{ const o={}; cats.forEach(c=>o[c]=true); setOpenCats(o); };
+  const closeAllCats=()=>setOpenCats({});
   const [vit,setVit]=useState(null); const [valert,setValert]=useState(null); const [sp,setSp]=useState(null); const [edRec,setEdRec]=useState(null);
   const EY=[]; for(let y=2015;y<=new Date().getFullYear()+1;y++)EY.push(y); const EMO=[]; for(let m=1;m<=12;m++)EMO.push(m); const EDA=[]; for(let dd=1;dd<=31;dd++)EDA.push(dd); const EHH=[]; for(let h=0;h<=23;h++)EHH.push(h); const EMI=[]; for(let m=0;m<60;m+=5)EMI.push(m);
   const [af,setAf]=useState(iso(addDays(new Date(),-7))); const [at,setAt]=useState(iso(new Date()));
@@ -1021,6 +1027,7 @@ function Records({me,data,persist,reload}){
   const addNote=async()=>{ if(!note.trim())return; if(await pushRecords(note.trim())){ flash("記録しました（現在時刻）"); setNote(""); } };
   const addNoteAt=async()=>{ if(!note.trim()){ flash("記録内容を入力してください"); return; } if(await pushRecords(note.trim(),null,bizTs())){ flash("記録しました（指定時刻）"); setNote(""); } };
   const delRec=async(id)=>{ try{ await recDelete(id); await reload(); }catch(e){} };
+  const delAllShown=async()=>{ if(!log.length){flash("削除する記録がありません");return;} if(!confirm("本当に削除して良いですか？\nこの勤務日に表示中の記録 "+log.length+" 件をすべて削除します。（元に戻せません）"))return; if(!confirm("最終確認です。よろしいですか？"))return; try{ for(const r of log){ await recDelete(r.id); } await reload(); flash("削除しました"); }catch(e){ setErr("一括削除に失敗しました"); } };
   const openEditRec=(r)=>{ const d=new Date(r.ts); setEdRec({id:r.id,user:r.user,abn:r.abn,thumb:r.thumb,photoId:r.photoId,y:d.getFullYear(),mo:d.getMonth()+1,da:d.getDate(),h:d.getHours(),mi:d.getMinutes(),item:r.item||""}); };
   const setER=(k,v)=>setEdRec(p=>Object.assign({},p,{[k]:v}));
   const saveEditRec=async()=>{ const e=edRec; if(!(e.item||"").trim()){flash("内容を入力してください");return;} const ts=new Date(e.y,e.mo-1,e.da,e.h,e.mi,0).toISOString(); const rec={id:e.id,ts,user:e.user,item:e.item.trim()}; if(e.abn)rec.abn=true; if(e.thumb)rec.thumb=e.thumb; if(e.photoId)rec.photoId=e.photoId; try{ await recUpdate(e.id,rec); await reload(); setEdRec(null); flash("修正しました"); }catch(err){ flash("修正に失敗しました"); } };
@@ -1051,7 +1058,8 @@ function Records({me,data,persist,reload}){
         <button className="recbtn vit" onClick={()=>setVit({sys:"",dia:"",hr:"",temp:""})}>🩺 バイタル測定（血圧・体温）</button>
         <button className="recbtn cam" onClick={()=>fileRef.current&&fileRef.current.click()} disabled={busy}>📷 写真</button>
       </div>
-      {cats.map(cat=>{ const list=rItems.filter(i=>i.cat===cat); if(!list.length) return null; return <div key={cat} className="rec-group"><div className="rec-gtitle">{cat}</div><div className="rec-items">{list.map(i=>(<button key={i.id} className="recbtn" onClick={()=>tapItem(i.name)}>{i.name}</button>))}</div></div>; })}
+      <div className="row-between" style={{margin:"4px 0 8px"}}><button className="link-btn" onClick={openAllCats}>すべて開く</button><button className="link-btn" onClick={closeAllCats}>すべて閉じる</button></div>
+      {cats.map(cat=>{ const list=rItems.filter(i=>i.cat===cat); if(!list.length) return null; const op=!!openCats[cat]; return <div key={cat} className="rec-group"><button className="cat-head" onClick={()=>toggleCat(cat)}><span>{op?"▼":"▶"} {cat}</span><span className="tiny">{list.length}</span></button>{op&&<div className="rec-items">{list.map(i=>(<button key={i.id} className="recbtn" onClick={()=>tapItem(i.name)}>{i.name}</button>))}</div>}</div>; })}
       {(function(){ const orphans=rItems.filter(i=>!cats.includes(i.cat)); if(!orphans.length) return null; return <div className="rec-group"><div className="rec-gtitle">その他</div><div className="rec-items">{orphans.map(i=>(<button key={i.id} className="recbtn" onClick={()=>tapItem(i.name)}>{i.name}</button>))}</div></div>; })()}
       <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={onFile} style={{display:"none"}}/>
       <div className="rec-sub">自由に記録</div>
@@ -1088,6 +1096,7 @@ function Records({me,data,persist,reload}){
         <button className="link-btn" onClick={()=>setDate(iso(addDays(new Date(date+"T00:00:00"),1)))}>次の勤務 ›</button>
       </div>
       <p className="tiny" style={{textAlign:"center",marginTop:2}}>15:30〜翌9:30の記録をまとめて表示します</p>
+      {me.isAdmin&&log.length>0&&<div className="row-end" style={{marginBottom:6}}><button className="mini-del" style={{padding:"6px 12px",borderRadius:"10px"}} onClick={delAllShown}>🗑 この勤務日の記録を一括削除</button></div>}
       {log.length===0&&<p className="empty">まだ記録がありません。</p>}
       <div className="rec-log">{log.map(r=>(<div key={r.id} className="rec-row">
         <span className="rec-time">{hm(r.ts)}</span><span className="chip">{r.user}</span>
@@ -1183,7 +1192,7 @@ function AppAuthGate({onDone}){
 /* ================================ 本体 ================================ */
 function App(){
   const [data,setData]=useState(null);
-  const [me,setMe]=useState(null);
+  const [me,setMe]=useState(null); const [sessTried,setSessTried]=useState(false);
   const [tab,setTab]=useState("schedule");
   const season=useMemo(seasonPalette,[]);
   const [login,setLogin]=useState(null);
@@ -1222,13 +1231,12 @@ function App(){
       SEED_STAFF.forEach(s=>{ if(!have.has(s.name)) d.accounts.push({id:uid(),name:s.name,hash:s.hash,isAdmin:false}); });
       localStorage.setItem("mizuho_staff_seeded","1"); save(d);
     }
-    try{ const ses=JSON.parse(localStorage.getItem("mizuho_session")||"null");
-      if(ses&&ses.exp>Date.now()){ const acc=d.accounts.find(a=>a.id===ses.id); if(acc){ setMe(acc); if(SB_ON) logAccess(acc.name,"開いた"); } } }catch(e){}
     setData(d);
     const standalone=(window.matchMedia&&window.matchMedia("(display-mode: standalone)").matches)||window.navigator.standalone===true;
     if(!standalone && !localStorage.getItem("mizuho_install_done")) setShowInstall(true);
     if(SB_ON){ try{ const row=await sbGet(); if(row&&row.data&&Object.keys(row.data).length>0){ let rd=row.data; if(!rd.recMigrated && (rd.records||[]).length){ try{ for(const rc of rd.records){ await recAdd(rc); } }catch(e){} rd=Object.assign({},rd,{recMigrated:true}); try{ await sbSave(rd,new Date().toISOString()); }catch(e){} } tsRef.current=row.updated_at||null; setData(rd); } else { const ts=new Date().toISOString(); tsRef.current=ts; await sbSave(d,ts); } await refreshRecords(); }catch(e){console.error("sb init",e);} }
   })();},[sbAuthed]);
+  useEffect(()=>{ if(me||!data||!data.accounts) return; try{ const ses=JSON.parse(localStorage.getItem("mizuho_session")||"null"); if(ses&&ses.exp>Date.now()){ const acc=(data.accounts||[]).find(a=>a.id===ses.id); if(acc){ localStorage.setItem("mizuho_session",JSON.stringify({id:acc.id,exp:Date.now()+86400000})); setMe(acc); if(SB_ON&&!sessTried){ setSessTried(true); logAccess(acc.name,"開いた"); } } } }catch(e){} },[data,me]);
   useEffect(()=>{ if(!SB_ON||!sbAuthed) return; const iv=setInterval(async()=>{ try{ const row=await sbGet(); if(row&&row.updated_at&&row.updated_at!==tsRef.current){ tsRef.current=row.updated_at; if(row.data&&Object.keys(row.data).length>0) setData(prev=>Object.assign({},row.data,{records:(prev&&prev.records)||[]})); } }catch(e){} try{ await refreshRecords(); }catch(e){} },12000); return ()=>clearInterval(iv); },[sbAuthed]);
 
   const persist=(next)=>{ setData(next); save(next); if(SB_ON){ const ts=new Date().toISOString(); tsRef.current=ts; sbSave(next,ts).catch(()=>{}); } };
@@ -1299,7 +1307,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.39〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.40〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
@@ -1901,6 +1909,9 @@ function AdminPanel({data,persist}){
   const [pwFor,setPwFor]=useState(null); const [np1,setNp1]=useState(""); const [np2,setNp2]=useState("");
   const [m1,setM1]=useState(""); const [m2,setM2]=useState("");
   const [alog,setAlog]=useState(null); const [alShow,setAlShow]=useState(false);
+  const qrRef=useRef(null); const [qrShown,setQrShown]=useState(false);
+  const APP_URL="https://matsuda18.github.io/fureai/";
+  useEffect(()=>{ if(qrShown&&qrRef.current&&window.QRCode){ qrRef.current.innerHTML=""; try{ new window.QRCode(qrRef.current,{text:APP_URL,width:220,height:220,correctLevel:window.QRCode.CorrectLevel.M}); }catch(e){} } },[qrShown]);
   const loadAlog=async()=>{ try{ setAlog(await alFetch()); }catch(e){ setAlog([]); } };
   const alDT=(ts)=>{ const d=new Date(ts); return (d.getMonth()+1)+"/"+d.getDate()+" "+String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0"); };
   const add=async()=>{
@@ -1965,6 +1976,12 @@ function AdminPanel({data,persist}){
     <Field label="新しい登録用パスワード" type="password" value={m1} onChange={e=>setM1(e.target.value)}/>
     <Field label="もう一度" type="password" value={m2} onChange={e=>setM2(e.target.value)}/>
     <div className="row-end"><Btn kind="ghost2" onClick={saveMaster}>変更する</Btn></div>
+    <h3 className="blk">📱 配布用QRコード</h3>
+    <p className="tiny">新しい職員に渡すURL：{APP_URL}</p>
+    {!qrShown?<div className="row-end"><Btn kind="ghost2" onClick={()=>setQrShown(true)}>QRコードを表示</Btn></div>:<div style={{textAlign:"center"}}>
+      <div ref={qrRef} style={{display:"inline-block",background:"#fff",padding:"12px",borderRadius:"12px"}}></div>
+      <p className="tiny">この画面を見せて読み取ってもらうか、スクリーンショットで配布できます。<br/>読み取った端末で「ホーム画面に追加」→以後はアイコンから開けます。</p>
+    </div>}
     <h3 className="blk">📋 アクセスログ（誰がいつ開いたか）</h3>
     <p className="tiny">職員が名前を選んで開くたびに記録が残ります（削除されず蓄積されます）。</p>
     {!alShow?<div className="row-end"><Btn kind="ghost2" onClick={()=>{setAlShow(true); if(alog===null) loadAlog();}}>ログを表示</Btn></div>:<>
@@ -1989,6 +2006,16 @@ class ErrorBoundary extends React.Component{
   render(){ if(this.state.err){ const m=(this.state.err&&this.state.err.message)||String(this.state.err); return <div style={{padding:"24px",color:"#5A4A50",fontFamily:"system-ui"}}><h2 style={{color:"#B25E77"}}>表示でエラーが発生しました</h2><p>お手数ですが、ページを再読み込みしてください。直らない時は、下の赤い文字をこの画面ごと教えてください。</p><button className="btn primary" onClick={()=>location.reload()}>再読み込み</button><pre style={{whiteSpace:"pre-wrap",fontSize:"11px",color:"#C0392B",marginTop:"12px",background:"#FBEAEE",padding:"10px",borderRadius:"8px"}}>{m}</pre></div>; } return this.props.children; }
 }
 ReactDOM.createRoot(document.getElementById("root")).render(<ErrorBoundary><App/></ErrorBoundary>);
+</script>
+<script>
+if('serviceWorker' in navigator){
+  window.addEventListener('load', function(){
+    navigator.serviceWorker.register('sw.js').then(function(reg){ reg.update(); setInterval(function(){ reg.update(); }, 30*60*1000); }).catch(function(){});
+    var refreshing=false;
+    navigator.serviceWorker.addEventListener('controllerchange', function(){ if(refreshing) return; refreshing=true; location.reload(); });
+  });
+  document.addEventListener('visibilitychange', function(){ if(document.visibilityState==='visible' && navigator.serviceWorker.controller){ navigator.serviceWorker.getRegistration().then(function(r){ if(r) r.update(); }); } });
+}
 </script>
 </body>
 </html>
