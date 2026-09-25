@@ -236,6 +236,10 @@
   .cat-row{display:flex;align-items:center;gap:6px;background:#fff;border:1px solid #F0D3DB;border-radius:8px;padding:6px 8px;margin-bottom:4px;}
   .cat-head{width:100%;display:flex;align-items:center;justify-content:space-between;background:linear-gradient(180deg,#FCEAF0,#FADCE6);border:1px solid #F0C6D5;border-radius:12px;padding:12px 14px;font-weight:700;color:#B25E77;font-size:15px;cursor:pointer;margin:0;}
   .cat-head:active{filter:brightness(0.98);}
+  .consent-box{background:#fff;border:1px solid #F0D3DB;border-radius:16px;padding:16px 18px;color:#5A4A50;line-height:1.8;box-shadow:0 8px 20px rgba(228,87,122,.10);}
+  .consent-box h3{color:#B25E77;margin:0 0 8px;font-size:16px;}
+  .consent-box ul{margin:6px 0 10px;padding-left:20px;}
+  .consent-box li{font-size:14px;margin-bottom:6px;}
   .maplink{color:#2F8F8A;font-size:11px;margin-left:6px;white-space:nowrap;}
   .proxy-tag{background:#EDE3F7;color:#8A5BB8;border-radius:6px;padding:1px 5px;font-size:10px;font-weight:700;margin-left:4px;}
   .ch-eve{display:block;font-size:10px;color:#8A5A00;background:#FBE1B0;border-radius:6px;padding:1px 5px;margin-top:2px;font-weight:700;}
@@ -1382,7 +1386,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.52〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.53〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
@@ -1426,6 +1430,8 @@ function TimeCard({me,data}){
   const [toast,setToast]=useState(""); const [edit,setEdit]=useState(null); const [placeAsk,setPlaceAsk]=useState(null);
   const flash=(m)=>{ setToast(m); setTimeout(()=>setToast(""),1800); };
   const today=bizDate();
+  const [agreed,setAgreed]=useState(()=>localStorage.getItem("mizuho_tc_consent")==="1");
+  const agree=async()=>{ localStorage.setItem("mizuho_tc_consent","1"); setAgreed(true); if(SB_ON){ try{ await logAccess(me.name,"勤怠・位置情報の説明に同意"); }catch(e){} } };
   const RMAP={A:"夜勤A",B:"夜勤B",nightonly:"夜勤のみ",eve:"夕勤",day:"日勤",other:"その他"};
   const hm=(ts)=>{ if(!ts)return"—"; const d=new Date(ts); return String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0"); };
   const hx=(ts)=>ts?hm(ts):"";
@@ -1453,6 +1459,20 @@ function TimeCard({me,data}){
   const SUB={ eve:{in:"15:30",out:"21:30",bin:"",bout:"",br:"なし",work:"6.0"}, A:{in:"15:30",out:"翌9:30",bin:"21:30",bout:"翌1:30",br:"4h",work:"14.0"}, B:{in:"15:30",out:"翌9:30",bin:"翌1:30",bout:"翌5:30",br:"4h",work:"14.0"}, nightonly:{in:"21:30",out:"翌9:30",bin:"",bout:"",br:"なし",work:"12.0"} };
   const toExcelSubmit=()=>{ if(!window.XLSX){flash("Excel機能の読み込み中です");return;} const A=[["日付","氏名","役割","出勤","退勤","休憩開始","休憩終了","休憩","実働(h)","交通費","メモ"]]; const rs=(rows||[]).slice().sort((a,b)=>String(a.name||"").localeCompare(String(b.name||""))||String(a.biz_date||"").localeCompare(String(b.biz_date||""))); rs.forEach(r=>{ const d=r.data||{}; const s=SUB[d.role]; if(s){ A.push([r.biz_date,r.name,RMAP[d.role]||"",s.in,s.out,s.bin,s.bout,s.br,s.work,d.transport||"",d.note||""]); } else { A.push([r.biz_date,r.name,RMAP[d.role]||"",hx(d.in_ts),hx(d.out_ts),hx(d.break_in),hx(d.break_out),(d.has_break?"4h":"なし"),worked(d),d.transport||"",d.note||""]); } }); const ws=XLSX.utils.aoa_to_sheet(A); ws["!cols"]=[{wch:11},{wch:12},{wch:8},{wch:7},{wch:8},{wch:8},{wch:8},{wch:7},{wch:8},{wch:7},{wch:20}]; const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,"提出用"+month); XLSX.writeFile(wb,"勤怠提出用_"+month+".xlsx"); };
   const toExcel=()=>{ if(!window.XLSX){flash("Excel機能の読み込み中です");return;} const A=[["日付","氏名","役割","出勤","出勤区分","退勤","退勤区分","休憩","実働(h)","交通費","メモ","登録区分","出勤位置","退勤位置"]]; const rs=(rows||[]).slice().sort((a,b)=>String(a.name||"").localeCompare(String(b.name||""))||String(a.biz_date||"").localeCompare(String(b.biz_date||""))); rs.forEach(r=>{ const d=r.data||{}; A.push([r.biz_date,r.name,RMAP[d.role]||"",hx(d.in_ts),d.in_place||"",hx(d.out_ts),d.out_place||"",(d.has_break?"4h":"なし")+(d.break_in?("／"+hx(d.break_in)+"-"+hx(d.break_out)):""),worked(d),d.transport||"",d.note||"",d.admin_entry?"管理者代理":"本人",mapUrl(d.geo_in)||"",mapUrl(d.geo_out)||""]); }); const ws=XLSX.utils.aoa_to_sheet(A); ws["!cols"]=[{wch:11},{wch:12},{wch:8},{wch:7},{wch:9},{wch:7},{wch:9},{wch:14},{wch:8},{wch:7},{wch:20},{wch:10},{wch:34},{wch:34}]; const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,"勤怠"+month); XLSX.writeFile(wb,"勤怠_"+month+".xlsx"); };
+  if(!agreed){ return <Section title="出勤簿（勤怠）について" note="はじめにお読みください。">
+    <div className="consent-box">
+      <h3>📍 位置情報の取り扱いについて</h3>
+      <ul>
+        <li><b>打刻の瞬間だけ</b>位置情報（GPS）を記録します。<b>常時追跡は行いません。</b></li>
+        <li>記録するのは、出勤・退勤・休憩の開始/終了を<b>あなたが打刻した時だけ</b>です。目的は<b>勤怠の確認</b>です。</li>
+        <li>初回にスマホで「位置情報の使用を許可しますか？」と表示されます。<b>許可しない場合は「位置なし」で打刻できます</b>（打刻自体は可能です）。</li>
+        <li>屋内や電波状況により精度は数m〜数百m変わります。本部／現地のおおよその目安であり、厳密な証明ではありません。</li>
+        <li>記録した位置は、管理者が勤怠確認の目的でのみ参照します。</li>
+      </ul>
+      <p className="tiny">「同意して利用する」を押すと、あなたのお名前・日時が同意記録として残ります（この端末では次回から表示されません）。</p>
+      <div className="row-end" style={{marginTop:12}}><Btn onClick={agree}>同意して利用する</Btn></div>
+    </div>
+  </Section>; }
   return <Section title="出勤簿（勤怠）" note="出勤・退勤を打刻します。休憩は一律4時間で自動計算（打刻は確認用）。管理者は全員分の追加・修正・月次出力ができます。">
     <div className="rec-sub" style={{marginTop:0}}>あなたの打刻（{fmtDate(today)}）</div>
     <div className="tl-editpanel">
