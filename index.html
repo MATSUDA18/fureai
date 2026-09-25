@@ -850,7 +850,7 @@ function Handover({me,data,persist}){
   const post=()=>{ if(!text.trim()&&pendingAtt.length===0)return; const h={id:uid(),ts:new Date().toISOString(),from,text:text.trim(),scope:from==="hq"?scope:null,day:(from==="hq"&&scope==="day")?day:null,confirmedBy:{},attachments:pendingAtt}; persist(Object.assign({},data,{handovers:[h,...list]})); setText(""); setPendingAtt([]); flash("申し送りを投稿しました"); };
   const delHo=(id)=>{ if(!confirm("削除しますか？"))return; persist(Object.assign({},data,{handovers:list.filter(h=>h.id!==id)})); };
   const confirmHo=(h)=>{ const cb=Object.assign({},h.confirmedBy||{},{[me.id]:new Date().toISOString()}); persist(Object.assign({},data,{handovers:list.map(x=>x.id===h.id?Object.assign({},x,{confirmedBy:cb}):x)})); };
-  const targeted=(h)=>{ if(h.from!=="hq")return false; if(h.scope==="all")return true; if(h.scope==="day"){ const p=(data.dayPlans||{})[h.day]||{}; return me.name===p.s1||me.name===p.s2; } return false; };
+  const targeted=(h)=>{ if(h.from!=="hq")return false; if(h.scope==="all")return true; if(h.scope==="day"){ const p=(data.dayPlans||{})[h.day]||{}; return me.name===p.s1||me.name===p.s2||me.name===p.s3; } return false; };
   const needConfirm=(h)=>targeted(h)&&!(h.confirmedBy&&h.confirmedBy[me.id]);
   const items=data.supplyItems||[];
   const supCats=(data.supplyCats&&data.supplyCats.length)?data.supplyCats:["清掃用具関係","衛生関連","食品関連","調味料関係","その他"];
@@ -879,7 +879,7 @@ function Handover({me,data,persist}){
       {list.filter(needConfirm).length>0&&<div className="notice-box"><b>📌 未確認の申し送り（本部）</b>{list.filter(needConfirm).map(h=>(<div key={h.id} className="notice-item"><span>{hoDate(h.ts)}・本部{h.scope==="day"?"（本日担当）":"（全員）"}</span><p>{h.text}</p><div className="row-end"><Btn onClick={()=>confirmHo(h)}>確認済みにする</Btn></div></div>))}</div>}
       <div className="tl-editpanel">
         <div className="chk-row"><label className="chk"><input type="radio" name="hofrom" checked={from==="field"} onChange={()=>setFrom("field")}/>現場より</label><label className="chk"><input type="radio" name="hofrom" checked={from==="hq"} onChange={()=>setFrom("hq")}/>本部より</label></div>
-        {from==="hq"&&<><div className="chk-row"><label className="chk"><input type="radio" name="hoscope" checked={scope==="all"} onChange={()=>setScope("all")}/>全員に周知</label><label className="chk"><input type="radio" name="hoscope" checked={scope==="day"} onChange={()=>setScope("day")}/>その日の担当のみ</label></div>{scope==="day"&&<label className="field"><span>対象日（担当＝その日の支援1・2）</span><input type="date" value={day} onChange={e=>setDay(e.target.value)}/></label>}</>}
+        {from==="hq"&&<><div className="chk-row"><label className="chk"><input type="radio" name="hoscope" checked={scope==="all"} onChange={()=>setScope("all")}/>全員に周知</label><label className="chk"><input type="radio" name="hoscope" checked={scope==="day"} onChange={()=>setScope("day")}/>その日の担当のみ</label></div>{scope==="day"&&<label className="field"><span>対象日（担当＝その日の支援員1・2・3）</span><input type="date" value={day} onChange={e=>setDay(e.target.value)}/></label>}</>}
         <Area label="申し送りの内容" rows={3} value={text} onChange={e=>setText(e.target.value)}/>
         <div className="row-between" style={{marginTop:2}}><button className="link-btn" onClick={()=>hoFileRef.current&&hoFileRef.current.click()}>📎 ファイル・写真を添付</button><span className="tiny">{pendingAtt.length>0?(pendingAtt.length+"件添付"):""}</span></div>
         <input ref={hoFileRef} type="file" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.csv" onChange={onHoFile} style={{display:"none"}}/>
@@ -893,7 +893,7 @@ function Handover({me,data,persist}){
         {h.attachments&&h.attachments.length>0&&<div className="ho-atts">{h.attachments.map(a=>(a.type==="image"?<img key={a.id} className="ho-att-thumb" src={a.thumb} alt={a.name} onClick={()=>openHoImg(a)}/>:<button key={a.id} className="ho-att-file" onClick={()=>dlAtt(a)}>📎 {a.name}</button>))}</div>}
         {h.from==="hq"&&((h.confirmedBy&&h.confirmedBy[me.id])?<div className="ho-ok">✓ 確認済み</div>:(targeted(h)&&<div className="row-end"><Btn kind="ghost2" onClick={()=>confirmHo(h)}>確認済みにする</Btn></div>))}
         {me.isAdmin&&h.from==="hq"&&<button className="link-btn" onClick={()=>setShowStatus(showStatus===h.id?null:h.id)}>{showStatus===h.id?"確認状況を閉じる":"確認状況をみる"}</button>}
-        {me.isAdmin&&h.from==="hq"&&showStatus===h.id&&<div className="ho-status">{(function(){ const targets=h.scope==="all"?(data.accounts||[]):(data.accounts||[]).filter(a=>{const p=(data.dayPlans||{})[h.day]||{};return a.name===p.s1||a.name===p.s2;}); if(targets.length===0) return <div className="ho-st-row"><span>対象者が未設定です</span></div>; return targets.map(a=>(<div key={a.id} className="ho-st-row"><span>{a.name}</span><span>{(h.confirmedBy&&h.confirmedBy[a.id])?("✓ "+dt(h.confirmedBy[a.id])):"未確認"}</span></div>)); })()}</div>}
+        {me.isAdmin&&h.from==="hq"&&showStatus===h.id&&<div className="ho-status">{(function(){ const targets=h.scope==="all"?(data.accounts||[]):(data.accounts||[]).filter(a=>{const p=(data.dayPlans||{})[h.day]||{};return a.name===p.s1||a.name===p.s2||a.name===p.s3;}); if(targets.length===0) return <div className="ho-st-row"><span>対象者が未設定です</span></div>; return targets.map(a=>(<div key={a.id} className="ho-st-row"><span>{a.name}</span><span>{(h.confirmedBy&&h.confirmedBy[a.id])?("✓ "+dt(h.confirmedBy[a.id])):"未確認"}</span></div>)); })()}</div>}
       </div>))}
     </>}
     {sub==="sup"&&<>
@@ -1368,7 +1368,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.45〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.47〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
@@ -1534,9 +1534,11 @@ function Schedule({me,data,persist}){
   const tplan=(data.dayPlans||{})[date]||{}; const nameA=tplan.s1||(dayShifts.find(s=>s.role==="A")||{}).name||"";
   const nameB=tplan.s2||(dayShifts.find(s=>s.role==="B")||{}).name||"";
   const nameE=tplan.s3||(dayShifts.find(s=>s.role==="eve")||{}).name||"";
-  const _en=new Date(); const _em=_en.getHours()*60+_en.getMinutes(); const eveNow=(_em>=930&&_em<=1290);
-  const eveTag=(eveNow&&nameE)?nameE:"";
-  const cols=[{key:"s1",label:"支援員1",name:nameA,eve:eveTag},{key:"s2",label:"支援員2",name:nameB,eve:eveTag},{key:"user",label:"利用者",name:""}];
+  const _em=now.getHours()*60+now.getMinutes();
+  const eveSlot=(_em>=570&&_em<1290); // 9:30〜21:30（15:30前も夕勤優先）／21:30〜翌9:30は夜勤
+  let name2=nameB, sub2="";
+  if(nameE){ if(eveSlot){ name2=nameE; sub2=nameB?("21:30〜 夜勤 "+nameB):""; } else { name2=nameB; sub2=("〜21:30 夕勤 "+nameE); } }
+  const cols=[{key:"s1",label:"支援員1",name:nameA,sub:""},{key:"s2",label:"支援員2",name:name2,sub:sub2},{key:"user",label:"利用者",name:""}];
   const colX=(k)=> k==="s2"?AXIS+COL : k==="user"?AXIS+COL*2 : AXIS;
   const COLORS={s1:"#F6D4DD",s2:"#CDE0F1",user:"#D7EAD0",common:"#FBE1B0"};
   const rawNow=now.getHours()*60+now.getMinutes();
@@ -1568,7 +1570,7 @@ function Schedule({me,data,persist}){
         <div className="tl-head" style={{height:HEAD,width:W}}>
           <div className="tl-corner" style={{width:AXIS}}>時刻</div>
           {cols.map(c=><div key={c.key} className="tl-colhead" style={{width:COL}} onClick={()=>{ if(c.key!=="user") setDpOpen(true); }}>
-            <span className="ch-role" style={c.key!=="user"?{cursor:"pointer"}:null}>{c.label}{c.key!=="user"?" ✎":""}</span>{c.name&&<span className="ch-name">{c.name}</span>}{c.eve&&<span className="ch-eve">夕勤 {c.eve}</span>}</div>)}
+            <span className="ch-role" style={c.key!=="user"?{cursor:"pointer"}:null}>{c.label}{c.key!=="user"?" ✎":""}</span>{c.name&&<span className="ch-name">{c.name}</span>}{c.sub&&<span className="ch-eve">{c.sub}</span>}</div>)}
         </div>
         <div className="tl-body" style={{position:"relative",height:TOTAL*ppm,width:W}}>
           {marks.map(mk=>{const y=(mk.m-DAY_START)*ppm; const col=mk.lv===0?"#E3B9C6":mk.lv===1?"#EECEDA":mk.lv===2?"#F1D7E0":"#F8EBF0"; return <div key={mk.m}>
