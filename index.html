@@ -97,6 +97,14 @@
   .tabs{display:flex;gap:6px;overflow-x:auto;padding:10px 12px;background:#FBEAEE;position:sticky;top:53px;z-index:9;}
   .tab{white-space:nowrap;border:1px solid #F0D3DB;background:#fff;color:#94808A;padding:8px 12px;border-radius:999px;cursor:pointer;font-size:13px;}
   .tab.on{background:#E79AB0;color:#fff;border-color:#E79AB0;font-weight:700;}
+  .tab-handover{border-color:#F3B4C4;color:#D24A6E;background:#FDEDF1;font-weight:700;}
+  .tab-handover.on{background:#E4577A;border-color:#E4577A;color:#fff;}
+  .tab-shifts{border-color:#D8C2EC;color:#8A5BB8;background:#F6EFFB;font-weight:700;}
+  .tab-shifts.on{background:#9B7BD6;border-color:#9B7BD6;color:#fff;}
+  .tab-records{border-color:#F1D3A9;color:#C47A1E;background:#FDF3E3;font-weight:700;}
+  .tab-records.on{background:#E0913C;border-color:#E0913C;color:#fff;}
+  .tab-timecard{border-color:#B7DAD7;color:#2F8F8A;background:#E9F6F5;font-weight:700;}
+  .tab-timecard.on{background:#4F9E9B;border-color:#4F9E9B;color:#fff;}
   .ins-body{padding:18px 16px 70px;}
   .sec-title{font-size:20px;color:#B25E77;margin:0 0 4px;}
   .sec-note{color:#94808A;font-size:13px;margin:0 0 16px;line-height:1.6;}
@@ -1372,7 +1380,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.50〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.51〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
@@ -1508,7 +1516,7 @@ function Inside({me,data,tab,setTab,onLogout,persist,reload}){
       <button className="ghost" onClick={onLogout}>{me.name} ⏻</button>
     </header>
     <nav className="tabs">{tabs.map(t=>(
-      <button key={t.id} className={"tab "+(tab===t.id?"on":"")} onClick={()=>setTab(t.id)}>{t.label}</button>))}</nav>
+      <button key={t.id} className={"tab tab-"+t.id+" "+(tab===t.id?"on":"")} onClick={()=>setTab(t.id)}>{t.label}</button>))}</nav>
     <main className="ins-body">
       {tab==="schedule"&&<Schedule me={me} data={data} persist={persist}/>}
       {tab==="handover"&&<Handover me={me} data={data} persist={persist}/>}
