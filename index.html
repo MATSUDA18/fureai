@@ -445,7 +445,7 @@ const AFFILIATIONS=[
   {v:"ほたるの仕事場栄光", label:"ほたるの仕事場栄光"},
 ];
 const TL_ROLES=[{v:"s1",label:"支援員1"},{v:"s2",label:"支援員2"},{v:"s3",label:"支援員3（夕勤）"},{v:"common",label:"共通（支援員1・2）"},{v:"user",label:"利用者さん"}];
-const SHIFT_ROLES=[{v:"A",label:"夜勤A（支援員1）"},{v:"B",label:"夜勤B（支援員2）"},{v:"eve",label:"夕勤（支援員3）"},{v:"day",label:"日勤"},{v:"other",label:"その他"}];
+const SHIFT_ROLES=[{v:"A",label:"夜勤A（支援員1・15:30〜翌9:30）"},{v:"B",label:"夜勤B（支援員2・15:30〜翌9:30）"},{v:"nightonly",label:"夜勤のみ（21:30〜翌9:30）"},{v:"eve",label:"夕勤（支援員3・15:30〜21:30）"},{v:"day",label:"日勤"},{v:"other",label:"その他"}];
 const REC_DEFAULT=["トイレ（小）","トイレ（大）","食事","水分補給","服薬","入浴","就寝","起床","バイタル測定","来所","帰宅","様子・特記"];
 const USERS4=["利用者1","利用者2","利用者3","利用者4"];
 const REC_HOURS=(()=>{const a=[];for(let h=15;h<=23;h++)a.push(h);for(let h=0;h<=9;h++)a.push(h);return a;})();
@@ -1372,7 +1372,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.48〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.50〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
@@ -1416,7 +1416,7 @@ function TimeCard({me,data}){
   const [toast,setToast]=useState(""); const [edit,setEdit]=useState(null); const [placeAsk,setPlaceAsk]=useState(null);
   const flash=(m)=>{ setToast(m); setTimeout(()=>setToast(""),1800); };
   const today=bizDate();
-  const RMAP={A:"夜勤A",B:"夜勤B",eve:"夕勤",day:"日勤",other:"その他"};
+  const RMAP={A:"夜勤A",B:"夜勤B",nightonly:"夜勤のみ",eve:"夕勤",day:"日勤",other:"その他"};
   const hm=(ts)=>{ if(!ts)return"—"; const d=new Date(ts); return String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0"); };
   const hx=(ts)=>ts?hm(ts):"";
   const worked=(d)=>{ if(!d||!d.in_ts||!d.out_ts)return""; let h=(new Date(d.out_ts)-new Date(d.in_ts))/3600000; if(d.has_break)h-=4; if(h<0)h=0; return h.toFixed(1); };
@@ -1426,16 +1426,20 @@ function TimeCard({me,data}){
   const saveTC=async(name,biz,dataObj)=>{ const id="tc_"+name+"_"+biz; try{ await tcSave({id,name,biz_date:biz,data:dataObj,created:new Date().toISOString()}); await load(); }catch(e){ flash("保存に失敗（timecard表の設定をご確認ください）"); } };
   const myToday=(rows||[]).find(r=>r.name===me.name&&r.biz_date===today);
   const md=myToday?myToday.data:null;
-  const clockIn=async(place)=>{ const role=roleOf(me.name,today); const hasBreak=role!=="eve"; const cur=md||{}; await saveTC(me.name,today,Object.assign({transport:"不要"},cur,{in_ts:new Date().toISOString(),in_place:place,role,has_break:hasBreak,by:me.name})); setPlaceAsk(null); flash("出勤を記録しました"); };
+  const clockIn=async(place)=>{ const role=roleOf(me.name,today); const hasBreak=(role!=="eve"&&role!=="nightonly"); const cur=md||{}; await saveTC(me.name,today,Object.assign({transport:"不要"},cur,{in_ts:new Date().toISOString(),in_place:place,role,has_break:hasBreak,by:me.name})); setPlaceAsk(null); flash("出勤を記録しました"); };
   const clockOut=async(place)=>{ if(!md){flash("先に出勤を押してください");return;} await saveTC(me.name,today,Object.assign({},md,{out_ts:new Date().toISOString(),out_place:place})); setPlaceAsk(null); flash("退勤を記録しました"); };
   const breakIn=async()=>{ await saveTC(me.name,today,Object.assign({},md,{break_in:new Date().toISOString()})); flash("休憩開始"); };
   const breakOut=async()=>{ await saveTC(me.name,today,Object.assign({},md,{break_out:new Date().toISOString()})); flash("休憩終了"); };
   const setTransport=async(v)=>{ await saveTC(me.name,today,Object.assign({},md||{},{transport:v})); };
-  const blankEdit=()=>({id:null,name:"",nameMode:"list",biz_date:today,role:"A",in_t:"15:30",in_place:"本部着",out_t:"09:30",out_place:"本部着",has_break:true,bin_t:"",bout_t:"",transport:"不要",note:""});
+  const STD={ eve:{in:"15:30",out:"21:30",br:false,bin:"",bout:""}, A:{in:"15:30",out:"09:30",br:true,bin:"21:30",bout:"01:30"}, B:{in:"15:30",out:"09:30",br:true,bin:"01:30",bout:"05:30"}, nightonly:{in:"21:30",out:"09:30",br:false,bin:"",bout:""} };
+  const blankEdit=()=>({id:null,name:"",nameMode:"list",biz_date:today,role:"A",in_t:"15:30",in_place:"本部着",out_t:"09:30",out_place:"本部着",has_break:true,bin_t:"21:30",bout_t:"01:30",transport:"不要",note:""});
+  const onRole=(r)=>{ const s=STD[r]; if(s){ setEdit(Object.assign({},edit,{role:r,in_t:s.in,out_t:s.out,has_break:s.br,bin_t:s.bin,bout_t:s.bout,in_place:"本部着",out_place:(r==="eve"?"直帰":"本部着")})); } else { setEdit(Object.assign({},edit,{role:r,has_break:false})); } };
   const openEdit=(r)=>{ const d=r.data||{}; setEdit({id:r.id,name:r.name,nameMode:"list",biz_date:r.biz_date,role:d.role||"other",in_t:hx(d.in_ts),in_place:d.in_place||"本部着",out_t:hx(d.out_ts),out_place:d.out_place||"本部着",has_break:d.has_break!==false,bin_t:hx(d.break_in),bout_t:hx(d.break_out),transport:d.transport||"不要",note:d.note||""}); };
-  const mkTs=(biz,t)=>{ if(!t)return null; return new Date(biz+"T"+t+":00").toISOString(); };
-  const saveEdit=async()=>{ const e=edit; const nm=(e.name||"").trim(); if(!nm){flash("名前を入力してください");return;} const dataObj={in_ts:mkTs(e.biz_date,e.in_t),in_place:e.in_place,out_ts:mkTs(e.biz_date,e.out_t),out_place:e.out_place,role:e.role,has_break:(e.role!=="eve"&&e.has_break),break_in:mkTs(e.biz_date,e.bin_t),break_out:mkTs(e.biz_date,e.bout_t),transport:e.transport,note:e.note,by:me.name}; const id=e.id||("tc_"+nm+"_"+e.biz_date); try{ await tcSave({id,name:nm,biz_date:e.biz_date,data:dataObj,created:new Date().toISOString()}); await load(); setEdit(null); flash("保存しました"); }catch(err){ flash("保存に失敗しました"); } };
+  const toMin=(t)=>{ const p=(t||"0:0").split(":"); return (+p[0])*60+(+p[1]); };
+  const saveEdit=async()=>{ const e=edit; const nm=(e.name||"").trim(); if(!nm){flash("名前を入力してください");return;} const inM=toMin(e.in_t); const base=(t)=>{ if(!t)return null; const d=new Date(e.biz_date+"T"+t+":00"); return d.toISOString(); }; const tsAt=(t)=>{ if(!t)return null; const d=new Date(e.biz_date+"T"+t+":00"); if(toMin(t)<inM) d.setDate(d.getDate()+1); return d.toISOString(); }; const dataObj={in_ts:base(e.in_t),in_place:e.in_place,out_ts:tsAt(e.out_t),out_place:e.out_place,role:e.role,has_break:(e.role!=="eve"&&e.role!=="nightonly"&&e.has_break),break_in:tsAt(e.bin_t),break_out:tsAt(e.bout_t),transport:e.transport,note:e.note,by:me.name}; const id=e.id||("tc_"+nm+"_"+e.biz_date); try{ await tcSave({id,name:nm,biz_date:e.biz_date,data:dataObj,created:new Date().toISOString()}); await load(); setEdit(null); flash("保存しました"); }catch(err){ flash("保存に失敗しました"); } };
   const delEdit=async()=>{ if(!edit||!edit.id)return; if(!confirm("この打刻を削除しますか？"))return; try{ await tcDelete(edit.id); await load(); setEdit(null); }catch(e){} };
+  const SUB={ eve:{in:"15:30",out:"21:30",bin:"",bout:"",br:"なし",work:"6.0"}, A:{in:"15:30",out:"翌9:30",bin:"21:30",bout:"翌1:30",br:"4h",work:"14.0"}, B:{in:"15:30",out:"翌9:30",bin:"翌1:30",bout:"翌5:30",br:"4h",work:"14.0"}, nightonly:{in:"21:30",out:"翌9:30",bin:"",bout:"",br:"なし",work:"12.0"} };
+  const toExcelSubmit=()=>{ if(!window.XLSX){flash("Excel機能の読み込み中です");return;} const A=[["日付","氏名","役割","出勤","退勤","休憩開始","休憩終了","休憩","実働(h)","交通費","メモ"]]; const rs=(rows||[]).slice().sort((a,b)=>String(a.name||"").localeCompare(String(b.name||""))||String(a.biz_date||"").localeCompare(String(b.biz_date||""))); rs.forEach(r=>{ const d=r.data||{}; const s=SUB[d.role]; if(s){ A.push([r.biz_date,r.name,RMAP[d.role]||"",s.in,s.out,s.bin,s.bout,s.br,s.work,d.transport||"",d.note||""]); } else { A.push([r.biz_date,r.name,RMAP[d.role]||"",hx(d.in_ts),hx(d.out_ts),hx(d.break_in),hx(d.break_out),(d.has_break?"4h":"なし"),worked(d),d.transport||"",d.note||""]); } }); const ws=XLSX.utils.aoa_to_sheet(A); ws["!cols"]=[{wch:11},{wch:12},{wch:8},{wch:7},{wch:8},{wch:8},{wch:8},{wch:7},{wch:8},{wch:7},{wch:20}]; const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,"提出用"+month); XLSX.writeFile(wb,"勤怠提出用_"+month+".xlsx"); };
   const toExcel=()=>{ if(!window.XLSX){flash("Excel機能の読み込み中です");return;} const A=[["日付","氏名","役割","出勤","出勤区分","退勤","退勤区分","休憩","実働(h)","交通費","メモ"]]; const rs=(rows||[]).slice().sort((a,b)=>String(a.name||"").localeCompare(String(b.name||""))||String(a.biz_date||"").localeCompare(String(b.biz_date||""))); rs.forEach(r=>{ const d=r.data||{}; A.push([r.biz_date,r.name,RMAP[d.role]||"",hx(d.in_ts),d.in_place||"",hx(d.out_ts),d.out_place||"",(d.has_break?"4h":"なし")+(d.break_in?("／"+hx(d.break_in)+"-"+hx(d.break_out)):""),worked(d),d.transport||"",d.note||""]); }); const ws=XLSX.utils.aoa_to_sheet(A); ws["!cols"]=[{wch:11},{wch:12},{wch:8},{wch:7},{wch:9},{wch:7},{wch:9},{wch:14},{wch:8},{wch:7},{wch:20}]; const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,"勤怠"+month); XLSX.writeFile(wb,"勤怠_"+month+".xlsx"); };
   return <Section title="出勤簿（勤怠）" note="出勤・退勤を打刻します。休憩は一律4時間で自動計算（打刻は確認用）。管理者は全員分の追加・修正・月次出力ができます。">
     <div className="rec-sub" style={{marginTop:0}}>あなたの打刻（{fmtDate(today)}）</div>
@@ -1455,7 +1459,7 @@ function TimeCard({me,data}){
     {me.isAdmin&&<>
       <div className="rec-sub">全員の勤怠（管理者）</div>
       <label className="field"><span>対象月</span><input type="month" value={month} onChange={e=>setMonth(e.target.value)}/></label>
-      <div className="row-between" style={{margin:"6px 0"}}><Btn onClick={()=>setEdit(blankEdit())}>＋ 打刻を追加/修正</Btn><Btn kind="ghost2" onClick={toExcel}>⬇ 月次Excel</Btn></div>
+      <div className="row-end" style={{margin:"6px 0",gap:"8px",flexWrap:"wrap"}}><Btn onClick={()=>setEdit(blankEdit())}>＋ 打刻を追加/修正</Btn><Btn kind="ghost2" onClick={toExcel}>⬇ 実態Excel</Btn><Btn onClick={toExcelSubmit}>⬇ 提出用Excel（定時）</Btn></div>
       {rows===null&&<p className="empty">読み込み中…</p>}
       {rows!==null&&rows.length===0&&<p className="empty">この月の打刻はありません。</p>}
       <div className="rec-log">{(rows||[]).map(r=>{ const d=r.data||{}; return <div key={r.id} className="rec-row">
@@ -1467,10 +1471,10 @@ function TimeCard({me,data}){
       <div className="chk-row"><label className="chk"><input type="radio" name="nm" checked={edit.nameMode==="list"} onChange={()=>setEdit(Object.assign({},edit,{nameMode:"list"}))}/>登録職員</label><label className="chk"><input type="radio" name="nm" checked={edit.nameMode==="free"} onChange={()=>setEdit(Object.assign({},edit,{nameMode:"free"}))}/>ヘルプ（名前入力）</label></div>
       {edit.nameMode==="list"?<label className="field"><span>氏名</span><select value={edit.name} onChange={e=>setEdit(Object.assign({},edit,{name:e.target.value}))}><option value="">選択</option>{(data.accounts||[]).map(a=><option key={a.id} value={a.name}>{a.name}</option>)}</select></label>:<label className="field"><span>氏名（ヘルプ）</span><input value={edit.name} onChange={e=>setEdit(Object.assign({},edit,{name:e.target.value}))} placeholder="例：応援 太郎"/></label>}
       <label className="field"><span>日付（勤務日）</span><input type="date" value={edit.biz_date} onChange={e=>setEdit(Object.assign({},edit,{biz_date:e.target.value}))}/></label>
-      <label className="field"><span>役割</span><select value={edit.role} onChange={e=>setEdit(Object.assign({},edit,{role:e.target.value}))}>{SHIFT_ROLES.map(r=><option key={r.v} value={r.v}>{r.label}</option>)}</select></label>
+      <label className="field"><span>役割（選ぶと定時が自動で入ります）</span><select value={edit.role} onChange={e=>onRole(e.target.value)}>{SHIFT_ROLES.map(r=><option key={r.v} value={r.v}>{r.label}</option>)}</select></label>
       <div className="nf2"><label className="field"><span>出勤</span><input type="time" value={edit.in_t} onChange={e=>setEdit(Object.assign({},edit,{in_t:e.target.value}))}/></label><label className="field"><span>出勤区分</span><select value={edit.in_place} onChange={e=>setEdit(Object.assign({},edit,{in_place:e.target.value}))}><option>本部着</option><option>現地着</option></select></label></div>
       <div className="nf2"><label className="field"><span>退勤</span><input type="time" value={edit.out_t} onChange={e=>setEdit(Object.assign({},edit,{out_t:e.target.value}))}/></label><label className="field"><span>退勤区分</span><select value={edit.out_place} onChange={e=>setEdit(Object.assign({},edit,{out_place:e.target.value}))}><option>本部着</option><option>直帰</option></select></label></div>
-      {edit.role!=="eve"&&<><div className="nf2"><label className="field"><span>休憩開始</span><input type="time" value={edit.bin_t} onChange={e=>setEdit(Object.assign({},edit,{bin_t:e.target.value}))}/></label><label className="field"><span>休憩終了</span><input type="time" value={edit.bout_t} onChange={e=>setEdit(Object.assign({},edit,{bout_t:e.target.value}))}/></label></div><p className="tiny">休憩は一律4時間で実働から自動控除します（打刻は確認用）。</p></>}
+      {edit.role!=="eve"&&edit.role!=="nightonly"&&<><div className="nf2"><label className="field"><span>休憩開始</span><input type="time" value={edit.bin_t} onChange={e=>setEdit(Object.assign({},edit,{bin_t:e.target.value}))}/></label><label className="field"><span>休憩終了</span><input type="time" value={edit.bout_t} onChange={e=>setEdit(Object.assign({},edit,{bout_t:e.target.value}))}/></label></div><p className="tiny">休憩は一律4時間で実働から自動控除します（打刻は確認用）。</p></>}
       <div className="rec-sub">交通費</div>
       <div className="chk-row"><label className="chk"><input type="radio" name="etp" checked={edit.transport==="必要"} onChange={()=>setEdit(Object.assign({},edit,{transport:"必要"}))}/>必要</label><label className="chk"><input type="radio" name="etp" checked={edit.transport!=="必要"} onChange={()=>setEdit(Object.assign({},edit,{transport:"不要"}))}/>不要</label></div>
       <label className="field"><span>メモ</span><input value={edit.note} onChange={e=>setEdit(Object.assign({},edit,{note:e.target.value}))}/></label>
@@ -1928,7 +1932,7 @@ function Shifts({me,data,persist}){
         <div className="day-head"><span className={cls}>{d.getMonth()+1}/{d.getDate()}（{WD[wd]}）</span></div>
         {list.length===0?<div className="noshift">予定なし</div>:list.map(s=>(
           <div key={s.id} className="shift-item">
-            <span className="shift-time">{s.start}–{s.end}</span>{s.role&&<span className="chip">{({A:"夜勤A",B:"夜勤B",eve:"夕勤",day:"日勤",other:"その他"})[s.role]||""}</span>}<span>{s.name}</span>
+            <span className="shift-time">{s.start}–{s.end}</span>{s.role&&<span className="chip">{({A:"夜勤A",B:"夜勤B",nightonly:"夜勤のみ",eve:"夕勤",day:"日勤",other:"その他"})[s.role]||""}</span>}<span>{s.name}</span>
             {s.note&&<span className="shift-note">{s.note}</span>}
             {me.isAdmin&&<button className="mini-key" onClick={()=>openEdit(s)}>✎</button>}{me.isAdmin&&<button className="mini-del" onClick={()=>remove(s.id)}>🗑</button>}
           </div>))}
