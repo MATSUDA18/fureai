@@ -943,13 +943,13 @@ function Plans({me,data,persist}){
   const [toast,setToast]=useState(""); const fileRef=useRef(null);
   const [d,setD]=useState(()=>{const n=new Date();return (n.getHours()*60+n.getMinutes())<(15*60)?iso(addDays(n,-1)):iso(n);}); const [dpOpen,setDpOpen]=useState(false);
   const flash=(m)=>{ setToast(m); setTimeout(()=>setToast(""),1800); };
-  const loadList=async()=>{ if(!SB_ON){setList([]);return;} try{ const l=await sbListAttach(); setList(l); const shown=l.filter(a=>!(a.meta&&a.meta.kind==="handover")); if(shown[0]){ try{ setNewest(await sbAttachFull(shown[0].id)); }catch(e){ setNewest(null);} } else setNewest(null); }catch(e){ setList([]); } };
+  const loadList=async()=>{ if(!SB_ON){setList([]);return;} try{ const l=await sbListAttach(); setList(l); const shown=l.filter(a=>!(a.meta&&a.meta.kind==="handover")); const cm=iso(new Date()).slice(0,7); const feat=shown.filter(a=>a.meta&&a.meta.month===cm)[0]||shown[0]; if(feat){ try{ setNewest(await sbAttachFull(feat.id)); }catch(e){ setNewest(null);} } else setNewest(null); }catch(e){ setList([]); } };
   useEffect(()=>{ if(list===null) loadList(); },[]);
   const onAttach=async(e)=>{ const f=e.target.files&&e.target.files[0]; e.target.value=""; if(!f)return; if(!SB_ON){flash("共有DBの設定が必要です");return;} setBusy(true);
     try{ const id=uid()+"_"+Date.now(); const created=new Date().toISOString(); let dataURI,type,thumb=null;
       if(f.type==="application/pdf"){ dataURI=await new Promise((res,rej)=>{const fr=new FileReader();fr.onload=()=>res(fr.result);fr.onerror=rej;fr.readAsDataURL(f);}); type="pdf"; }
       else { dataURI=await compressImage(f,1400,0.72); thumb=await compressImage(f,240,0.5); type="image"; }
-      await sbInsertAttach({id, meta:{month, kind, name:f.name, type, thumb}, data:dataURI, created});
+      const rev=((list||[]).filter(a=>a.meta&&a.meta.kind!=="handover"&&a.meta.month===month).length); await sbInsertAttach({id, meta:{month, kind, name:f.name, type, thumb, rev}, data:dataURI, created});
       flash("アップロードしました"); setList(null); loadList();
     }catch(err){ flash("アップロード失敗（attachments表の設定をご確認ください）"); } finally{ setBusy(false); } };
   const openAttach=async(id)=>{ try{ const a=await sbAttachFull(id); if(a) setAv(a); }catch(e){ flash("開けませんでした"); } };
@@ -957,14 +957,15 @@ function Plans({me,data,persist}){
   const cur=(data.dayPlans||{})[d]||{};
   return <Section title="利用予定カレンダー" note="利用予定表・勤務シフトの資料（PDF/写真）を登録し、その日の利用者・支援員を設定します。どのページで設定しても全体に反映されます。">
     {list===null&&<p className="empty">読み込み中…</p>}
-    {(function(){ const shown=(list||[]).filter(a=>!(a.meta&&a.meta.kind==="handover")); if(list!==null&&shown.length===0) return <p className="empty">まだ資料がありません。下の「資料の登録」から追加できます。</p>; if(shown.length===0) return null; const top=shown[0]; return <div>
+    {(function(){ const shown=(list||[]).filter(a=>!(a.meta&&a.meta.kind==="handover")); if(list!==null&&shown.length===0) return <p className="empty">まだ資料がありません。下の「資料の登録」から追加できます。</p>; if(shown.length===0) return null; const cm=iso(new Date()).slice(0,7); const revL=(m)=>(m&&m.rev)?("／改訂版"+(m.rev>=2?m.rev:"")):""; const top=shown.filter(a=>a.meta&&a.meta.month===cm)[0]||shown[0]; const rest=shown.filter(a=>a.id!==top.id).sort((a,b)=>String((b.meta&&b.meta.month)||"").localeCompare(String((a.meta&&a.meta.month)||""))||String(b.created||"").localeCompare(String(a.created||""))); const isCur=top.meta&&top.meta.month===cm; return <div>
       <div className="att-latest">
-        <div className="att-latest-head"><b>{top.meta?top.meta.month:""}　{top.meta?top.meta.kind:""}</b><span>{top.created?fmtDate(top.created.slice(0,10)):""}</span>{me.isAdmin&&<button className="mini-del" onClick={()=>delAttach(top.id)}>🗑</button>}</div>
-        {(newest&&newest.id===top.id)?((newest.meta&&newest.meta.type==="pdf")?<><embed src={newest.data} type="application/pdf" style={{width:"100%",height:"64vh",borderRadius:"10px"}}/><div className="row-end" style={{marginTop:6}}><a className="btn ghost2" href={newest.data} target="_blank" rel="noreferrer">大きく開く ↗</a></div></>:<img className="att-big" src={newest.data} alt="最新の資料" onClick={()=>setAv(newest)}/>):((top.meta&&top.meta.thumb)?<img className="att-big" src={top.meta.thumb} alt="最新の資料"/>:<div className="att-pdf" style={{width:"100%",height:"120px"}}>PDF</div>)}
+        <div className="att-latest-head"><b>{top.meta?top.meta.month:""}　{top.meta?top.meta.kind:""}{revL(top.meta)}</b><span>{top.created?fmtDate(top.created.slice(0,10)):""}</span>{me.isAdmin&&<button className="mini-del" onClick={()=>delAttach(top.id)}>🗑</button>}</div>
+        {!isCur&&<p className="tiny" style={{color:"#B0895A"}}>※ 今月（{cm}）の資料が未登録のため、最新のものを表示しています。</p>}
+        {(newest&&newest.id===top.id)?((newest.meta&&newest.meta.type==="pdf")?<><embed src={newest.data} type="application/pdf" style={{width:"100%",height:"64vh",borderRadius:"10px"}}/><div className="row-end" style={{marginTop:6}}><a className="btn ghost2" href={newest.data} target="_blank" rel="noreferrer">大きく開く ↗</a></div></>:<img className="att-big" src={newest.data} alt="今月の資料" onClick={()=>setAv(newest)}/>):((top.meta&&top.meta.thumb)?<img className="att-big" src={top.meta.thumb} alt="今月の資料"/>:<div className="att-pdf" style={{width:"100%",height:"120px"}}>PDF</div>)}
       </div>
-      {shown.length>1&&<div><button className="time-toggle" onClick={()=>setShowArch(!showArch)}>{showArch?"過去の資料を閉じる":"過去の資料（アーカイブ）を見る"}</button>
-        {showArch&&<div className="arch-list">{shown.slice(1).map(a=>(<div key={a.id} className="arch-row" onClick={()=>openAttach(a.id)}>
-          <span className="arch-date">{a.created?fmtDate(a.created.slice(0,10)):""}</span><span className="arch-name">{a.meta?a.meta.month:""} {a.meta?a.meta.kind:""}／{a.meta?a.meta.name:""}</span>{me.isAdmin&&<button className="mini-del" onClick={e=>{e.stopPropagation();delAttach(a.id);}}>🗑</button>}
+      {rest.length>0&&<div><button className="time-toggle" onClick={()=>setShowArch(!showArch)}>{showArch?"ほかの月・改訂版を閉じる":"ほかの月・過去の資料（アーカイブ）を見る"}</button>
+        {showArch&&<div className="arch-list">{rest.map(a=>(<div key={a.id} className="arch-row" onClick={()=>openAttach(a.id)}>
+          <span className="arch-date">{a.created?fmtDate(a.created.slice(0,10)):""}</span><span className="arch-name">{a.meta?a.meta.month:""} {a.meta?a.meta.kind:""}{revL(a.meta)}／{a.meta?a.meta.name:""}</span>{me.isAdmin&&<button className="mini-del" onClick={e=>{e.stopPropagation();delAttach(a.id);}}>🗑</button>}
         </div>))}</div>}
       </div>}
     </div>; })()}
@@ -975,6 +976,7 @@ function Plans({me,data,persist}){
     {sub==="files"&&<div className="tl-editpanel">
       <div className="nf2"><label className="field"><span>対象の月</span><input type="month" value={month} onChange={e=>setMonth(e.target.value)}/></label>
         <label className="field"><span>種類</span><select value={kind} onChange={e=>setKind(e.target.value)}><option>両方（利用者＋シフト）</option><option>利用者の利用予定</option><option>スタッフのシフト</option></select></label></div>
+      <p className="tiny">同じ月にもう一度登録すると、自動で「改訂版／改訂版2…」と付きます（前のものはアーカイブに残ります）。表示は「今月」の最新版が大きく出ます。</p>
       <button className="recbtn cam" onClick={()=>fileRef.current&&fileRef.current.click()} disabled={busy}>⬆ PDF / 写真をアップロード</button>
       <input ref={fileRef} type="file" accept="image/*,application/pdf" onChange={onAttach} style={{display:"none"}}/>
     </div>}
@@ -1366,7 +1368,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.44〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.45〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
