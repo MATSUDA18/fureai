@@ -228,6 +228,7 @@
   .cat-row{display:flex;align-items:center;gap:6px;background:#fff;border:1px solid #F0D3DB;border-radius:8px;padding:6px 8px;margin-bottom:4px;}
   .cat-head{width:100%;display:flex;align-items:center;justify-content:space-between;background:linear-gradient(180deg,#FCEAF0,#FADCE6);border:1px solid #F0C6D5;border-radius:12px;padding:12px 14px;font-weight:700;color:#B25E77;font-size:15px;cursor:pointer;margin:0;}
   .cat-head:active{filter:brightness(0.98);}
+  .ch-eve{display:block;font-size:10px;color:#8A5A00;background:#FBE1B0;border-radius:6px;padding:1px 5px;margin-top:2px;font-weight:700;}
   .cat-name{flex:1;font-size:13px;color:#5A4A50;}
   .cat-sel{font-size:11px;padding:4px;border:1px solid #F0D3DB;border-radius:6px;background:#FCF4F5;max-width:120px;}
   .recbtn.cam{background:#EAF3E6;border-color:#CFE3C6;color:#5B8A45;}
@@ -439,8 +440,8 @@ const AFFILIATIONS=[
   {v:"ほたるの園岐阜県庁南", label:"ほたるの園岐阜県庁南"},
   {v:"ほたるの仕事場栄光", label:"ほたるの仕事場栄光"},
 ];
-const TL_ROLES=[{v:"s1",label:"支援1"},{v:"s2",label:"支援2"},{v:"common",label:"共通（支援1・2）"},{v:"user",label:"利用者さん"}];
-const SHIFT_ROLES=[{v:"A",label:"夜勤A（支援1）"},{v:"B",label:"夜勤B（支援2）"},{v:"day",label:"日勤"},{v:"other",label:"その他"}];
+const TL_ROLES=[{v:"s1",label:"支援員1"},{v:"s2",label:"支援員2"},{v:"s3",label:"支援員3（夕勤）"},{v:"common",label:"共通（支援員1・2）"},{v:"user",label:"利用者さん"}];
+const SHIFT_ROLES=[{v:"A",label:"夜勤A（支援員1）"},{v:"B",label:"夜勤B（支援員2）"},{v:"eve",label:"夕勤（支援員3）"},{v:"day",label:"日勤"},{v:"other",label:"その他"}];
 const REC_DEFAULT=["トイレ（小）","トイレ（大）","食事","水分補給","服薬","入浴","就寝","起床","バイタル測定","来所","帰宅","様子・特記"];
 const USERS4=["利用者1","利用者2","利用者3","利用者4"];
 const REC_HOURS=(()=>{const a=[];for(let h=15;h<=23;h++)a.push(h);for(let h=0;h<=9;h++)a.push(h);return a;})();
@@ -797,26 +798,28 @@ function DayPlanModal({data,persist,date,onClose}){
   const allUsers=Array.from(new Set([].concat(resNames,userList).filter(Boolean)));
   const cur=(data.dayPlans||{})[date]||{};
   const [u,setU]=useState(()=>{ const a=(cur.users||[]).slice(0,4); while(a.length<4)a.push(""); return a; });
-  const [s1,setS1]=useState(cur.s1||""); const [s2,setS2]=useState(cur.s2||""); const [newU,setNewU]=useState("");
+  const [s1,setS1]=useState(cur.s1||""); const [s2,setS2]=useState(cur.s2||""); const [s3,setS3]=useState(cur.s3||""); const [newU,setNewU]=useState("");
   const addUser=()=>{ const n=newU.trim(); if(!n)return; if(!userList.includes(n)) persist({...data,userList:[...userList,n]}); setNewU(""); };
-  const save=()=>{ const users=u.map(x=>x.trim()).filter(Boolean).slice(0,4); let ns1=s1.trim(), ns2=s2.trim(); let shifts=(data.shifts||[]).slice();
-    const resolve=(role,nm)=>{ if(!nm) return nm; const idx=shifts.findIndex(s=>s.date===date&&s.role===role); if(idx>=0){ if(shifts[idx].name!==nm){ if(confirm("職員シフト（"+(role==="A"?"夜勤A":"夜勤B")+"）は「"+shifts[idx].name+"」です。\nOK＝この予定「"+nm+"」に統一 ／ キャンセル＝シフト「"+shifts[idx].name+"」に合わせる")){ shifts[idx]=Object.assign({},shifts[idx],{name:nm}); return nm; } else { return shifts[idx].name; } } return nm; } else { shifts.push({id:uid(),date,name:nm,role,start:"15:30",end:"09:30",note:""}); return nm; } };
-    ns1=resolve("A",ns1); ns2=resolve("B",ns2);
-    persist(Object.assign({},data,{dayPlans:Object.assign({},data.dayPlans||{},{[date]:{users,s1:ns1,s2:ns2}}),shifts})); onClose(); };
+  const save=()=>{ const users=u.map(x=>x.trim()).filter(Boolean).slice(0,4); let ns1=s1.trim(), ns2=s2.trim(), ns3=s3.trim(); let shifts=(data.shifts||[]).slice();
+    const RL={A:"夜勤A",B:"夜勤B",eve:"夕勤"}; const TM={A:["15:30","09:30"],B:["15:30","09:30"],eve:["15:30","21:30"]};
+    const resolve=(role,nm)=>{ if(!nm) return nm; const idx=shifts.findIndex(s=>s.date===date&&s.role===role); if(idx>=0){ if(shifts[idx].name!==nm){ if(confirm("職員シフト（"+RL[role]+"）は「"+shifts[idx].name+"」です。\nOK＝この予定「"+nm+"」に統一 ／ キャンセル＝シフト「"+shifts[idx].name+"」に合わせる")){ shifts[idx]=Object.assign({},shifts[idx],{name:nm}); return nm; } else { return shifts[idx].name; } } return nm; } else { shifts.push({id:uid(),date,name:nm,role,start:TM[role][0],end:TM[role][1],note:""}); return nm; } };
+    ns1=resolve("A",ns1); ns2=resolve("B",ns2); ns3=resolve("eve",ns3);
+    persist(Object.assign({},data,{dayPlans:Object.assign({},data.dayPlans||{},{[date]:{users,s1:ns1,s2:ns2,s3:ns3}}),shifts})); onClose(); };
   return <Modal title={fmtDate(date)+" の利用者・支援員"} tint="#C9788F" onClose={onClose}>
     <div className="sync-note">
       <b>💡 ここで設定すると、下の4か所へ自動で反映されます</b>
       <ul>
-        <li>① <b>タイムスケジュール</b>（支援1・支援2の名前）</li>
-        <li>② <b>職員シフト</b>（夜勤A＝支援1／夜勤B＝支援2）</li>
+        <li>① <b>タイムスケジュール</b>（支援員1・2・3の名前）</li>
+        <li>② <b>職員シフト</b>（夜勤A＝支援員1／夜勤B＝支援員2／夕勤＝支援員3）</li>
         <li>③ <b>記録</b>（利用者の選択ボタン）</li>
         <li>④ <b>日誌まとめ</b>（利用者・担当）</li>
       </ul>
       <span className="tiny">※ 対象は「{fmtDate(date)} 15:30〜翌9:30」の勤務です。反映を見るときは<b>同じ勤務日</b>で確認してください。逆に、タイムスケジュールや職員シフトで入力しても、ここへ反映されます。</span>
     </div>
-    <div className="rec-sub" style={{marginTop:0}}>支援員（夜勤A＝支援1／夜勤B＝支援2）</div>
-    <label className="field"><span>支援1（A夜勤）</span><select value={s1} onChange={e=>setS1(e.target.value)}><option value="">（未設定）</option>{accounts.map(a=><option key={a.id} value={a.name}>{a.name}</option>)}</select></label>
-    <label className="field"><span>支援2（B夜勤）</span><select value={s2} onChange={e=>setS2(e.target.value)}><option value="">（未設定）</option>{accounts.map(a=><option key={a.id} value={a.name}>{a.name}</option>)}</select></label>
+    <div className="rec-sub" style={{marginTop:0}}>支援員（夜勤A＝支援員1／夜勤B＝支援員2／夕勤＝支援員3）</div>
+    <label className="field"><span>支援員1（夜勤A）</span><select value={s1} onChange={e=>setS1(e.target.value)}><option value="">（未設定）</option>{accounts.map(a=><option key={a.id} value={a.name}>{a.name}</option>)}</select></label>
+    <label className="field"><span>支援員2（夜勤B）</span><select value={s2} onChange={e=>setS2(e.target.value)}><option value="">（未設定）</option>{accounts.map(a=><option key={a.id} value={a.name}>{a.name}</option>)}</select></label>
+    <label className="field"><span>支援員3（夕勤 15:30–21:30）</span><select value={s3} onChange={e=>setS3(e.target.value)}><option value="">（未設定）</option>{accounts.map(a=><option key={a.id} value={a.name}>{a.name}</option>)}</select></label>
     <div className="rec-sub">利用者（最大4名・キャンセルは選ばない）</div>
     {u.map((v,i)=>(<label className="field" key={i}><span>利用者{i+1}</span><select value={v} onChange={e=>{const nv=e.target.value; setU(p=>p.map((x,j)=>j===i?nv:x));}}><option value="">（なし）</option>{allUsers.map(n=><option key={n} value={n}>{n}</option>)}</select></label>))}
     <div className="composer" style={{marginTop:4}}><textarea rows={1} value={newU} placeholder="リストに無い利用者名を追加" onChange={e=>setNewU(e.target.value)}/><button className="send" onClick={addUser} title="利用者名を追加">＋</button></div>
@@ -981,7 +984,8 @@ function Plans({me,data,persist}){
       <p className="tiny">この設定は「タイムスケジュール」「職員シフト」「記録」「日誌」に反映されます（同じ勤務日で確認してください）。</p>
       <div className="rec-sub" style={{marginTop:8}}>現在の設定</div>
       <p>利用者：{(cur.users&&cur.users.length)?cur.users.join("・"):"未設定"}</p>
-      <p>支援1（A）：{cur.s1||"未設定"}　／　支援2（B）：{cur.s2||"未設定"}</p>
+      <p>支援員1（夜勤A）：{cur.s1||"未設定"}　／　支援員2（夜勤B）：{cur.s2||"未設定"}</p>
+      <p>支援員3（夕勤）：{cur.s3||"未設定"}</p>
       <div className="row-end"><Btn onClick={()=>setDpOpen(true)}>👥 この日を設定する</Btn></div>
     </div>}
     {toast&&<div className="toast">{toast}</div>}
@@ -1362,7 +1366,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.43〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.44〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
@@ -1470,7 +1474,7 @@ function VideoView({url}){
     <a className="btn primary vopen" href={url} target="_blank" rel="noreferrer">▶ やり方の動画を開く ↗</a>
   </div>;
 }
-const RLABEL=(r)=>({s1:"支援1",s2:"支援2",common:"共通",user:"利用者"}[r]||r);
+const RLABEL=(r)=>({s1:"支援員1",s2:"支援員2",s3:"支援員3",common:"共通",user:"利用者"}[r]||r);
 function TimelineEdit({data,persist}){
   const [role,setRole]=useState("s1"); const [start,setStart]=useState("15:30"); const [end,setEnd]=useState("16:30");
   const [title,setTitle]=useState(""); const [detail,setDetail]=useState(""); const [video,setVideo]=useState(""); const [editId,setEditId]=useState(null); const [msg,setMsg]=useState("");
@@ -1527,7 +1531,10 @@ function Schedule({me,data,persist}){
   const dayShifts=(data.shifts||[]).filter(s=>s.date===date);
   const tplan=(data.dayPlans||{})[date]||{}; const nameA=tplan.s1||(dayShifts.find(s=>s.role==="A")||{}).name||"";
   const nameB=tplan.s2||(dayShifts.find(s=>s.role==="B")||{}).name||"";
-  const cols=[{key:"s1",label:"支援1",name:nameA},{key:"s2",label:"支援2",name:nameB},{key:"user",label:"利用者",name:""}];
+  const nameE=tplan.s3||(dayShifts.find(s=>s.role==="eve")||{}).name||"";
+  const _en=new Date(); const _em=_en.getHours()*60+_en.getMinutes(); const eveNow=(_em>=930&&_em<=1290);
+  const eveTag=(eveNow&&nameE)?nameE:"";
+  const cols=[{key:"s1",label:"支援員1",name:nameA,eve:eveTag},{key:"s2",label:"支援員2",name:nameB,eve:eveTag},{key:"user",label:"利用者",name:""}];
   const colX=(k)=> k==="s2"?AXIS+COL : k==="user"?AXIS+COL*2 : AXIS;
   const COLORS={s1:"#F6D4DD",s2:"#CDE0F1",user:"#D7EAD0",common:"#FBE1B0"};
   const rawNow=now.getHours()*60+now.getMinutes();
@@ -1558,8 +1565,8 @@ function Schedule({me,data,persist}){
       <div className="tl-inner" style={{width:W}}>
         <div className="tl-head" style={{height:HEAD,width:W}}>
           <div className="tl-corner" style={{width:AXIS}}>時刻</div>
-          {cols.map(c=><div key={c.key} className="tl-colhead" style={{width:COL}}>
-            <span className="ch-role">{c.label}</span>{c.name&&<span className="ch-name">{c.name}</span>}</div>)}
+          {cols.map(c=><div key={c.key} className="tl-colhead" style={{width:COL}} onClick={()=>{ if(c.key!=="user") setDpOpen(true); }}>
+            <span className="ch-role" style={c.key!=="user"?{cursor:"pointer"}:null}>{c.label}{c.key!=="user"?" ✎":""}</span>{c.name&&<span className="ch-name">{c.name}</span>}{c.eve&&<span className="ch-eve">夕勤 {c.eve}</span>}</div>)}
         </div>
         <div className="tl-body" style={{position:"relative",height:TOTAL*ppm,width:W}}>
           {marks.map(mk=>{const y=(mk.m-DAY_START)*ppm; const col=mk.lv===0?"#E3B9C6":mk.lv===1?"#EECEDA":mk.lv===2?"#F1D7E0":"#F8EBF0"; return <div key={mk.m}>
@@ -1808,17 +1815,20 @@ function ResidentDetail({me,res,onBack,onEdit,onDel,onChange}){
 }
 function Shifts({me,data,persist}){
   const [weekStart,setWeekStart]=useState(()=>mondayOf(new Date()));
-  const [open,setOpen]=useState(false);
-  const [form,setForm]=useState({date:iso(new Date()),name:"",role:"A",start:"15:30",end:"09:30",note:""});
+  const [open,setOpen]=useState(false); const [editId,setEditId]=useState(null);
+  const openEdit=(s)=>{ setForm({date:s.date,name:s.name,role:s.role,start:s.start,end:s.end,note:s.note||""}); setEditId(s.id); setOpen(true); };
+  const [form,setForm]=useState({date:(()=>{const n=new Date();return (n.getHours()*60+n.getMinutes())<(15*60)?iso(addDays(n,-1)):iso(n);})(),name:"",role:"A",start:"15:30",end:"09:30",note:""});
   const days=Array.from({length:7}).map((_,i)=>addDays(weekStart,i));
   const label=`${weekStart.getMonth()+1}/${weekStart.getDate()} 〜 ${addDays(weekStart,6).getMonth()+1}/${addDays(weekStart,6).getDate()}`;
   const add=()=>{
     if(!form.name.trim())return;
     const nm=form.name.trim();
-    const shift={id:uid(),date:form.date,name:nm,role:form.role,start:form.start,end:form.end,note:form.note};
+    let shifts=(data.shifts||[]).slice();
+    if(editId){ shifts=shifts.map(s=>s.id===editId?Object.assign({},s,{date:form.date,name:nm,role:form.role,start:form.start,end:form.end,note:form.note}):s); }
+    else { shifts=[...shifts,{id:uid(),date:form.date,name:nm,role:form.role,start:form.start,end:form.end,note:form.note}]; }
     let dp=Object.assign({},data.dayPlans||{});
-    if(form.role==="A"||form.role==="B"){ const key=form.role==="A"?"s1":"s2"; const cur=Object.assign({},dp[form.date]||{}); if(cur[key]&&cur[key]!==nm){ if(confirm("この日の"+(form.role==="A"?"支援1":"支援2")+"は現在「"+cur[key]+"」です。「"+nm+"」に更新しますか？")){ cur[key]=nm; dp[form.date]=cur; } } else { cur[key]=nm; dp[form.date]=cur; } }
-    persist(Object.assign({},data,{shifts:[...(data.shifts||[]),shift],dayPlans:dp})); setOpen(false);
+    if(form.role==="A"||form.role==="B"||form.role==="eve"){ const key=form.role==="A"?"s1":form.role==="B"?"s2":"s3"; const rl=form.role==="A"?"支援員1":form.role==="B"?"支援員2":"支援員3(夕勤)"; const cur=Object.assign({},dp[form.date]||{}); if(cur[key]&&cur[key]!==nm){ if(confirm("この日の"+rl+"は現在「"+cur[key]+"」です。「"+nm+"」に更新しますか？")){ cur[key]=nm; dp[form.date]=cur; } } else { cur[key]=nm; dp[form.date]=cur; } }
+    persist(Object.assign({},data,{shifts,dayPlans:dp})); setOpen(false); setEditId(null);
     setForm(Object.assign({},form,{note:""}));
   };
   const remove=(id)=>{ if(!confirm("このシフトを削除しますか？"))return; persist({...data,shifts:data.shifts.filter(s=>s.id!==id)}); };
@@ -1830,7 +1840,7 @@ function Shifts({me,data,persist}){
     </div>
     <div className="row-between" style={{marginBottom:10}}>
       <button className="link-btn" onClick={()=>setWeekStart(mondayOf(new Date()))}>今週に戻る</button>
-      {me.isAdmin&&<Btn onClick={()=>{setForm({date:iso(days[0]),name:"",role:"A",start:"15:30",end:"09:30",note:""});setOpen(true);}}>＋ シフトを追加</Btn>}
+      {me.isAdmin&&<Btn onClick={()=>{setEditId(null);setForm({date:(()=>{const n=new Date();return (n.getHours()*60+n.getMinutes())<(15*60)?iso(addDays(n,-1)):iso(n);})(),name:"",role:"A",start:"15:30",end:"09:30",note:""});setOpen(true);}}>＋ シフトを追加</Btn>}
     </div>
     {days.map(d=>{
       const key=iso(d); const list=data.shifts.filter(s=>s.date===key).sort((a,b)=>a.start.localeCompare(b.start));
@@ -1839,13 +1849,13 @@ function Shifts({me,data,persist}){
         <div className="day-head"><span className={cls}>{d.getMonth()+1}/{d.getDate()}（{WD[wd]}）</span></div>
         {list.length===0?<div className="noshift">予定なし</div>:list.map(s=>(
           <div key={s.id} className="shift-item">
-            <span className="shift-time">{s.start}–{s.end}</span>{s.role&&<span className="chip">{({A:"夜勤A",B:"夜勤B",day:"日勤",other:"その他"})[s.role]||""}</span>}<span>{s.name}</span>
+            <span className="shift-time">{s.start}–{s.end}</span>{s.role&&<span className="chip">{({A:"夜勤A",B:"夜勤B",eve:"夕勤",day:"日勤",other:"その他"})[s.role]||""}</span>}<span>{s.name}</span>
             {s.note&&<span className="shift-note">{s.note}</span>}
-            {me.isAdmin&&<button className="mini-del" onClick={()=>remove(s.id)}>🗑</button>}
+            {me.isAdmin&&<button className="mini-key" onClick={()=>openEdit(s)}>✎</button>}{me.isAdmin&&<button className="mini-del" onClick={()=>remove(s.id)}>🗑</button>}
           </div>))}
       </div>;
     })}
-    {open&&<Modal title="シフトを追加" tint="#C9788F" onClose={()=>setOpen(false)}>
+    {open&&<Modal title={editId?"シフトを編集":"シフトを追加"} tint="#C9788F" onClose={()=>{setOpen(false);setEditId(null);}}>
       <Field label="日付" type="date" value={form.date} onChange={e=>setForm({...form,date:e.target.value})}/>
       <label className="field"><span>職員</span>
         <select value={form.name} onChange={e=>setForm({...form,name:e.target.value})}>
