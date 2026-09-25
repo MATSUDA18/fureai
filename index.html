@@ -241,6 +241,9 @@
   .consent-box ul{margin:6px 0 10px;padding-left:20px;}
   .consent-box li{font-size:14px;margin-bottom:6px;}
   .maplink{color:#2F8F8A;font-size:11px;margin-left:6px;white-space:nowrap;}
+  .ot-ok{color:#2F8F8A;}
+  .ot-ng{color:#C0392B;}
+  .ot-approve{display:inline-flex;align-items:center;gap:6px;margin-left:6px;}
   .proxy-tag{background:#EDE3F7;color:#8A5BB8;border-radius:6px;padding:1px 5px;font-size:10px;font-weight:700;margin-left:4px;}
   .ch-eve{display:block;font-size:10px;color:#8A5A00;background:#FBE1B0;border-radius:6px;padding:1px 5px;margin-top:2px;font-weight:700;}
   .cat-name{flex:1;font-size:13px;color:#5A4A50;}
@@ -1386,7 +1389,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.53〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.54〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
@@ -1427,7 +1430,7 @@ function AdminRegister({data,persist,onClose}){
 function TimeCard({me,data}){
   const [rows,setRows]=useState(null);
   const [month,setMonth]=useState(iso(new Date()).slice(0,7));
-  const [toast,setToast]=useState(""); const [edit,setEdit]=useState(null); const [placeAsk,setPlaceAsk]=useState(null);
+  const [toast,setToast]=useState(""); const [edit,setEdit]=useState(null); const [placeAsk,setPlaceAsk]=useState(null); const [otOpen,setOtOpen]=useState(false); const [otForm,setOtForm]=useState({end_t:"",late_reason:"",reason:""});
   const flash=(m)=>{ setToast(m); setTimeout(()=>setToast(""),1800); };
   const today=bizDate();
   const [agreed,setAgreed]=useState(()=>localStorage.getItem("mizuho_tc_consent")==="1");
@@ -1439,6 +1442,9 @@ function TimeCard({me,data}){
   const roleOf=(name,d)=>{ const sh=(data.shifts||[]).find(s=>s.date===d&&s.name===name); return sh?sh.role:""; };
   const getGeo=()=>new Promise((res)=>{ if(!navigator.geolocation){res(null);return;} navigator.geolocation.getCurrentPosition(p=>res({lat:+p.coords.latitude.toFixed(6),lng:+p.coords.longitude.toFixed(6),acc:Math.round(p.coords.accuracy||0),ts:new Date().toISOString()}), ()=>res(null), {enableHighAccuracy:true,timeout:8000,maximumAge:60000}); });
   const mapUrl=(g)=>g?("https://www.google.com/maps?q="+g.lat+","+g.lng):null;
+  const ceil5=(d)=>new Date(Math.ceil(d.getTime()/300000)*300000);
+  const schedEndTs=(role,biz)=>{ if(role==="eve"){ return new Date(biz+"T21:30:00"); } const d=new Date(biz+"T09:30:00"); d.setDate(d.getDate()+1); return d; };
+  const manualEndTs=(role,biz,t)=>{ const d=new Date(biz+"T"+t+":00"); if(role!=="eve") d.setDate(d.getDate()+1); return d; };
   const load=async()=>{ if(!SB_ON){setRows([]);return;} try{ setRows(await tcListMonth(month)); }catch(e){ setRows([]); } };
   useEffect(()=>{ load(); },[month]);
   const saveTC=async(name,biz,dataObj)=>{ const id="tc_"+name+"_"+biz; try{ await tcSave({id,name,biz_date:biz,data:dataObj,created:new Date().toISOString()}); await load(); }catch(e){ flash("保存に失敗（timecard表の設定をご確認ください）"); } };
@@ -1449,6 +1455,11 @@ function TimeCard({me,data}){
   const breakIn=async()=>{ const g=await getGeo(); await saveTC(me.name,today,Object.assign({},md,{break_in:new Date().toISOString(),geo_bin:g})); flash("休憩開始"); };
   const breakOut=async()=>{ const g=await getGeo(); await saveTC(me.name,today,Object.assign({},md,{break_out:new Date().toISOString(),geo_bout:g})); flash("休憩終了"); };
   const setTransport=async(v)=>{ await saveTC(me.name,today,Object.assign({},md||{},{transport:v})); };
+  const otMake=(role,end)=>{ const se=schedEndTs(role,today); const e=ceil5(end); const mins=Math.max(0,Math.round((e-se)/60000)); return {se,e,mins}; };
+  const otNow=async()=>{ if(!md||!md.in_ts){flash("先に出勤打刻をしてください");return;} const role=md.role||roleOf(me.name,today); const {se,e,mins}=otMake(role,new Date()); if(mins<=0){ if(!confirm("定時退勤（"+hm(se.toISOString())+"）を過ぎていません。残業0分ですが申請しますか？"))return; } const ot={req_by:me.name,req_ts:new Date().toISOString(),sched_end_ts:se.toISOString(),end_ts:e.toISOString(),minutes:mins,reason:"",late_reason:"",status:"申請中"}; await saveTC(me.name,today,Object.assign({},md,{overtime:ot})); flash("残業を申請しました（"+mins+"分）"); };
+  const otSubmitManual=async()=>{ if(!md||!md.in_ts){flash("先に出勤打刻をしてください");return;} if(!otForm.end_t){flash("残業の終了時刻を入力してください");return;} const role=md.role||roleOf(me.name,today); const {se,e,mins}=otMake(role,manualEndTs(role,today,otForm.end_t)); const ot={req_by:me.name,req_ts:new Date().toISOString(),sched_end_ts:se.toISOString(),end_ts:e.toISOString(),minutes:mins,reason:otForm.reason||"",late_reason:otForm.late_reason||"",status:"申請中"}; await saveTC(me.name,today,Object.assign({},md,{overtime:ot})); setOtOpen(false); setOtForm({end_t:"",late_reason:"",reason:""}); flash("残業を申請しました（"+mins+"分）"); };
+  const otCancel=async()=>{ if(!confirm("残業申請を取り消しますか？"))return; const d=Object.assign({},md); delete d.overtime; await saveTC(me.name,today,d); flash("取り消しました"); };
+  const otApprove=async(r,ok)=>{ const d=r.data||{}; if(!d.overtime)return; const ot=Object.assign({},d.overtime,{status:ok?"承認":"却下",approved_by:me.name,approved_ts:new Date().toISOString()}); try{ await tcSave({id:r.id,name:r.name,biz_date:r.biz_date,data:Object.assign({},d,{overtime:ot}),created:r.created||new Date().toISOString()}); await load(); }catch(e){ flash("更新に失敗しました"); } };
   const STD={ eve:{in:"15:30",out:"21:30",br:false,bin:"",bout:""}, A:{in:"15:30",out:"09:30",br:true,bin:"21:30",bout:"01:30"}, B:{in:"15:30",out:"09:30",br:true,bin:"01:30",bout:"05:30"}, nightonly:{in:"21:30",out:"09:30",br:false,bin:"",bout:""} };
   const blankEdit=()=>({id:null,name:"",nameMode:"list",biz_date:today,role:"A",in_t:"15:30",in_place:"本部着",out_t:"09:30",out_place:"本部着",has_break:true,bin_t:"21:30",bout_t:"01:30",transport:"不要",note:"",_orig:{},admin_entry:true});
   const onRole=(r)=>{ const s=STD[r]; if(s){ setEdit(Object.assign({},edit,{role:r,in_t:s.in,out_t:s.out,has_break:s.br,bin_t:s.bin,bout_t:s.bout,in_place:"本部着",out_place:(r==="eve"?"直帰":"本部着")})); } else { setEdit(Object.assign({},edit,{role:r,has_break:false})); } };
@@ -1457,8 +1468,8 @@ function TimeCard({me,data}){
   const saveEdit=async()=>{ const e=edit; const nm=(e.name||"").trim(); if(!nm){flash("名前を入力してください");return;} const inM=toMin(e.in_t); const base=(t)=>{ if(!t)return null; const d=new Date(e.biz_date+"T"+t+":00"); return d.toISOString(); }; const tsAt=(t)=>{ if(!t)return null; const d=new Date(e.biz_date+"T"+t+":00"); if(toMin(t)<inM) d.setDate(d.getDate()+1); return d.toISOString(); }; const dataObj=Object.assign({},e._orig||{},{in_ts:base(e.in_t),in_place:e.in_place,out_ts:tsAt(e.out_t),out_place:e.out_place,role:e.role,has_break:(e.role!=="eve"&&e.role!=="nightonly"&&e.has_break),break_in:tsAt(e.bin_t),break_out:tsAt(e.bout_t),transport:e.transport,note:e.note,by:me.name,admin_entry:(e.id?e.admin_entry:true),edited_by:me.name}); const id=e.id||("tc_"+nm+"_"+e.biz_date); try{ await tcSave({id,name:nm,biz_date:e.biz_date,data:dataObj,created:new Date().toISOString()}); await load(); setEdit(null); flash("保存しました"); }catch(err){ flash("保存に失敗しました"); } };
   const delEdit=async()=>{ if(!edit||!edit.id)return; if(!confirm("この打刻を削除しますか？"))return; try{ await tcDelete(edit.id); await load(); setEdit(null); }catch(e){} };
   const SUB={ eve:{in:"15:30",out:"21:30",bin:"",bout:"",br:"なし",work:"6.0"}, A:{in:"15:30",out:"翌9:30",bin:"21:30",bout:"翌1:30",br:"4h",work:"14.0"}, B:{in:"15:30",out:"翌9:30",bin:"翌1:30",bout:"翌5:30",br:"4h",work:"14.0"}, nightonly:{in:"21:30",out:"翌9:30",bin:"",bout:"",br:"なし",work:"12.0"} };
-  const toExcelSubmit=()=>{ if(!window.XLSX){flash("Excel機能の読み込み中です");return;} const A=[["日付","氏名","役割","出勤","退勤","休憩開始","休憩終了","休憩","実働(h)","交通費","メモ"]]; const rs=(rows||[]).slice().sort((a,b)=>String(a.name||"").localeCompare(String(b.name||""))||String(a.biz_date||"").localeCompare(String(b.biz_date||""))); rs.forEach(r=>{ const d=r.data||{}; const s=SUB[d.role]; if(s){ A.push([r.biz_date,r.name,RMAP[d.role]||"",s.in,s.out,s.bin,s.bout,s.br,s.work,d.transport||"",d.note||""]); } else { A.push([r.biz_date,r.name,RMAP[d.role]||"",hx(d.in_ts),hx(d.out_ts),hx(d.break_in),hx(d.break_out),(d.has_break?"4h":"なし"),worked(d),d.transport||"",d.note||""]); } }); const ws=XLSX.utils.aoa_to_sheet(A); ws["!cols"]=[{wch:11},{wch:12},{wch:8},{wch:7},{wch:8},{wch:8},{wch:8},{wch:7},{wch:8},{wch:7},{wch:20}]; const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,"提出用"+month); XLSX.writeFile(wb,"勤怠提出用_"+month+".xlsx"); };
-  const toExcel=()=>{ if(!window.XLSX){flash("Excel機能の読み込み中です");return;} const A=[["日付","氏名","役割","出勤","出勤区分","退勤","退勤区分","休憩","実働(h)","交通費","メモ","登録区分","出勤位置","退勤位置"]]; const rs=(rows||[]).slice().sort((a,b)=>String(a.name||"").localeCompare(String(b.name||""))||String(a.biz_date||"").localeCompare(String(b.biz_date||""))); rs.forEach(r=>{ const d=r.data||{}; A.push([r.biz_date,r.name,RMAP[d.role]||"",hx(d.in_ts),d.in_place||"",hx(d.out_ts),d.out_place||"",(d.has_break?"4h":"なし")+(d.break_in?("／"+hx(d.break_in)+"-"+hx(d.break_out)):""),worked(d),d.transport||"",d.note||"",d.admin_entry?"管理者代理":"本人",mapUrl(d.geo_in)||"",mapUrl(d.geo_out)||""]); }); const ws=XLSX.utils.aoa_to_sheet(A); ws["!cols"]=[{wch:11},{wch:12},{wch:8},{wch:7},{wch:9},{wch:7},{wch:9},{wch:14},{wch:8},{wch:7},{wch:20},{wch:10},{wch:34},{wch:34}]; const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,"勤怠"+month); XLSX.writeFile(wb,"勤怠_"+month+".xlsx"); };
+  const toExcelSubmit=()=>{ if(!window.XLSX){flash("Excel機能の読み込み中です");return;} const A=[["日付","氏名","役割","出勤","退勤","休憩開始","休憩終了","休憩","実働(h)","残業(分)","残業終了","残業承認者","交通費","メモ"]]; const rs=(rows||[]).slice().sort((a,b)=>String(a.name||"").localeCompare(String(b.name||""))||String(a.biz_date||"").localeCompare(String(b.biz_date||""))); rs.forEach(r=>{ const d=r.data||{}; const s=SUB[d.role]; const ot=d.overtime; const otMin=(ot&&ot.status==="承認")?ot.minutes:""; const otEnd=(ot&&ot.status==="承認")?hx(ot.end_ts):""; const otBy=(ot&&ot.status==="承認")?(ot.approved_by||""):""; if(s){ A.push([r.biz_date,r.name,RMAP[d.role]||"",s.in,s.out,s.bin,s.bout,s.br,s.work,otMin,otEnd,otBy,d.transport||"",d.note||""]); } else { A.push([r.biz_date,r.name,RMAP[d.role]||"",hx(d.in_ts),hx(d.out_ts),hx(d.break_in),hx(d.break_out),(d.has_break?"4h":"なし"),worked(d),otMin,otEnd,otBy,d.transport||"",d.note||""]); } }); const ws=XLSX.utils.aoa_to_sheet(A); ws["!cols"]=[{wch:11},{wch:12},{wch:8},{wch:7},{wch:8},{wch:8},{wch:8},{wch:7},{wch:8},{wch:8},{wch:8},{wch:12},{wch:7},{wch:20}]; const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,"提出用"+month); XLSX.writeFile(wb,"勤怠提出用_"+month+".xlsx"); };
+  const toExcel=()=>{ if(!window.XLSX){flash("Excel機能の読み込み中です");return;} const A=[["日付","氏名","役割","出勤","出勤区分","退勤","退勤区分","休憩","実働(h)","残業(分)","残業状態","承認者","遅延理由","交通費","メモ","登録区分","出勤位置","退勤位置"]]; const rs=(rows||[]).slice().sort((a,b)=>String(a.name||"").localeCompare(String(b.name||""))||String(a.biz_date||"").localeCompare(String(b.biz_date||""))); rs.forEach(r=>{ const d=r.data||{}; const ot=d.overtime; A.push([r.biz_date,r.name,RMAP[d.role]||"",hx(d.in_ts),d.in_place||"",hx(d.out_ts),d.out_place||"",(d.has_break?"4h":"なし")+(d.break_in?("／"+hx(d.break_in)+"-"+hx(d.break_out)):""),worked(d),ot?ot.minutes:"",ot?ot.status:"",ot?(ot.approved_by||""):"",ot?(ot.late_reason||""):"",d.transport||"",d.note||"",d.admin_entry?"管理者代理":"本人",mapUrl(d.geo_in)||"",mapUrl(d.geo_out)||""]); }); const ws=XLSX.utils.aoa_to_sheet(A); ws["!cols"]=[{wch:11},{wch:12},{wch:8},{wch:7},{wch:9},{wch:7},{wch:9},{wch:14},{wch:8},{wch:8},{wch:8},{wch:12},{wch:14},{wch:7},{wch:20},{wch:10},{wch:34},{wch:34}]; const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,"勤怠"+month); XLSX.writeFile(wb,"勤怠_"+month+".xlsx"); };
   if(!agreed){ return <Section title="出勤簿（勤怠）について" note="はじめにお読みください。">
     <div className="consent-box">
       <h3>📍 位置情報の取り扱いについて</h3>
@@ -1483,6 +1494,9 @@ function TimeCard({me,data}){
         <div className="rec-sub">交通費</div>
         <div className="chk-row"><label className="chk"><input type="radio" name="tp" checked={md.transport==="必要"} onChange={()=>setTransport("必要")}/>必要</label><label className="chk"><input type="radio" name="tp" checked={md.transport!=="必要"} onChange={()=>setTransport("不要")}/>不要</label></div>
         {!md.out_ts?<div className="row-end"><Btn onClick={()=>setPlaceAsk("out")}>🔴 退勤</Btn></div>:<p>退勤：<b>{hm(md.out_ts)}</b>（{md.out_place}）／実働 <b>{worked(md)}h</b>{md.geo_out&&<a className="maplink" href={mapUrl(md.geo_out)} target="_blank" rel="noreferrer">📍地図(±{md.geo_out.acc}m)</a>}</p>}
+        <div className="rec-sub">残業申請（1日1回）</div>
+        {md.overtime?<div><p>残業 <b>{md.overtime.minutes}分</b>（終了 {hm(md.overtime.end_ts)}）</p><p className="tiny">状態：<b className={md.overtime.status==="承認"?"ot-ok":(md.overtime.status==="却下"?"ot-ng":"")}>{md.overtime.status}</b>{md.overtime.status==="承認"&&md.overtime.approved_by?("／承認者 "+md.overtime.approved_by):""}{md.overtime.late_reason?("／"+md.overtime.late_reason):""}{md.overtime.reason?("／"+md.overtime.reason):""}</p>{md.overtime.status!=="承認"&&<button className="link-btn" onClick={otCancel}>申請を取り消す</button>}</div>
+         :<><p className="tiny">定時退勤（{hm(schedEndTs(md.role||roleOf(me.name,today),today).toISOString())}）以降が残業です。終了を5分単位で切り上げます。</p><div className="row-end" style={{gap:"8px",flexWrap:"wrap"}}><Btn onClick={otNow}>残業終了を打刻（今すぐ）</Btn><Btn kind="ghost2" onClick={()=>setOtOpen(true)}>後から時刻を入力</Btn></div></>}
       </>}
     </div>
     {placeAsk&&<Modal title={placeAsk==="in"?"出勤の記録":"退勤の記録"} tint="#C9788F" onClose={()=>setPlaceAsk(null)}>
@@ -1497,8 +1511,18 @@ function TimeCard({me,data}){
       <div className="rec-log">{(rows||[]).map(r=>{ const d=r.data||{}; return <div key={r.id} className="rec-row">
         <span className="rec-time">{r.biz_date?r.biz_date.slice(5):""}</span><span className="chip">{r.name}</span>
         <span className="rec-item">{RMAP[d.role]||""} {hm(d.in_ts)}〜{d.out_ts?hm(d.out_ts):"…"}{d.out_ts?("／"+worked(d)+"h"):""} {d.transport==="必要"?"🚗費":""} {d.admin_entry?<span className="proxy-tag">👤代理</span>:""}{d.geo_in&&<a className="maplink" href={mapUrl(d.geo_in)} target="_blank" rel="noreferrer">📍出</a>}{d.geo_out&&<a className="maplink" href={mapUrl(d.geo_out)} target="_blank" rel="noreferrer">📍退</a>}</span>
-        <button className="mini-key" onClick={()=>openEdit(r)}>✎</button></div>; })}</div>
+        <button className="mini-key" onClick={()=>openEdit(r)}>✎</button>
+        {d.overtime&&d.overtime.status==="申請中"&&<span className="ot-approve"><span className="tiny">残業{d.overtime.minutes}分</span><button className="btn ghost2" onClick={()=>otApprove(r,true)}>承認</button><button className="link-btn" onClick={()=>otApprove(r,false)}>却下</button></span>}
+        {d.overtime&&d.overtime.status!=="申請中"&&<span className="tiny" style={{marginLeft:"6px"}}>残業{d.overtime.minutes}分:<b className={d.overtime.status==="承認"?"ot-ok":"ot-ng"}>{d.overtime.status}</b>{d.overtime.approved_by?("("+d.overtime.approved_by+")"):""}</span>}
+        </div>; })}</div>
     </>}
+    {otOpen&&<Modal title="残業を後から申請" tint="#C9788F" onClose={()=>setOtOpen(false)}>
+      <label className="field"><span>残業の終了時刻（5分単位に切り上げます）</span><input type="time" step="300" value={otForm.end_t} onChange={e=>setOtForm(Object.assign({},otForm,{end_t:e.target.value}))}/></label>
+      <label className="field"><span>遅れて入力した理由</span><select value={otForm.late_reason} onChange={e=>setOtForm(Object.assign({},otForm,{late_reason:e.target.value}))}><option value="">（選択）</option>{["打刻を忘れた","申請を忘れた","勤務が長引き後で入力","その他"].map(x=><option key={x} value={x}>{x}</option>)}</select></label>
+      <label className="field"><span>理由・メモ（任意）</span><input value={otForm.reason} onChange={e=>setOtForm(Object.assign({},otForm,{reason:e.target.value}))}/></label>
+      <p className="tiny">申請後、管理者の承認で経理提出に反映されます。</p>
+      <div className="row-end"><Btn onClick={otSubmitManual}>申請する</Btn></div>
+    </Modal>}
     {edit&&<Modal title={edit.id?"打刻の修正":"打刻の追加（管理者）"} tint="#C9788F" onClose={()=>setEdit(null)}>
       {(!edit.id||edit.admin_entry)&&<p className="tiny" style={{color:"#8A5BB8"}}>👤 これは「管理者代理入力」として記録されます（一覧・出力に表示）。</p>}
       <div className="chk-row"><label className="chk"><input type="radio" name="nm" checked={edit.nameMode==="list"} onChange={()=>setEdit(Object.assign({},edit,{nameMode:"list"}))}/>登録職員</label><label className="chk"><input type="radio" name="nm" checked={edit.nameMode==="free"} onChange={()=>setEdit(Object.assign({},edit,{nameMode:"free"}))}/>ヘルプ（名前入力）</label></div>
