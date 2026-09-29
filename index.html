@@ -236,6 +236,12 @@
   .cat-row{display:flex;align-items:center;gap:6px;background:#fff;border:1px solid #F0D3DB;border-radius:8px;padding:6px 8px;margin-bottom:4px;}
   .cat-head{width:100%;display:flex;align-items:center;justify-content:space-between;background:linear-gradient(180deg,#FCEAF0,#FADCE6);border:1px solid #F0C6D5;border-radius:12px;padding:12px 14px;font-weight:700;color:#B25E77;font-size:15px;cursor:pointer;margin:0;}
   .cat-head:active{filter:brightness(0.98);}
+  .cat-head.open{border-radius:12px 12px 0 0;border-bottom:none;}
+  .time-toggle.active{background:#E0913C;color:#fff;border-color:#E0913C;}
+  .rec-open{margin-top:0;padding:12px;background:#FFF6F9;border:1px solid #F6DCE5;border-top:none;border-radius:0 0 12px 12px;}
+  .rec-group{margin-bottom:10px;}
+  .pastmode-banner{position:sticky;top:96px;z-index:8;background:linear-gradient(180deg,#FFF0D6,#FCE3B4);border:1px solid #F0C982;color:#8A5A00;border-radius:12px;padding:10px 12px;font-weight:700;font-size:13px;margin:0 0 10px;box-shadow:0 4px 12px rgba(200,150,40,.18);}
+  .items-past{outline:2px dashed #E0A94A;outline-offset:4px;border-radius:12px;padding:6px;background:#FFFBF3;}
   .consent-box{background:#fff;border:1px solid #F0D3DB;border-radius:16px;padding:16px 18px;color:#5A4A50;line-height:1.8;box-shadow:0 8px 20px rgba(228,87,122,.10);}
   .consent-box h3{color:#B25E77;margin:0 0 8px;font-size:16px;}
   .consent-box ul{margin:6px 0 10px;padding-left:20px;}
@@ -1129,9 +1135,12 @@ function Records({me,data,persist,reload}){
         <button className="recbtn vit" onClick={()=>setVit({sys:"",dia:"",hr:"",temp:""})}>🩺 バイタル測定（血圧・体温）</button>
         <button className="recbtn cam" onClick={()=>fileRef.current&&fileRef.current.click()} disabled={busy}>📷 写真</button>
       </div>
+      {useTime&&<div className="pastmode-banner">⏱ 過去日時モードで記録中：{fmtDate(mDate)}　{mH}:{String(mM).padStart(2,"0")}<br/><span className="tiny" style={{fontWeight:400}}>下の利用者と項目を押すと、この日時で保存されます（閉じるまで続きます）。</span></div>}
       <div className="row-between" style={{margin:"4px 0 8px"}}><button className="link-btn" onClick={openAllCats}>すべて開く</button><button className="link-btn" onClick={closeAllCats}>すべて閉じる</button></div>
-      {cats.map(cat=>{ const list=rItems.filter(i=>i.cat===cat); if(!list.length) return null; const op=!!openCats[cat]; return <div key={cat} className="rec-group"><button className="cat-head" onClick={()=>toggleCat(cat)}><span>{op?"▼":"▶"} {cat}</span><span className="tiny">{list.length}</span></button>{op&&<div className="rec-items">{list.map(i=>(<button key={i.id} className="recbtn" onClick={()=>tapItem(i.name)}>{i.name}</button>))}</div>}</div>; })}
+      <div className={useTime?"items-past":""}>
+      {cats.map(cat=>{ const list=rItems.filter(i=>i.cat===cat); if(!list.length) return null; const op=!!openCats[cat]; return <div key={cat} className="rec-group"><button className={"cat-head"+(op?" open":"")} onClick={()=>toggleCat(cat)}><span>{op?"▼":"▶"} {cat}</span><span className="tiny">{list.length}</span></button>{op&&<div className="rec-items rec-open">{list.map(i=>(<button key={i.id} className="recbtn" onClick={()=>tapItem(i.name)}>{i.name}</button>))}</div>}</div>; })}
       {(function(){ const orphans=rItems.filter(i=>!cats.includes(i.cat)); if(!orphans.length) return null; return <div className="rec-group"><div className="rec-gtitle">その他</div><div className="rec-items">{orphans.map(i=>(<button key={i.id} className="recbtn" onClick={()=>tapItem(i.name)}>{i.name}</button>))}</div></div>; })()}
+      </div>
       <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={onFile} style={{display:"none"}}/>
       <div className="rec-sub">自由に記録</div>
       <div className="composer">
@@ -1139,7 +1148,7 @@ function Records({me,data,persist,reload}){
         <button className="send" onClick={addNote} title="現在時刻で記録">＋</button>
       </div>
       <p className="tiny" style={{marginTop:4}}>「＋」を押すと<b>現在の時刻</b>のまま記録します。</p>
-      <button className="time-toggle" onClick={()=>{ if(!useTime){ setMDate(date); const n=new Date(); const nh=n.getHours(); setMH(String((nh>=15||nh<=9)?nh:16)); setMM(String(Math.floor(n.getMinutes()/5)*5)); } setUseTime(!useTime); }}>{useTime?"× 日時の指定を閉じる":"🕒 過去の日時を指定して記録"}</button>
+      <button className={"time-toggle"+(useTime?" active":"")} onClick={()=>{ if(!useTime){ setMDate(date); const n=new Date(); const nh=n.getHours(); setMH(String((nh>=15||nh<=9)?nh:16)); setMM(String(Math.floor(n.getMinutes()/5)*5)); } setUseTime(!useTime); }}>{useTime?"× 日時の指定を閉じる":"🕒 過去の日時を指定して記録"}</button>
       {useTime&&<div className="timepick">
         <div className="rec-sub" style={{marginTop:0}}>日時を選んで記録</div>
         <label className="field"><span>勤務開始日（この日の勤務として記録）</span><input type="date" value={mDate} onChange={e=>setMDate(e.target.value)}/></label>
@@ -1390,7 +1399,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.56〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.57〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
