@@ -253,6 +253,8 @@
   .proxy-tag{background:#EDE3F7;color:#8A5BB8;border-radius:6px;padding:1px 5px;font-size:10px;font-weight:700;margin-left:4px;}
   .ch-eve{display:block;font-size:10px;color:#8A5A00;background:#FBE1B0;border-radius:6px;padding:1px 5px;margin-top:2px;font-weight:700;}
   .cat-name{flex:1;font-size:13px;color:#5A4A50;}
+  .catname-btn{background:none;border:none;text-align:left;cursor:pointer;padding:0;}
+  .catname-btn:active{opacity:.6;}
   .cat-sel{font-size:11px;padding:4px;border:1px solid #F0D3DB;border-radius:6px;background:#FCF4F5;max-width:120px;}
   .recbtn.cam{background:#EAF3E6;border-color:#CFE3C6;color:#5B8A45;}
   .rec-log{display:flex;flex-direction:column;gap:6px;margin-top:6px;}
@@ -1122,6 +1124,7 @@ function Records({me,data,persist,reload}){
   const catAdd=()=>{ const nm=newCat.trim(); if(!nm||cats.includes(nm))return; persist({...data,recCats:[...cats,nm],recItems:rItems}); setNewCat(""); };
   const itemAdd=()=>{ const nm=newItem.trim(); if(!nm)return; const cat=newItemCat||cats[0]||"その他"; const vars=nVars.split(/[、,]/).map(s=>s.trim()).filter(Boolean); persist({...data,recCats:cats,recItems:[...rItems,{id:uid(),name:nm,cat,variants:vars,multi:nMulti}]}); setNewItem(""); setNVars(""); setNMulti(false); };
   const itemToggleMulti=(id)=>persist({...data,recItems:rItems.map(x=>x.id===id?Object.assign({},x,{multi:!x.multi}):x),recCats:cats});
+  const itemRename=(id)=>{ const it=rItems.find(x=>x.id===id); if(!it)return; const nn=prompt("項目名を修正",it.name); if(nn===null||!nn.trim())return; persist({...data,recItems:rItems.map(x=>x.id===id?Object.assign({},x,{name:nn.trim()}):x),recCats:cats}); };
   const itemSetVars=(id)=>{ const it=rItems.find(x=>x.id===id); const cur=((it&&it.variants)||[]).join("、"); const nn=prompt("種類（読点・カンマ区切り。空にすると種類なし）\n例：一部介助、全介助",cur); if(nn===null)return; const vars=nn.split(/[、,]/).map(s=>s.trim()).filter(Boolean); persist({...data,recItems:rItems.map(x=>x.id===id?Object.assign({},x,{variants:vars}):x),recCats:cats}); };
   const itemDel=(id)=>persist({...data,recItems:rItems.filter(x=>x.id!==id),recCats:cats});
   const itemMove=(id,dir)=>{ const arr=rItems.slice(); const idx=arr.findIndex(x=>x.id===id); if(idx<0)return; const cat=arr[idx].cat; let j=idx+dir; while(j>=0&&j<arr.length&&arr[j].cat!==cat) j+=dir; if(j<0||j>=arr.length)return; const t=arr[idx];arr[idx]=arr[j];arr[j]=t; persist({...data,recItems:arr,recCats:cats}); };
@@ -1176,7 +1179,7 @@ function Records({me,data,persist,reload}){
         <label className="chk" style={{marginTop:"6px"}}><input type="checkbox" checked={nMulti} onChange={e=>setNMulti(e.target.checked)}/>種類を複数選べる（チェック式）</label>
         <p className="tiny">「種類」を入れると、その項目に選択肢が付きます（記録時に選べます）。読点「、」かカンマ「,」で区切ってください。複数選びたい項目（巡回など）は上の「チェック式」をオンに。</p>
         <div className="rec-gtitle" style={{marginTop:12}}>項目の並び替え・移動・削除</div>
-        {cats.map(cat=>{ const list=rItems.filter(i=>i.cat===cat); if(!list.length) return null; return <div key={cat} style={{marginBottom:"8px"}}><div className="tiny" style={{fontWeight:700,color:"#C9788F"}}>{cat}</div>{list.map(i=>(<div key={i.id} className="cat-row"><span className="cat-name">{i.name}{i.variants&&i.variants.length?(" ["+i.variants.join("・")+"]"):""}</span><button className="mini-key" onClick={()=>itemMove(i.id,-1)}>↑</button><button className="mini-key" onClick={()=>itemMove(i.id,1)}>↓</button><button className="mini-key" onClick={()=>itemSetVars(i.id)}>種</button><button className="mini-key" onClick={()=>itemToggleMulti(i.id)}>{i.multi?"複✓":"複"}</button><select className="cat-sel" value={i.cat} onChange={e=>itemSetCat(i.id,e.target.value)}>{cats.map(c=><option key={c} value={c}>{c}</option>)}</select><button className="mini-del" onClick={()=>itemDel(i.id)}>🗑</button></div>))}</div>; })}
+        {cats.map(cat=>{ const list=rItems.filter(i=>i.cat===cat); if(!list.length) return null; return <div key={cat} style={{marginBottom:"8px"}}><div className="tiny" style={{fontWeight:700,color:"#C9788F"}}>{cat}</div>{list.map(i=>(<div key={i.id} className="cat-row"><button className="cat-name catname-btn" onClick={()=>itemRename(i.id)}>✎ {i.name}{i.variants&&i.variants.length?(" ["+i.variants.join("・")+"]"):""}{i.multi?"（複）":""}</button><button className="mini-key" onClick={()=>itemMove(i.id,-1)}>↑</button><button className="mini-key" onClick={()=>itemMove(i.id,1)}>↓</button><button className="mini-key" onClick={()=>itemSetVars(i.id)}>種</button><button className="mini-key" onClick={()=>itemToggleMulti(i.id)}>{i.multi?"複✓":"複"}</button><select className="cat-sel" value={i.cat} onChange={e=>itemSetCat(i.id,e.target.value)}>{cats.map(c=><option key={c} value={c}>{c}</option>)}</select><button className="mini-del" onClick={()=>itemDel(i.id)}>🗑</button></div>))}</div>; })}
       </div>}
       <div className="tl-datenav" style={{marginTop:14}}>
         <button className="link-btn" onClick={()=>setDate(iso(addDays(new Date(date+"T00:00:00"),-1)))}>‹ 前の勤務</button>
@@ -1406,7 +1409,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.60〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.61〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
@@ -1582,10 +1585,10 @@ function TimeCard({me,data}){
 const TABS=[
   {id:"schedule",label:"タイムスケジュール"},
   {id:"handover",label:"申し送り・補充品"},
+  {id:"records",label:"記録"},
   {id:"shifts",label:"職員シフト"},
   {id:"timecard",label:"出勤簿（勤怠）"},
   {id:"plans",label:"利用予定カレンダー"},
-  {id:"records",label:"記録"},
   {id:"users",label:"利用者情報"},
   {id:"consult",label:"AI相談"},
   {id:"nisshi",label:"日誌まとめ"},
