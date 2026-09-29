@@ -1088,12 +1088,12 @@ function Records({me,data,persist,reload}){
   const hm=(ts)=>{ const d=new Date(ts); return String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0"); };
   const _bs=new Date(date+"T15:00:00"); const _be=(()=>{const e=addDays(new Date(date+"T00:00:00"),1); e.setHours(15,0,0,0); return e;})();
   const log=(data.records||[]).filter(r=>r&&r.ts).filter(r=>{ const t=new Date(r.ts); return t>=_bs && t<_be; }).sort((a,b)=>String(b.ts||"").localeCompare(String(a.ts||"")));
-  const rplan=(data.dayPlans||{})[date]||{}; const dayUsers=(rplan.users&&rplan.users.length)?rplan.users:USERS4;
+  const effDate=useTime?mDate:date; const rplan=(data.dayPlans||{})[effDate]||{}; const dayUsers=(rplan.users&&rplan.users.length)?rplan.users:USERS4;
   const pushRecords=async(item,extra,tsOverride)=>{ if(sel.length===0){ flash("利用者を選んでください"); return false; } const ts=tsOverride||new Date().toISOString(); const targets=sel.filter(u=>dayUsers.includes(u)); if(!targets.length){ flash("利用者を選んでください"); return false; } const recs=targets.map(u=>Object.assign({id:uid(),ts,user:u,item},extra||{})); try{ for(const rc of recs) await recAdd(rc); await reload(); return true; }catch(e){ flash("保存に失敗しました"); return false; } };
   const bizTs=()=>{ const bd=new Date(mDate+"T00:00:00"); const cal=(+mH>=15)?bd:addDays(bd,1); cal.setHours(+mH,+mM,0,0); return cal.toISOString(); };
   const tapItem=(it)=>{ if(it==="巡回") setSp({type:"patrol",checks:{},val:""}); else if(it==="服薬") setSp({type:"med",checks:{},val:""}); else if(it==="血糖値測定") setSp({type:"glu",checks:{},val:""}); else if(it==="メニュー") setSp({type:"menu",checks:{},val:""}); else if(it==="介助") setSp({type:"care",checks:{},level:"部分介助",val:""}); else addRecord(it); };
-  const submitSp=async()=>{ let item=""; if(sp.type==="patrol"){ const c=PATROL_OPTS.filter(o=>sp.checks[o]); if(!c.length){flash("項目を選んでください");return;} item="巡回："+c.join("・"); } else if(sp.type==="med"){ const c=MED_OPTS.filter(o=>sp.checks[o]); if(!c.length){flash("項目を選んでください");return;} item="服薬："+c.join("・"); } else if(sp.type==="glu"){ if(!sp.val){flash("数値を入力してください");return;} item="血糖値 "+sp.val+" mg/dL"; } else if(sp.type==="care"){ const types=CARE_OPTS.filter(o=>sp.checks[o]); if(!types.length){flash("介助の種類を選んでください");return;} item="介助（"+types.join("・")+"／"+(sp.level||"部分介助")+"）："+(sp.val||"").trim(); } else { const meals=["晩","朝"].filter(m=>sp.checks[m]); if(!meals.length){flash("晩か朝を選んでください");return;} if(!sp.val.trim()){flash("メニューを入力してください");return;} item="メニュー（"+meals.join("・")+"）："+sp.val.trim(); } if(await pushRecords(item)){ flash("記録しました"); setSp(null); } };
-  const addRecord=async(item)=>{ if(await pushRecords(item)) flash("記録："+sel.join("・")+" "+item); };
+  const submitSp=async()=>{ let item=""; if(sp.type==="patrol"){ const c=PATROL_OPTS.filter(o=>sp.checks[o]); if(!c.length){flash("項目を選んでください");return;} item="巡回："+c.join("・"); } else if(sp.type==="med"){ const c=MED_OPTS.filter(o=>sp.checks[o]); if(!c.length){flash("項目を選んでください");return;} item="服薬："+c.join("・"); } else if(sp.type==="glu"){ if(!sp.val){flash("数値を入力してください");return;} item="血糖値 "+sp.val+" mg/dL"; } else if(sp.type==="care"){ const types=CARE_OPTS.filter(o=>sp.checks[o]); if(!types.length){flash("介助の種類を選んでください");return;} item="介助（"+types.join("・")+"／"+(sp.level||"部分介助")+"）："+(sp.val||"").trim(); } else { const meals=["晩","朝"].filter(m=>sp.checks[m]); if(!meals.length){flash("晩か朝を選んでください");return;} if(!sp.val.trim()){flash("メニューを入力してください");return;} item="メニュー（"+meals.join("・")+"）："+sp.val.trim(); } if(await pushRecords(item,null,useTime?bizTs():undefined)){ flash(useTime?"記録しました（指定日時）":"記録しました"); setSp(null); } };
+  const addRecord=async(item)=>{ if(await pushRecords(item,null,useTime?bizTs():undefined)) flash((useTime?"記録（指定日時）：":"記録：")+sel.filter(u=>dayUsers.includes(u)).join("・")+" "+item); };
   const addNote=async()=>{ if(!note.trim())return; if(await pushRecords(note.trim())){ flash("記録しました（現在時刻）"); setNote(""); } };
   const addNoteAt=async()=>{ if(!note.trim()){ flash("記録内容を入力してください"); return; } if(await pushRecords(note.trim(),null,bizTs())){ flash("記録しました（指定時刻）"); setNote(""); } };
   const delRec=async(id)=>{ try{ await recDelete(id); await reload(); }catch(e){} };
@@ -1101,7 +1101,7 @@ function Records({me,data,persist,reload}){
   const openEditRec=(r)=>{ const d=new Date(r.ts); setEdRec({id:r.id,user:r.user,abn:r.abn,thumb:r.thumb,photoId:r.photoId,y:d.getFullYear(),mo:d.getMonth()+1,da:d.getDate(),h:d.getHours(),mi:d.getMinutes(),item:r.item||""}); };
   const setER=(k,v)=>setEdRec(p=>Object.assign({},p,{[k]:v}));
   const saveEditRec=async()=>{ const e=edRec; if(!(e.item||"").trim()){flash("内容を入力してください");return;} const ts=new Date(e.y,e.mo-1,e.da,e.h,e.mi,0).toISOString(); const rec={id:e.id,ts,user:e.user,item:e.item.trim()}; if(e.abn)rec.abn=true; if(e.thumb)rec.thumb=e.thumb; if(e.photoId)rec.photoId=e.photoId; try{ await recUpdate(e.id,rec); await reload(); setEdRec(null); flash("修正しました"); }catch(err){ flash("修正に失敗しました"); } };
-  const submitVit=async()=>{ const v=vit; const item=buildVitItem(v); if(item==="🩺 "){ flash("数値を入力してください"); return; } const abn=vitAbn(v); if(await pushRecords(item, abn?{abn:true}:null)){ if(abn){ setVit(null); setValert(v.re?"second":"first"); } else { flash("バイタルを記録しました"); setVit(null); } } };
+  const submitVit=async()=>{ const v=vit; const item=buildVitItem(v); if(item==="🩺 "){ flash("数値を入力してください"); return; } const abn=vitAbn(v); if(await pushRecords(item, abn?{abn:true}:null, useTime?bizTs():undefined)){ if(abn){ setVit(null); setValert(v.re?"second":"first"); } else { flash("バイタルを記録しました"); setVit(null); } } };
   const loadPhotos=async()=>{ if(!SB_ON){ setPhotos([]); return; } try{ setPhotos(await sbListPhotos(af,at)); }catch(e){ setPhotos([]); } };
   useEffect(()=>{ if(view==="album"){ setPhotos(null); loadPhotos(); } },[view,af,at]);
   useEffect(()=>{ setSel([]); },[date, dayUsers.join("|")]);
@@ -1148,7 +1148,8 @@ function Records({me,data,persist,reload}){
           <select value={mM} onChange={e=>setMM(e.target.value)}>{REC_MINS.map(m=><option key={m} value={m}>{String(m).padStart(2,"0")}分</option>)}</select>
         </div>
         <p className="tiny">15時〜翌9時台で選べます（0〜9時台は自動で翌日扱いになります）。</p>
-        <div className="row-end"><Btn onClick={addNoteAt}>この日時で記録する</Btn></div>
+        <p className="tiny" style={{color:"#B25E77",fontWeight:700}}>⏱ この状態のまま下の「利用者」を選んで各項目（巡回・服薬・介助・バイタル等）を押すと、上で指定した日時で記録されます。文章は下のボタンで記録できます。</p>
+        <div className="row-end"><Btn onClick={addNoteAt}>この日時で文章を記録</Btn></div>
       </div>}
       {me.isAdmin&&<div style={{marginTop:8}}><button className="link-btn" onClick={()=>setEditItems(!editItems)}>{editItems?"項目の編集を閉じる":"項目を編集（管理者）"}</button></div>}
       {editItems&&me.isAdmin&&<div className="tl-editpanel">
@@ -1389,7 +1390,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.55〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.56〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
