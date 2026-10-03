@@ -312,6 +312,7 @@
   .res-av img{width:44px;height:44px;object-fit:cover;display:block;border-radius:50%;}
   .res-card.allergy{background:#FDECEC;border-color:#E9A8A8;}
   .res-badge.alg{left:8px;right:auto;background:#C0392B;}
+  .res-alg{position:absolute;top:6px;left:6px;background:#C0392B;color:#fff;font-size:9.5px;font-weight:700;border-radius:8px;padding:2px 6px;line-height:1.3;}
   .res-detail.allergy{background:#FDECEC;border:1px solid #E9A8A8;border-radius:14px;padding:12px;}
   .res-head{display:flex;align-items:center;gap:12px;margin-bottom:8px;}
   .res-face{width:64px;height:64px;border-radius:12px;object-fit:cover;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.12);}
@@ -459,6 +460,7 @@ async function logAccess(name,event){ try{ await authFetch(`${SUPABASE_URL}/rest
 async function alFetch(){ const r=await authFetch(`${SUPABASE_URL}/rest/v1/access_log?select=name,event,ts&order=ts.desc&limit=500`); if(!r.ok) throw new Error("al"); return await r.json(); }
 const nendoOf=(d)=>{ d=d||new Date(); return (d.getMonth()+1>=4)?d.getFullYear():d.getFullYear()-1; };
 function compressImage(file,max,q){ max=max||800; q=q||0.55; return new Promise((res,rej)=>{ const fr=new FileReader(); fr.onload=()=>{ const img=new Image(); img.onload=()=>{ let w=img.width,h=img.height; if(w>h&&w>max){h=Math.round(h*max/w);w=max;} else if(h>max){w=Math.round(w*max/h);h=max;} const c=document.createElement("canvas"); c.width=w;c.height=h; c.getContext("2d").drawImage(img,0,0,w,h); res(c.toDataURL("image/jpeg",q)); }; img.onerror=rej; img.src=fr.result; }; fr.onerror=rej; fr.readAsDataURL(file); }); }
+function resizeDataUrl(src,max,q){ max=max||240;q=q||0.6; return new Promise((res,rej)=>{ const img=new Image(); img.onload=()=>{ let w=img.width,h=img.height; if(w>h&&w>max){h=Math.round(h*max/w);w=max;} else if(h>max){w=Math.round(w*max/h);h=max;} const c=document.createElement("canvas");c.width=w;c.height=h;c.getContext("2d").drawImage(img,0,0,w,h); res(c.toDataURL("image/jpeg",q)); }; img.onerror=rej; img.src=src; }); }
 
 /* 所属（応援元）とタイムライン/シフトの役割 */
 const AFFILIATIONS=[
@@ -1428,7 +1430,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.65〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.66〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
@@ -1857,7 +1859,7 @@ function Residents({me,onLogout}){
       <span className="res-av">{r.data&&r.data.face?<img src={r.data.face} alt=""/>:(((r.data&&r.data.name)||"？").slice(0,1))}</span>
       <span className="res-nm">{(r.data&&r.data.name)||"（無名）"}</span>
       <span className="res-tag">{[r.data&&r.data.kubun&&("区分"+r.data.kubun),r.data&&r.data.disability].filter(Boolean).join("・")}</span>
-      {(r.data&&r.data.allergy&&r.data.allergy.has)&&<span className="res-badge alg">ア</span>}
+      {(r.data&&r.data.allergy&&r.data.allergy.has)&&<span className="res-alg">アレルギー</span>}
       {r.data&&r.data.notices&&r.data.notices.length>0&&<span className="res-badge">!</span>}
     </button>))}</div>
     {toast&&<div className="toast">{toast}</div>}
@@ -1879,7 +1881,9 @@ function ResidentForm({init,onCancel,onSave}){
   const setEmg=(i,k,v)=>setD(p=>{const e=(p.emergency||[]).slice(); e[i]=Object.assign({},e[i],{[k]:v}); return Object.assign({},p,{emergency:e});});
   const addEmg=()=>setD(p=>((p.emergency||[]).length>=3?p:Object.assign({},p,{emergency:[...(p.emergency||[]),{relation:"母",name:"",phone:""}]})));
   const rmEmg=(i)=>setD(p=>Object.assign({},p,{emergency:(p.emergency||[]).filter((_,j)=>j!==i)}));
-  const faceRef=useRef(null); const medRefs=useRef({});
+  const faceRef=useRef(null); const medRefs=useRef({}); const [albumOpen,setAlbumOpen]=useState(false); const [album,setAlbum]=useState(null);
+  const openAlbum=async()=>{ setAlbumOpen(true); if(album===null){ try{ setAlbum(await sbListPhotos()); }catch(e){ setAlbum([]); } } };
+  const pickFace=async(p)=>{ try{ const full=await sbPhotoFull(p.id); const img=full&&full.image; if(img){ set("face", await resizeDataUrl(img,240,0.6)); } }catch(e){} setAlbumOpen(false); };
   const onFace=async(e)=>{ const f=e.target.files&&e.target.files[0]; e.target.value=""; if(!f)return; try{ set("face", await compressImage(f,240,0.6)); }catch(err){} };
   const onMedP=async(i,e)=>{ const f=e.target.files&&e.target.files[0]; e.target.value=""; if(!f)return; try{ setMed(i,"photo", await compressImage(f,300,0.5)); }catch(err){} };
   const submit=()=>{ if(!(d.name&&d.name.trim())){ alert("氏名を入力してください"); return; } const id=init.id||("r_"+uid()+Date.now()); onSave(id, Object.assign({},d,{notices:(d.notices||[]),name:d.name.trim()})); };
@@ -1897,7 +1901,7 @@ function ResidentForm({init,onCancel,onSave}){
       <div className="nf"><label>区分</label><select value={d.kubun||""} onChange={e=>set("kubun",e.target.value)}>{KUBUN_OPTS.map(k=><option key={k} value={k}>{k?("区分"+k):"選択"}</option>)}</select></div>
     </div>
     <div className="nf"><label>障害名</label><input value={d.disability||""} onChange={e=>set("disability",e.target.value)}/></div>
-    <div className="nf"><label>顔写真</label><div className="row-between"><div className="face-prev">{d.face?<img src={d.face} alt="顔"/>:<span>なし</span>}</div><button className="recbtn cam" onClick={()=>faceRef.current&&faceRef.current.click()}>📷 写真</button></div><input ref={faceRef} type="file" accept="image/*" onChange={onFace} style={{display:"none"}}/></div>
+    <div className="nf"><label>顔写真</label><div className="row-between"><div className="face-prev">{d.face?<img src={d.face} alt="顔"/>:<span>なし</span>}</div><div style={{display:"flex",gap:"6px",flexWrap:"wrap"}}><button className="recbtn cam" onClick={()=>faceRef.current&&faceRef.current.click()}>📷 写真</button><button className="recbtn cam" onClick={openAlbum}>🖼 アルバム</button>{d.face&&<button className="recbtn" onClick={()=>set("face","")}>削除</button>}</div></div><input ref={faceRef} type="file" accept="image/*" onChange={onFace} style={{display:"none"}}/></div>
     <div className="res-sec">家族構成</div>
     <div className="chk-grid">
       <label className="chk"><input type="checkbox" checked={!!(d.family&&d.family.father)} onChange={e=>setFam("father",e.target.checked)}/>父</label>
@@ -1942,6 +1946,11 @@ function ResidentForm({init,onCancel,onSave}){
     <div className="nf"><label>本人の将来ビジョン</label><textarea rows={2} value={d.vision||""} onChange={e=>set("vision",e.target.value)}/></div>
     <div className="nf"><label>対応アドバイス（こういう時はこう対応）</label><textarea rows={5} value={d.advice||""} onChange={e=>set("advice",e.target.value)}/></div>
     <div className="n-actions"><Btn onClick={submit}>保存</Btn><Btn kind="ghost2" onClick={onCancel}>キャンセル</Btn></div>
+    {albumOpen&&<Modal title="アルバムから顔写真を選ぶ" tint="#C9788F" onClose={()=>setAlbumOpen(false)}>
+      {album===null&&<p className="empty">読み込み中…</p>}
+      {album!==null&&album.length===0&&<p className="empty">共有アルバムに写真がありません。記録タブで撮影すると、ここから選べます。</p>}
+      <div className="album">{(album||[]).map(p=>(<button key={p.id} className="thumb" onClick={()=>pickFace(p)}><img className="noSave" draggable={false} src={p.meta&&p.meta.thumb?p.meta.thumb:""} alt="写真"/><span>{p.created?p.created.slice(5,10):""}</span></button>))}</div>
+    </Modal>}
   </Section>;
 }
 function ResidentDetail({me,res,onBack,onEdit,onDel,onChange}){
