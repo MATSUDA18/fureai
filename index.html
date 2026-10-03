@@ -1028,7 +1028,9 @@ function Plans({me,data,persist}){
   </Section>;
 }
 function VitalsView({data,persist,reload}){
-  const users=Array.from(new Set([].concat(USERS4,(data.userList||[]),((data.records||[]).map(r=>r.user))))).filter(Boolean);
+  const [resNames,setResNames]=useState([]);
+  useEffect(()=>{ (async()=>{ if(!SB_ON)return; try{ const rows=await resList(); setResNames(rows.map(r=>r.data&&r.data.name).filter(Boolean)); }catch(e){} })(); },[]);
+  const users=Array.from(new Set([].concat(resNames,(data.userList||[]),((data.records||[]).map(r=>r.user)),USERS4))).filter(Boolean);
   const [user,setUser]=useState(users[0]||"利用者1");
   const [ed,setEd]=useState(null); const [toast,setToast]=useState("");
   const flash=(m)=>{setToast(m);setTimeout(()=>setToast(""),1600);};
@@ -1423,7 +1425,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.62〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.63〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
@@ -2012,7 +2014,7 @@ function ResidentDetail({me,res,onBack,onEdit,onDel,onChange}){
 function Shifts({me,data,persist}){
   const [weekStart,setWeekStart]=useState(()=>mondayOf(new Date()));
   const [open,setOpen]=useState(false); const [editId,setEditId]=useState(null);
-  const openEdit=(s)=>{ setForm({date:s.date,name:s.name,role:s.role,start:s.start,end:s.end,note:s.note||""}); setEditId(s.id); setOpen(true); };
+  const openEdit=(s)=>{ setForm({date:s.date,name:s.name,role:s.role,start:s.start,end:s.end,note:s.note||"",nameMode:(s.help?"free":"list")}); setEditId(s.id); setOpen(true); };
   const [form,setForm]=useState({date:(()=>{const n=new Date();return (n.getHours()*60+n.getMinutes())<(15*60)?iso(addDays(n,-1)):iso(n);})(),name:"",role:"A",start:"15:30",end:"09:30",note:""});
   const days=Array.from({length:7}).map((_,i)=>addDays(weekStart,i));
   const label=`${weekStart.getMonth()+1}/${weekStart.getDate()} 〜 ${addDays(weekStart,6).getMonth()+1}/${addDays(weekStart,6).getDate()}`;
@@ -2020,8 +2022,8 @@ function Shifts({me,data,persist}){
     if(!form.name.trim())return;
     const nm=form.name.trim();
     let shifts=(data.shifts||[]).slice();
-    if(editId){ shifts=shifts.map(s=>s.id===editId?Object.assign({},s,{date:form.date,name:nm,role:form.role,start:form.start,end:form.end,note:form.note}):s); }
-    else { shifts=[...shifts,{id:uid(),date:form.date,name:nm,role:form.role,start:form.start,end:form.end,note:form.note}]; }
+    if(editId){ shifts=shifts.map(s=>s.id===editId?Object.assign({},s,{date:form.date,name:nm,role:form.role,start:form.start,end:form.end,note:form.note,help:(form.nameMode==="free")}):s); }
+    else { shifts=[...shifts,{id:uid(),date:form.date,name:nm,role:form.role,start:form.start,end:form.end,note:form.note,help:(form.nameMode==="free")}]; }
     let dp=Object.assign({},data.dayPlans||{});
     if(form.role==="A"||form.role==="B"||form.role==="eve"){ const key=form.role==="A"?"s1":form.role==="B"?"s2":"s3"; const rl=form.role==="A"?"支援員1":form.role==="B"?"支援員2":"支援員3(夕勤)"; const cur=Object.assign({},dp[form.date]||{}); if(cur[key]&&cur[key]!==nm){ if(confirm("この日の"+rl+"は現在「"+cur[key]+"」です。「"+nm+"」に更新しますか？")){ cur[key]=nm; dp[form.date]=cur; } } else { cur[key]=nm; dp[form.date]=cur; } }
     persist(Object.assign({},data,{shifts,dayPlans:dp})); setOpen(false); setEditId(null);
@@ -2036,7 +2038,7 @@ function Shifts({me,data,persist}){
     </div>
     <div className="row-between" style={{marginBottom:10}}>
       <button className="link-btn" onClick={()=>setWeekStart(mondayOf(new Date()))}>今週に戻る</button>
-      {me.isAdmin&&<Btn onClick={()=>{setEditId(null);setForm({date:(()=>{const n=new Date();return (n.getHours()*60+n.getMinutes())<(15*60)?iso(addDays(n,-1)):iso(n);})(),name:"",role:"A",start:"15:30",end:"09:30",note:""});setOpen(true);}}>＋ シフトを追加</Btn>}
+      {me.isAdmin&&<Btn onClick={()=>{setEditId(null);setForm({date:(()=>{const n=new Date();return (n.getHours()*60+n.getMinutes())<(15*60)?iso(addDays(n,-1)):iso(n);})(),name:"",role:"A",start:"15:30",end:"09:30",note:"",nameMode:"list"});setOpen(true);}}>＋ シフトを追加</Btn>}
     </div>
     {days.map(d=>{
       const key=iso(d); const list=data.shifts.filter(s=>s.date===key).sort((a,b)=>a.start.localeCompare(b.start));
@@ -2045,7 +2047,7 @@ function Shifts({me,data,persist}){
         <div className="day-head"><span className={cls}>{d.getMonth()+1}/{d.getDate()}（{WD[wd]}）</span></div>
         {list.length===0?<div className="noshift">予定なし</div>:list.map(s=>(
           <div key={s.id} className="shift-item">
-            <span className="shift-time">{s.start}–{s.end}</span>{s.role&&<span className="chip">{({A:"夜勤A",B:"夜勤B",nightonly:"夜勤のみ",eve:"夕勤",event:"イベント",day:"日勤",other:"その他"})[s.role]||""}</span>}<span>{s.name}</span>
+            <span className="shift-time">{s.start}–{s.end}</span>{s.role&&<span className="chip">{({A:"夜勤A",B:"夜勤B",nightonly:"夜勤のみ",eve:"夕勤",event:"イベント",day:"日勤",other:"その他"})[s.role]||""}</span>}<span>{s.name}</span>{s.help&&<span className="proxy-tag">ヘルプ</span>}
             {s.note&&<span className="shift-note">{s.note}</span>}
             {me.isAdmin&&<button className="mini-key" onClick={()=>openEdit(s)}>✎</button>}{me.isAdmin&&<button className="mini-del" onClick={()=>remove(s.id)}>🗑</button>}
           </div>))}
@@ -2053,11 +2055,12 @@ function Shifts({me,data,persist}){
     })}
     {open&&<Modal title={editId?"シフトを編集":"シフトを追加"} tint="#C9788F" onClose={()=>{setOpen(false);setEditId(null);}}>
       <Field label="日付" type="date" value={form.date} onChange={e=>setForm({...form,date:e.target.value})}/>
-      <label className="field"><span>職員</span>
+      <div className="chk-row"><label className="chk"><input type="radio" name="snm" checked={(form.nameMode||"list")==="list"} onChange={()=>setForm({...form,nameMode:"list",name:""})}/>登録職員</label><label className="chk"><input type="radio" name="snm" checked={form.nameMode==="free"} onChange={()=>setForm({...form,nameMode:"free",name:""})}/>ヘルプ（名前入力・アプリ未登録）</label></div>
+      {(form.nameMode||"list")==="list"?<label className="field"><span>職員</span>
         <select value={form.name} onChange={e=>setForm({...form,name:e.target.value})}>
           <option value="">選択してください</option>
           {data.accounts.map(a=><option key={a.id} value={a.name}>{a.name}</option>)}
-        </select></label>
+        </select></label>:<label className="field"><span>ヘルプの氏名</span><input value={form.name} onChange={e=>setForm({...form,name:e.target.value})} placeholder="例：応援 太郎"/></label>}
       <label className="field"><span>担当（役割）</span>
         <select value={form.role} onChange={e=>setForm({...form,role:e.target.value})}>
           {SHIFT_ROLES.map(r=><option key={r.v} value={r.v}>{r.label}</option>)}
