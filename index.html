@@ -310,10 +310,11 @@
   .notice-item p{margin:2px 0 0;font-size:13.5px;line-height:1.6;}
   .plan-row{display:flex;align-items:center;justify-content:space-between;background:#fff;border:1px solid #F0D3DB;border-radius:10px;padding:6px 10px;margin-bottom:6px;}
   .res-av img{width:44px;height:44px;object-fit:cover;display:block;border-radius:50%;}
+  .res-card.female{background:#FCEAF0;border-color:#F0C4D5;}
   .res-card.male{background:#EAF2FB;border-color:#B9D4EE;}
-  .res-card.allergy{background:#FDECEC;border-color:#E9A8A8;}
+  .res-card.allergy{background:#FFF4D6;border-color:#EBCB74;}
   .res-badge.alg{left:8px;right:auto;background:#C0392B;}
-  .res-alg{position:absolute;top:6px;left:6px;background:#C0392B;color:#fff;font-size:9.5px;font-weight:700;border-radius:8px;padding:2px 6px;line-height:1.3;}
+  .res-alg{position:absolute;top:6px;left:6px;background:#D9822B;color:#fff;font-size:9.5px;font-weight:700;border-radius:8px;padding:2px 6px;line-height:1.3;}
   .res-detail.allergy{background:#FDECEC;border:1px solid #E9A8A8;border-radius:14px;padding:12px;}
   .res-head{display:flex;align-items:center;gap:12px;margin-bottom:8px;}
   .res-face{width:64px;height:64px;border-radius:12px;object-fit:cover;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.12);}
@@ -1431,7 +1432,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.67〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.68〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
@@ -1856,7 +1857,7 @@ function Residents({me,onLogout}){
     <div className="composer" style={{marginTop:10}}><textarea rows={1} value={q} placeholder="名前で検索" onChange={e=>setQ(e.target.value)}/></div>
     {list===null&&<p className="empty">読み込み中…</p>}
     {list!==null&&items.length===0&&<p className="empty">該当がありません。</p>}
-    <div className="res-grid">{items.map(r=>(<button key={r.id} className={"res-card"+((r.data&&r.data.allergy&&r.data.allergy.has)?" allergy":((r.data&&r.data.sex==="男性")?" male":""))} onClick={()=>setSel(r)}>
+    <div className="res-grid">{items.map(r=>(<button key={r.id} className={"res-card"+((r.data&&r.data.allergy&&r.data.allergy.has)?" allergy":((r.data&&r.data.sex==="女性")?" female":((r.data&&r.data.sex==="男性")?" male":"")))} onClick={()=>setSel(r)}>
       <span className="res-av">{r.data&&r.data.face?<img src={r.data.face} alt=""/>:(((r.data&&r.data.name)||"？").slice(0,1))}</span>
       <span className="res-nm">{(r.data&&r.data.name)||"（無名）"}</span>
       <span className="res-tag">{[r.data&&r.data.kubun&&("区分"+r.data.kubun),r.data&&r.data.disability].filter(Boolean).join("・")}</span>
