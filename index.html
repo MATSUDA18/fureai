@@ -48,11 +48,11 @@
   .card{background:#fff;border-radius:20px;padding:18px;margin-top:16px;box-shadow:0 6px 20px rgba(201,120,143,.10);border:1px solid #F0D3DB;}
   .card h2{display:flex;align-items:center;gap:8px;margin:0 0 14px;font-size:16px;color:#C9788F;}
   .name-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;}
-  .name-chip{display:flex;align-items:center;gap:10px;padding:12px;border-radius:14px;border:1px solid #F0D3DB;background:#FBEAEE;cursor:pointer;transition:transform .12s,background .12s;}
+  .name-chip{display:flex;align-items:center;gap:10px;padding:12px;border-radius:14px;border:1px solid #F0D3DB;background:#FBEAEE;cursor:pointer;transition:transform .12s,background .12s;min-width:0;overflow:hidden;}
   .name-chip:hover{background:#F6D4DD;transform:translateY(-1px);}
-  .avatar{width:34px;height:34px;border-radius:50%;background:#E79AB0;color:#fff;display:grid;place-items:center;font-weight:700;font-family:"Zen Maru Gothic";}
+  .avatar{width:34px;height:34px;min-width:34px;flex:none;border-radius:50%;background:#E79AB0;color:#fff;display:grid;place-items:center;font-weight:700;font-family:"Zen Maru Gothic";overflow:hidden;}
   .avatar.sm{width:28px;height:28px;font-size:13px;}
-  .nm{font-weight:500;}
+  .nm{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .tag{margin-left:auto;font-size:10px;background:#C9788F;color:#fff;padding:2px 7px;border-radius:999px;}
 
   .foot-actions{display:flex;gap:12px;margin-top:18px;}
@@ -290,7 +290,7 @@
   .att-info span{font-size:11px;color:#94808A;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .res-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:12px;}
   .res-card{position:relative;display:flex;flex-direction:column;align-items:center;gap:4px;padding:14px 8px;border:1px solid #F0D3DB;border-radius:14px;background:#fff;cursor:pointer;}
-  .res-av{width:44px;height:44px;border-radius:50%;background:#E79AB0;color:#fff;display:grid;place-items:center;font-weight:700;font-size:18px;font-family:"Zen Maru Gothic";}
+  .res-av{width:44px;height:44px;min-width:44px;min-height:44px;flex:none;border-radius:50%;background:#E79AB0;color:#fff;display:grid;place-items:center;font-weight:700;font-size:18px;font-family:"Zen Maru Gothic";overflow:hidden;}
   .res-nm{font-weight:700;color:#5A4A50;font-size:14px;}
   .res-tag{font-size:10px;color:#94808A;text-align:center;line-height:1.3;}
   .res-badge{position:absolute;top:6px;right:8px;width:18px;height:18px;border-radius:50%;background:#E4577A;color:#fff;font-size:12px;font-weight:700;display:grid;place-items:center;}
@@ -309,7 +309,7 @@
   .notice-item span{font-size:11px;color:#94808A;}
   .notice-item p{margin:2px 0 0;font-size:13.5px;line-height:1.6;}
   .plan-row{display:flex;align-items:center;justify-content:space-between;background:#fff;border:1px solid #F0D3DB;border-radius:10px;padding:6px 10px;margin-bottom:6px;}
-  .res-av img{width:100%;height:100%;object-fit:cover;border-radius:50%;}
+  .res-av img{width:44px;height:44px;object-fit:cover;display:block;border-radius:50%;}
   .res-card.allergy{background:#FDECEC;border-color:#E9A8A8;}
   .res-badge.alg{left:8px;right:auto;background:#C0392B;}
   .res-detail.allergy{background:#FDECEC;border:1px solid #E9A8A8;border-radius:14px;padding:12px;}
@@ -827,13 +827,15 @@ function DayPlanModal({data,persist,date,onClose}){
   const allUsers=Array.from(new Set([].concat(resNames,userList).filter(Boolean)));
   const cur=(data.dayPlans||{})[date]||{};
   const [u,setU]=useState(()=>{ const a=(cur.users||[]).slice(0,4); while(a.length<4)a.push(""); return a; });
-  const [s1,setS1]=useState(cur.s1||""); const [s2,setS2]=useState(cur.s2||""); const [s3,setS3]=useState(cur.s3||""); const [newU,setNewU]=useState("");
+  const [s1,setS1]=useState(cur.s1||""); const [s2,setS2]=useState(cur.s2||""); const [s3,setS3]=useState(cur.s3||""); const [s4,setS4]=useState(cur.s4||""); const [newU,setNewU]=useState("");
   const addUser=()=>{ const n=newU.trim(); if(!n)return; if(!userList.includes(n)) persist({...data,userList:[...userList,n]}); setNewU(""); };
   const save=()=>{ const users=u.map(x=>x.trim()).filter(Boolean).slice(0,4); let ns1=s1.trim(), ns2=s2.trim(), ns3=s3.trim(); let shifts=(data.shifts||[]).slice();
     const RL={A:"夜勤A",B:"夜勤B",eve:"夕勤"}; const TM={A:["15:30","09:30"],B:["15:30","09:30"],eve:["15:30","21:30"]};
     const resolve=(role,nm)=>{ if(!nm) return nm; const idx=shifts.findIndex(s=>s.date===date&&s.role===role); if(idx>=0){ if(shifts[idx].name!==nm){ if(confirm("職員シフト（"+RL[role]+"）は「"+shifts[idx].name+"」です。\nOK＝この予定「"+nm+"」に統一 ／ キャンセル＝シフト「"+shifts[idx].name+"」に合わせる")){ shifts[idx]=Object.assign({},shifts[idx],{name:nm}); return nm; } else { return shifts[idx].name; } } return nm; } else { shifts.push({id:uid(),date,name:nm,role,start:TM[role][0],end:TM[role][1],note:""}); return nm; } };
-    ns1=resolve("A",ns1); ns2=resolve("B",ns2); ns3=resolve("eve",ns3);
-    persist(Object.assign({},data,{dayPlans:Object.assign({},data.dayPlans||{},{[date]:{users,s1:ns1,s2:ns2,s3:ns3}}),shifts})); onClose(); };
+    ns1=resolve("A",ns1); ns2=resolve("B",ns2); const ns4=s4.trim();
+    shifts=shifts.filter(s=>!(s.date===date&&s.role==="eve"));
+    [ns3,ns4].filter(Boolean).forEach(nm=>{ shifts.push({id:uid(),date,name:nm,role:"eve",start:"15:30",end:"21:30",note:""}); });
+    persist(Object.assign({},data,{dayPlans:Object.assign({},data.dayPlans||{},{[date]:{users,s1:ns1,s2:ns2,s3:ns3,s4:ns4}}),shifts})); onClose(); };
   return <Modal title={fmtDate(date)+" の利用者・支援員"} tint="#C9788F" onClose={onClose}>
     <div className="sync-note">
       <b>💡 ここで設定すると、下の4か所へ自動で反映されます</b>
@@ -848,7 +850,8 @@ function DayPlanModal({data,persist,date,onClose}){
     <div className="rec-sub" style={{marginTop:0}}>支援員（夜勤A＝支援員1／夜勤B＝支援員2／夕勤＝支援員3）</div>
     <label className="field"><span>支援員1（夜勤A）</span><select value={s1} onChange={e=>setS1(e.target.value)}><option value="">（未設定）</option>{accounts.map(a=><option key={a.id} value={a.name}>{a.name}</option>)}</select></label>
     <label className="field"><span>支援員2（夜勤B）</span><select value={s2} onChange={e=>setS2(e.target.value)}><option value="">（未設定）</option>{accounts.map(a=><option key={a.id} value={a.name}>{a.name}</option>)}</select></label>
-    <label className="field"><span>支援員3（夕勤 15:30–21:30）</span><select value={s3} onChange={e=>setS3(e.target.value)}><option value="">（未設定）</option>{accounts.map(a=><option key={a.id} value={a.name}>{a.name}</option>)}</select></label>
+    <label className="field"><span>支援員3（夕勤① 15:30–21:30）</span><select value={s3} onChange={e=>setS3(e.target.value)}><option value="">（未設定）</option>{accounts.map(a=><option key={a.id} value={a.name}>{a.name}</option>)}</select></label>
+    <label className="field"><span>夕勤②（必要な場合）</span><select value={s4} onChange={e=>setS4(e.target.value)}><option value="">（未設定）</option>{accounts.map(a=><option key={a.id} value={a.name}>{a.name}</option>)}</select></label>
     <div className="rec-sub">利用者（最大4名・キャンセルは選ばない）</div>
     {u.map((v,i)=>(<label className="field" key={i}><span>利用者{i+1}</span><select value={v} onChange={e=>{const nv=e.target.value; setU(p=>p.map((x,j)=>j===i?nv:x));}}><option value="">（なし）</option>{allUsers.map(n=><option key={n} value={n}>{n}</option>)}</select></label>))}
     <div className="composer" style={{marginTop:4}}><textarea rows={1} value={newU} placeholder="リストに無い利用者名を追加" onChange={e=>setNewU(e.target.value)}/><button className="send" onClick={addUser} title="利用者名を追加">＋</button></div>
@@ -1016,7 +1019,7 @@ function Plans({me,data,persist}){
       <div className="rec-sub" style={{marginTop:8}}>現在の設定</div>
       <p>利用者：{(cur.users&&cur.users.length)?cur.users.join("・"):"未設定"}</p>
       <p>支援員1（夜勤A）：{cur.s1||"未設定"}　／　支援員2（夜勤B）：{cur.s2||"未設定"}</p>
-      <p>支援員3（夕勤）：{cur.s3||"未設定"}</p>
+      <p>夕勤：{[cur.s3,cur.s4].filter(Boolean).join("・")||"未設定"}</p>
       <div className="row-end"><Btn onClick={()=>setDpOpen(true)}>👥 この日を設定する</Btn></div>
     </div>}
     {toast&&<div className="toast">{toast}</div>}
@@ -1425,7 +1428,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.63〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.65〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
@@ -1493,7 +1496,7 @@ function TimeCard({me,data}){
   const clockOutEv=async(place)=>{ if(!mev){flash("先にイベント出勤を押してください");return;} const g=await getGeo(); await saveEv(Object.assign({},mev,{out_ts:new Date().toISOString(),out_place:place,geo_out:g})); setPlaceAsk(null); flash("イベント退勤を記録しました"); };
   const evCancel=async()=>{ if(!myEvent)return; if(!confirm("イベント勤怠を取り消しますか？"))return; try{ await tcDelete(myEvent.id); await load(); }catch(e){} };
   const evSubmit=async()=>{ if(!evForm.in_t||!evForm.out_t){flash("出勤・退勤の時刻を入力してください");return;} const biz=evForm.date||today; const inTs=new Date(biz+"T"+evForm.in_t+":00"); const outD=new Date(biz+"T"+evForm.out_t+":00"); if(evForm.out_t<evForm.in_t) outD.setDate(outD.getDate()+1); const id="tcev_"+me.name+"_"+biz; try{ await tcSave({id,name:me.name,biz_date:biz,data:{event:true,role:"event",has_break:false,in_ts:inTs.toISOString(),out_ts:outD.toISOString(),note:evForm.note||"",transport:"不要",by:me.name},created:new Date().toISOString()}); await load(); setEvOpen(false); setEvForm({date:today,in_t:"09:00",out_t:"13:30",note:""}); flash("イベント勤怠を登録しました"); }catch(e){ flash("保存に失敗しました"); } };
-  const clockIn=async(place)=>{ const role=roleOf(me.name,today); const hasBreak=(role!=="eve"&&role!=="nightonly"); const cur=md||{}; const g=await getGeo(); await saveTC(me.name,today,Object.assign({transport:"不要"},cur,{in_ts:new Date().toISOString(),in_place:place,role,has_break:hasBreak,by:me.name,geo_in:g})); setPlaceAsk(null); flash(g?("出勤を記録（📍±"+g.acc+"m）"):"出勤を記録（位置なし）"); };
+  const clockIn=async(place)=>{ const role=roleOf(me.name,today); const hasBreak=(role!=="eve"&&role!=="nightonly"); const cur=md||{}; const g=await getGeo(); await saveTC(me.name,today,Object.assign({transport:"必要"},cur,{in_ts:new Date().toISOString(),in_place:place,role,has_break:hasBreak,by:me.name,geo_in:g})); setPlaceAsk(null); flash(g?("出勤を記録（📍±"+g.acc+"m）"):"出勤を記録（位置なし）"); };
   const clockOut=async(place)=>{ if(!md){flash("先に出勤を押してください");return;} const g=await getGeo(); await saveTC(me.name,today,Object.assign({},md,{out_ts:new Date().toISOString(),out_place:place,geo_out:g})); setPlaceAsk(null); flash(g?("退勤を記録（📍±"+g.acc+"m）"):"退勤を記録（位置なし）"); };
   const breakIn=async()=>{ const g=await getGeo(); await saveTC(me.name,today,Object.assign({},md,{break_in:new Date().toISOString(),geo_bin:g})); flash("休憩開始"); };
   const breakOut=async()=>{ const g=await getGeo(); await saveTC(me.name,today,Object.assign({},md,{break_out:new Date().toISOString(),geo_bout:g})); flash("休憩終了"); };
@@ -1504,7 +1507,7 @@ function TimeCard({me,data}){
   const otCancel=async()=>{ if(!confirm("残業申請を取り消しますか？"))return; const d=Object.assign({},md); delete d.overtime; await saveTC(me.name,today,d); flash("取り消しました"); };
   const otApprove=async(r,ok)=>{ const d=r.data||{}; if(!d.overtime)return; const ot=Object.assign({},d.overtime,{status:ok?"承認":"却下",approved_by:me.name,approved_ts:new Date().toISOString()}); try{ await tcSave({id:r.id,name:r.name,biz_date:r.biz_date,data:Object.assign({},d,{overtime:ot}),created:r.created||new Date().toISOString()}); await load(); }catch(e){ flash("更新に失敗しました"); } };
   const STD={ eve:{in:"15:30",out:"21:30",br:false,bin:"",bout:""}, A:{in:"15:30",out:"09:30",br:true,bin:"21:30",bout:"01:30"}, B:{in:"15:30",out:"09:30",br:true,bin:"01:30",bout:"05:30"}, nightonly:{in:"21:30",out:"09:30",br:false,bin:"",bout:""} };
-  const blankEdit=()=>({id:null,name:"",nameMode:"list",biz_date:today,role:"A",in_t:"15:30",in_place:"本部着",out_t:"09:30",out_place:"本部着",has_break:true,bin_t:"21:30",bout_t:"01:30",transport:"不要",note:"",_orig:{},admin_entry:true});
+  const blankEdit=()=>({id:null,name:"",nameMode:"list",biz_date:today,role:"A",in_t:"15:30",in_place:"本部着",out_t:"09:30",out_place:"本部着",has_break:true,bin_t:"21:30",bout_t:"01:30",transport:"必要",note:"",_orig:{},admin_entry:true});
   const onRole=(r)=>{ const s=STD[r]; if(s){ setEdit(Object.assign({},edit,{role:r,in_t:s.in,out_t:s.out,has_break:s.br,bin_t:s.bin,bout_t:s.bout,in_place:"本部着",out_place:(r==="eve"?"直帰":"本部着")})); } else { setEdit(Object.assign({},edit,{role:r,has_break:false})); } };
   const openEdit=(r)=>{ const d=r.data||{}; setEdit({id:r.id,name:r.name,nameMode:"list",biz_date:r.biz_date,role:d.role||"other",in_t:hx(d.in_ts),in_place:d.in_place||"本部着",out_t:hx(d.out_ts),out_place:d.out_place||"本部着",has_break:d.has_break!==false,bin_t:hx(d.break_in),bout_t:hx(d.break_out),transport:d.transport||"不要",note:d.note||"",_orig:d,admin_entry:!!d.admin_entry}); };
   const toMin=(t)=>{ const p=(t||"0:0").split(":"); return (+p[0])*60+(+p[1]); };
@@ -1727,7 +1730,7 @@ function Schedule({me,data,persist}){
   const dayShifts=(data.shifts||[]).filter(s=>s.date===date);
   const tplan=(data.dayPlans||{})[date]||{}; const nameA=tplan.s1||(dayShifts.find(s=>s.role==="A")||{}).name||"";
   const nameB=tplan.s2||(dayShifts.find(s=>s.role==="B")||{}).name||"";
-  const nameE=tplan.s3||(dayShifts.find(s=>s.role==="eve")||{}).name||"";
+  let eveNames=[tplan.s3,tplan.s4].filter(Boolean); if(!eveNames.length){ dayShifts.filter(s=>s.role==="eve").forEach(s=>{ if(s.name) eveNames.push(s.name); }); } const nameE=eveNames.join("・");
   const _em=now.getHours()*60+now.getMinutes();
   const eveSlot=(_em>=570&&_em<1290); // 9:30〜21:30（15:30前も夕勤優先）／21:30〜翌9:30は夜勤
   let name2=nameB, sub2="";
@@ -2025,7 +2028,8 @@ function Shifts({me,data,persist}){
     if(editId){ shifts=shifts.map(s=>s.id===editId?Object.assign({},s,{date:form.date,name:nm,role:form.role,start:form.start,end:form.end,note:form.note,help:(form.nameMode==="free")}):s); }
     else { shifts=[...shifts,{id:uid(),date:form.date,name:nm,role:form.role,start:form.start,end:form.end,note:form.note,help:(form.nameMode==="free")}]; }
     let dp=Object.assign({},data.dayPlans||{});
-    if(form.role==="A"||form.role==="B"||form.role==="eve"){ const key=form.role==="A"?"s1":form.role==="B"?"s2":"s3"; const rl=form.role==="A"?"支援員1":form.role==="B"?"支援員2":"支援員3(夕勤)"; const cur=Object.assign({},dp[form.date]||{}); if(cur[key]&&cur[key]!==nm){ if(confirm("この日の"+rl+"は現在「"+cur[key]+"」です。「"+nm+"」に更新しますか？")){ cur[key]=nm; dp[form.date]=cur; } } else { cur[key]=nm; dp[form.date]=cur; } }
+    if(form.role==="A"||form.role==="B"){ const key=form.role==="A"?"s1":"s2"; const rl=form.role==="A"?"支援員1":"支援員2"; const cur=Object.assign({},dp[form.date]||{}); if(cur[key]&&cur[key]!==nm){ if(confirm("この日の"+rl+"は現在「"+cur[key]+"」です。「"+nm+"」に更新しますか？")){ cur[key]=nm; dp[form.date]=cur; } } else { cur[key]=nm; dp[form.date]=cur; } }
+    else if(form.role==="eve"){ const cur=Object.assign({},dp[form.date]||{}); if((!cur.s3)||cur.s3===nm){ cur.s3=nm; } else if((!cur.s4)||cur.s4===nm){ cur.s4=nm; } else { cur.s4=nm; } dp[form.date]=cur; }
     persist(Object.assign({},data,{shifts,dayPlans:dp})); setOpen(false); setEditId(null);
     setForm(Object.assign({},form,{note:""}));
   };
