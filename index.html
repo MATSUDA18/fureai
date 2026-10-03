@@ -247,6 +247,12 @@
   .consent-box ul{margin:6px 0 10px;padding-left:20px;}
   .consent-box li{font-size:14px;margin-bottom:6px;}
   .maplink{color:#2F8F8A;font-size:11px;margin-left:6px;white-space:nowrap;}
+  .slideshow{position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:100;display:flex;align-items:center;justify-content:center;padding:10px;}
+  .slide-inner{max-width:96vw;max-height:96vh;text-align:center;}
+  .slide-inner img{max-width:96vw;max-height:78vh;border-radius:10px;object-fit:contain;}
+  .slide-cap{color:#fff;font-size:13px;margin-top:10px;}
+  .slide-ctrl{display:flex;gap:12px;justify-content:center;margin-top:12px;}
+  .slide-ctrl button{background:rgba(255,255,255,.16);color:#fff;border:none;border-radius:10px;padding:8px 18px;font-size:18px;cursor:pointer;}
   .ot-ok{color:#2F8F8A;}
   .ot-ng{color:#C0392B;}
   .ot-approve{display:inline-flex;align-items:center;gap:6px;margin-left:6px;}
@@ -1432,7 +1438,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.68〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.69〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
@@ -1605,6 +1611,62 @@ function TimeCard({me,data}){
     {toast&&<div className="toast">{toast}</div>}
   </Section>;
 }
+function Album({me,data}){
+  const [photos,setPhotos]=useState(null);
+  const [from,setFrom]=useState(""); const [to,setTo]=useState(""); const [q,setQ]=useState("");
+  const [pv,setPv]=useState(null); const [busy,setBusy]=useState(false); const [toast,setToast]=useState("");
+  const flash=(m)=>{ setToast(m); setTimeout(()=>setToast(""),1800); };
+  const fileRef=useRef(null);
+  const [addOpen,setAddOpen]=useState(false); const [addFile,setAddFile]=useState(null); const [addName,setAddName]=useState("");
+  const nowStr=()=>{ const n=new Date(); return String(n.getHours()).padStart(2,"0")+":"+String(n.getMinutes()).padStart(2,"0"); };
+  const [addDate,setAddDate]=useState(iso(new Date())); const [addTime,setAddTime]=useState(nowStr());
+  const [resNames,setResNames]=useState([]);
+  useEffect(()=>{ (async()=>{ if(!SB_ON)return; try{ const rows=await resList(); setResNames(rows.map(r=>r.data&&r.data.name).filter(Boolean)); }catch(e){} })(); },[]);
+  const load=async()=>{ if(!SB_ON){setPhotos([]);return;} try{ setPhotos(await sbListPhotos(from||undefined,to||undefined)); }catch(e){ setPhotos([]); } };
+  useEffect(()=>{ setPhotos(null); load(); },[from,to]);
+  const results=(photos||[]).filter(p=>{ if(!q) return true; const nm=(((p.meta&&p.meta.users)||[]).join(" ")+" "+((p.meta&&p.meta.name)||"")); return nm.indexOf(q)>=0; });
+  const hm=(ts)=>{ const d=new Date(ts); return String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0"); };
+  const openFull=async(id)=>{ try{ const p=await sbPhotoFull(id); if(p) setPv(p); }catch(e){ flash("開けませんでした"); } };
+  const delPhoto=async(id)=>{ if(!confirm("この写真を削除しますか？"))return; try{ await sbDeletePhoto(id); setPv(null); load(); }catch(e){ flash("削除に失敗"); } };
+  const onFile=(e)=>{ const f=e.target.files&&e.target.files[0]; e.target.value=""; if(!f)return; setAddFile(f); setAddName(""); setAddDate(iso(new Date())); setAddTime(nowStr()); setAddOpen(true); };
+  const saveAdd=async()=>{ if(!addFile){flash("写真を選んでください");return;} if(!SB_ON){flash("共有DBが必要です");return;} setBusy(true); try{ const full=await compressImage(addFile,900,0.6); const thumb=await compressImage(addFile,160,0.5); const d=new Date(addDate+"T"+(addTime||"12:00")+":00"); const created=d.toISOString(); const id=uid()+"_"+Date.now(); await sbInsertPhoto({id, meta:{users:(addName.trim()?[addName.trim()]:[]), name:addName.trim(), ts:created, thumb, uploaded:true, by:me.name}, image:full, created}); setAddOpen(false); setAddFile(null); flash("写真を追加しました"); load(); }catch(e){ flash("保存に失敗（写真表の設定をご確認ください）"); } finally{ setBusy(false); } };
+  const [slide,setSlide]=useState(null);
+  const startSlide=()=>{ if(!results.length){flash("対象の写真がありません");return;} setSlide({list:results,idx:0,img:null,playing:true}); };
+  useEffect(()=>{ if(!slide)return; let cancel=false; (async()=>{ try{ const p=await sbPhotoFull(slide.list[slide.idx].id); if(!cancel) setSlide(s=>s?Object.assign({},s,{img:p?p.image:null}):s); }catch(e){} })(); return ()=>{cancel=true;}; },[slide&&slide.idx]);
+  useEffect(()=>{ if(!slide||!slide.playing||!slide.img)return; const t=setTimeout(()=>{ setSlide(s=>s?Object.assign({},s,{idx:(s.idx+1)%s.list.length,img:null}):s); },3500); return ()=>clearTimeout(t); },[slide&&slide.idx, slide&&slide.playing, slide&&slide.img]);
+  const slideNav=(d)=>setSlide(s=>s?Object.assign({},s,{idx:(s.idx+d+s.list.length)%s.list.length,img:null}):s);
+  return <Section title="写真・アルバム" note="このアプリに保存した写真を表示・検索できます。写真の取り込みや、期間を指定したスライドショーもできます。">
+    <div className="tl-editpanel">
+      <div className="nf"><label>名前で検索</label><input value={q} onChange={e=>setQ(e.target.value)} placeholder="利用者名・イベント名など" list="albnames"/></div>
+      <datalist id="albnames">{resNames.map(n=><option key={n} value={n}/>)}</datalist>
+      <div className="nf2"><div className="nf"><label>期間（開始）</label><input type="date" value={from} onChange={e=>setFrom(e.target.value)}/></div><div className="nf"><label>期間（終了）</label><input type="date" value={to} onChange={e=>setTo(e.target.value)}/></div></div>
+      <div className="row-end" style={{gap:"8px",flexWrap:"wrap"}}><Btn onClick={()=>fileRef.current&&fileRef.current.click()} disabled={busy}>＋ 写真を取り込む</Btn><Btn kind="ghost2" onClick={startSlide}>▶ スライドショー</Btn></div>
+      <input ref={fileRef} type="file" accept="image/*" onChange={onFile} style={{display:"none"}}/>
+    </div>
+    {photos===null&&<p className="empty">読み込み中…</p>}
+    {photos!==null&&results.length===0&&<p className="empty">写真がありません。</p>}
+    <div className="album">{results.map(p=>(<button key={p.id} className="thumb" onClick={()=>openFull(p.id)}><img className="noSave" draggable={false} onContextMenu={e=>e.preventDefault()} src={p.meta&&p.meta.thumb?p.meta.thumb:""} alt="写真"/><span>{((p.meta&&p.meta.users)||[]).join("・")||((p.meta&&p.meta.name)||"")} {p.created?(p.created.slice(0,10)+" "+hm(p.created)):""}</span></button>))}</div>
+    {pv&&<Modal title="写真" tint="#C9788F" onClose={()=>setPv(null)}>
+      <img className="noSave" draggable={false} onContextMenu={e=>e.preventDefault()} src={pv.image} style={{width:"100%",borderRadius:12}} alt="写真"/>
+      <p className="hint">{((pv.meta&&pv.meta.users)||[]).join("・")||((pv.meta&&pv.meta.name)||"")}　{pv.created?new Date(pv.created).toLocaleString():""}</p>
+      {me.isAdmin&&<div className="row-end"><button className="link-btn" onClick={()=>delPhoto(pv.id)}>この写真を削除</button></div>}
+    </Modal>}
+    {addOpen&&<Modal title="写真を取り込む" tint="#C9788F" onClose={()=>{setAddOpen(false);setAddFile(null);}}>
+      <p className="tiny">選んだ写真：{addFile?addFile.name:""}</p>
+      <div className="nf"><label>名前（任意・利用者名やイベント名）</label><input value={addName} onChange={e=>setAddName(e.target.value)} list="albnames"/></div>
+      <div className="nf2"><div className="nf"><label>撮影した日</label><input type="date" value={addDate} onChange={e=>setAddDate(e.target.value)}/></div><div className="nf"><label>時刻</label><input type="time" value={addTime} onChange={e=>setAddTime(e.target.value)}/></div></div>
+      <div className="row-end"><Btn onClick={saveAdd} disabled={busy}>{busy?"保存中…":"追加する"}</Btn></div>
+    </Modal>}
+    {slide&&<div className="slideshow" onClick={()=>setSlide(null)}>
+      <div className="slide-inner" onClick={e=>e.stopPropagation()}>
+        {slide.img?<img className="noSave" draggable={false} src={slide.img} alt="スライド"/>:<div className="empty" style={{color:"#fff"}}>読み込み中…</div>}
+        <div className="slide-cap">{(()=>{const p=slide.list[slide.idx];return (((p.meta&&p.meta.users)||[]).join("・")||((p.meta&&p.meta.name)||""))+"　"+(p.created?p.created.slice(0,10):"");})()}（{slide.idx+1}/{slide.list.length}）</div>
+        <div className="slide-ctrl"><button onClick={()=>slideNav(-1)}>‹</button><button onClick={()=>setSlide(s=>Object.assign({},s,{playing:!s.playing}))}>{slide.playing?"⏸":"▶"}</button><button onClick={()=>slideNav(1)}>›</button><button onClick={()=>setSlide(null)}>✕</button></div>
+      </div>
+    </div>}
+    {toast&&<div className="toast">{toast}</div>}
+  </Section>;
+}
 const TABS=[
   {id:"schedule",label:"タイムスケジュール"},
   {id:"handover",label:"申し送り・補充品"},
@@ -1612,6 +1674,7 @@ const TABS=[
   {id:"shifts",label:"職員シフト"},
   {id:"timecard",label:"出勤簿（勤怠）"},
   {id:"plans",label:"利用予定カレンダー"},
+  {id:"album",label:"写真・アルバム"},
   {id:"users",label:"利用者情報"},
   {id:"consult",label:"AI相談"},
   {id:"nisshi",label:"日誌まとめ"},
@@ -1639,6 +1702,7 @@ function Inside({me,data,tab,setTab,onLogout,persist,reload}){
       {tab==="records"&&<Records me={me} data={data} persist={persist} reload={reload}/>}
       {tab==="vitals"&&<VitalsView data={data} persist={persist} reload={reload}/>}
       {tab==="plans"&&<Plans me={me} data={data} persist={persist}/>}
+      {tab==="album"&&<Album me={me} data={data}/>}
       {tab==="nisshi"&&<Nisshi me={me} data={data}/>}
       {tab==="work"&&<Work/>}
       {tab==="traits"&&<Traits/>}
