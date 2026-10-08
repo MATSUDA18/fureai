@@ -144,6 +144,8 @@
   .starters{display:flex;flex-direction:column;gap:8px;}
   .starter{background:#FBEAEE;border:1px solid #F0D3DB;color:#C9788F;border-radius:12px;padding:10px 12px;font-size:13px;cursor:pointer;text-align:left;}
   .ai-warn{background:#FFF4D6;border:1px solid #EBCB74;color:#8A5A00;border-radius:12px;padding:10px 12px;font-size:12.5px;line-height:1.7;margin-bottom:10px;}
+  .bk-remind{background:#FFF4D6;border:1px solid #EBCB74;color:#8A5A00;border-radius:12px;padding:10px 12px;font-size:13px;line-height:1.7;margin:4px 0 10px;}
+  .bk-banner{background:linear-gradient(180deg,#FFF0D6,#FCE3B4);border:1px solid #F0C982;color:#8A5A00;border-radius:12px;padding:10px 14px;font-weight:700;font-size:13px;margin:0 0 10px;cursor:pointer;box-shadow:0 4px 12px rgba(200,150,40,.15);}
   .starter:hover{background:#F6D4DD;}
   .bubble{max-width:88%;padding:11px 14px;border-radius:16px;font-size:14px;line-height:1.75;white-space:pre-wrap;}
   .bubble.user{align-self:flex-end;background:#E79AB0;color:#fff;border-bottom-right-radius:4px;}
@@ -1439,7 +1441,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.71〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.73〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
@@ -1696,6 +1698,7 @@ function Inside({me,data,tab,setTab,onLogout,persist,reload}){
     <nav className="tabs">{tabs.map(t=>(
       <button key={t.id} className={"tab tab-"+t.id+" "+(tab===t.id?"on":"")} onClick={()=>setTab(t.id)}>{t.label}</button>))}</nav>
     <main className="ins-body">
+      {me.isAdmin&&(()=>{ let last=""; try{ last=localStorage.getItem("mizuho_last_backup")||""; }catch(e){} const days=last?Math.floor((Date.now()-new Date(last).getTime())/86400000):9999; if(days>=7){ return <div className="bk-banner" onClick={()=>setTab("admin")}>⏰ バックアップの時期です（{last?("前回 "+last.slice(0,10)):"未実施"}）。タップして管理者パネルで書き出し →</div>; } return null; })()}
       {tab==="schedule"&&<Schedule me={me} data={data} persist={persist}/>}
       {tab==="handover"&&<Handover me={me} data={data} persist={persist}/>}
       {tab==="shifts"&&<Shifts me={me} data={data} persist={persist}/>}
@@ -2265,8 +2268,14 @@ function AdminPanel({data,persist}){
     for(const t of tbls){ setBkProg(t+" を取得中…"); try{ out[t]=await fetchAll(t+"?select=*"); }catch(e){ out[t]="(取得失敗)"; } }
     setBkProg("resident_files を取得中…"); try{ out.resident_files=await fetchAll("resident_files?select="+(full?"*":"id,resident_id,meta,created")); }catch(e){ out.resident_files="(取得失敗)"; }
     setBkProg("photos を取得中…"); try{ out.photos=await fetchAll("photos?select="+(full?"*":"id,meta,created")); }catch(e){ out.photos="(取得失敗)"; }
-    dlJson(out, "mizuho_backup_"+(full?"full_":"")+date+".json");
-    setBkProg("完了しました。ファイルを保存しました。");
+    const fname="mizuho_backup_"+(full?"full_":"")+date+".json";
+    const cnt=(a)=>Array.isArray(a)?a.length:0;
+    const total=cnt(out.residents)+cnt(out.records)+cnt(out.timecard)+cnt(out.nisshi)+cnt(out.photos)+cnt(out.resident_files);
+    const sizeMB=(JSON.stringify(out).length/1048576).toFixed(1);
+    dlJson(out, fname);
+    setBkProg("✅ 保存しました（利用者"+cnt(out.residents)+"・記録"+cnt(out.records)+"・勤怠"+cnt(out.timecard)+"・日誌"+cnt(out.nisshi)+"・写真"+cnt(out.photos)+"・計画"+cnt(out.resident_files)+"件／約"+sizeMB+"MB）。ファイル名：「"+fname+"」。端末の『ダウンロード』フォルダ（iPhoneは『ファイル』アプリ→ダウンロード）に保存されました。");
+    try{ localStorage.setItem("mizuho_last_backup", new Date().toISOString()); }catch(e){}
+    alert("バックアップを保存しました。\n\nファイル名：\n"+fname+"\n\n保存先：端末の『ダウンロード』フォルダ\n\n★必ず Googleドライブ 等のクラウドに移してください（機種変更・紛失でも安心）\n\n【iPhone】\n1.『ファイル』アプリ →『ダウンロード』\n2. このファイルを長押し →『共有』\n3.『Googleドライブ』または『自分宛てにメール』を選ぶ\n\n【Android】\n1.『Files（ファイル）』→『ダウンロード』\n2. このファイルを長押し →『共有』→『ドライブに保存』\n\n【パソコン】\nダウンロードフォルダのファイルをGoogleドライブにアップロード");
   }catch(e){ alert("バックアップに失敗しました"); setBkProg("失敗しました"); } finally{ setBkBusy(false); } };
   const qrRef=useRef(null); const [qrShown,setQrShown]=useState(false);
   const APP_URL="https://matsuda18.github.io/fureai/";
@@ -2342,6 +2351,7 @@ function AdminPanel({data,persist}){
       <p className="tiny">この画面を見せて読み取ってもらうか、スクリーンショットで配布できます。<br/>読み取った端末で「ホーム画面に追加」→以後はアイコンから開けます。</p>
     </div>}
     <h3 className="blk">💾 データのバックアップ（書き出し）</h3>
+    {(()=>{ let last=""; try{ last=localStorage.getItem("mizuho_last_backup")||""; }catch(e){} const days=last?Math.floor((Date.now()-new Date(last).getTime())/86400000):null; if(last===""){ return <div className="bk-remind">⏰ まだバックアップをしていません。今すぐ1回、書き出して保存しましょう。</div>; } if(days!==null&&days>=7){ return <div className="bk-remind">⏰ 前回のバックアップから<b>{days}日</b>たちました。週1回のバックアップをおすすめします（前回：{last.slice(0,10)}）。</div>; } return <p className="tiny">前回のバックアップ：{last.slice(0,10)}（{days}日前）</p>; })()}
     <p className="tiny">利用者情報・記録・勤怠・日誌・設定・アクセスログなどをJSONファイルに書き出します。万一に備え、定期的に保存してください。</p>
     <p className="tiny"><b>軽量</b>＝写真・計画ファイルの画像は含めず（小さい）。<b>フル</b>＝写真・個別訓練計画の画像も全部含める（大きく時間がかかります）。</p>
     <div className="row-end" style={{gap:"8px",flexWrap:"wrap"}}><Btn kind="ghost2" onClick={()=>doBackup(false)} disabled={bkBusy}>{bkBusy?"書き出し中…":"⬇ 軽量バックアップ"}</Btn><Btn onClick={()=>doBackup(true)} disabled={bkBusy}>{bkBusy?"書き出し中…":"⬇ フルバックアップ（画像込み）"}</Btn></div>
