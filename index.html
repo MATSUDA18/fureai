@@ -143,6 +143,7 @@
   .chat-empty p{font-size:13px;margin:0 0 12px;}
   .starters{display:flex;flex-direction:column;gap:8px;}
   .starter{background:#FBEAEE;border:1px solid #F0D3DB;color:#C9788F;border-radius:12px;padding:10px 12px;font-size:13px;cursor:pointer;text-align:left;}
+  .ai-warn{background:#FFF4D6;border:1px solid #EBCB74;color:#8A5A00;border-radius:12px;padding:10px 12px;font-size:12.5px;line-height:1.7;margin-bottom:10px;}
   .starter:hover{background:#F6D4DD;}
   .bubble{max-width:88%;padding:11px 14px;border-radius:16px;font-size:14px;line-height:1.75;white-space:pre-wrap;}
   .bubble.user{align-self:flex-end;background:#E79AB0;color:#fff;border-bottom-right-radius:4px;}
@@ -1438,7 +1439,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.69〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.71〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
@@ -2217,6 +2218,7 @@ function Consult({data}){
   };
 
   return <Section title="AI相談" note="支援の対応に迷ったとき、一緒に考えます。研修資料・ほたる理念・意思決定支援・虐待防止・強度行動障害・身体介助の考え方も参考にします。">
+    <div className="ai-warn">⚠️ 個人情報の保護のため、利用者の<b>実名・住所・電話番号などは入力しないでください</b>。「Aさん」「利用者本人」などに置き換えてご相談ください（入力内容は外部のAIに送信されます）。</div>
     <div className="ai-note"><span>💛</span><div>ご本人が特定される情報（氏名など）は書かず、状況として相談してください。回答は参考です。最終判断はチームとご本人の意思で。
       {" "}<button className="link-btn" onClick={()=>{setKeyInput(apiKey);setSetup(true);}}>AIの設定</button></div></div>
     {!apiKey&&<div className="privacy" style={{marginBottom:12}}><span>🔑</span><div>
@@ -2252,6 +2254,20 @@ function AdminPanel({data,persist}){
   const [pwFor,setPwFor]=useState(null); const [np1,setNp1]=useState(""); const [np2,setNp2]=useState("");
   const [m1,setM1]=useState(""); const [m2,setM2]=useState("");
   const [alog,setAlog]=useState(null); const [alShow,setAlShow]=useState(false);
+  const [bkBusy,setBkBusy]=useState(false);
+  const [bkProg,setBkProg]=useState("");
+  const dlJson=(obj,name)=>{ const blob=new Blob([JSON.stringify(obj)],{type:"application/json"}); const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),6000); };
+  const fetchAll=async(path)=>{ const out=[]; let off=0; const page=1000; for(;;){ const r=await authFetch(`${SUPABASE_URL}/rest/v1/${path}${path.indexOf("?")>=0?"&":"?"}limit=${page}&offset=${off}`); if(!r.ok) break; const j=await r.json(); out.push.apply(out,j); if(j.length<page) break; off+=page; if(off>200000) break; } return out; };
+  const doBackup=async(full)=>{ if(!SB_ON){alert("共有DBが必要です");return;} setBkBusy(true); setBkProg(""); try{
+    const date=new Date().toISOString().slice(0,10);
+    const tbls=["app_state","residents","records","timecard","nisshi","access_log","attachments"];
+    const out={exported:new Date().toISOString(),type:full?"full":"light",note:"ふれあいホームみずほ バックアップ"};
+    for(const t of tbls){ setBkProg(t+" を取得中…"); try{ out[t]=await fetchAll(t+"?select=*"); }catch(e){ out[t]="(取得失敗)"; } }
+    setBkProg("resident_files を取得中…"); try{ out.resident_files=await fetchAll("resident_files?select="+(full?"*":"id,resident_id,meta,created")); }catch(e){ out.resident_files="(取得失敗)"; }
+    setBkProg("photos を取得中…"); try{ out.photos=await fetchAll("photos?select="+(full?"*":"id,meta,created")); }catch(e){ out.photos="(取得失敗)"; }
+    dlJson(out, "mizuho_backup_"+(full?"full_":"")+date+".json");
+    setBkProg("完了しました。ファイルを保存しました。");
+  }catch(e){ alert("バックアップに失敗しました"); setBkProg("失敗しました"); } finally{ setBkBusy(false); } };
   const qrRef=useRef(null); const [qrShown,setQrShown]=useState(false);
   const APP_URL="https://matsuda18.github.io/fureai/";
   useEffect(()=>{ if(qrShown&&qrRef.current&&window.QRCode){ qrRef.current.innerHTML=""; try{ new window.QRCode(qrRef.current,{text:APP_URL,width:220,height:220,correctLevel:window.QRCode.CorrectLevel.M}); }catch(e){} } },[qrShown]);
@@ -2325,6 +2341,11 @@ function AdminPanel({data,persist}){
       <div ref={qrRef} style={{display:"inline-block",background:"#fff",padding:"12px",borderRadius:"12px"}}></div>
       <p className="tiny">この画面を見せて読み取ってもらうか、スクリーンショットで配布できます。<br/>読み取った端末で「ホーム画面に追加」→以後はアイコンから開けます。</p>
     </div>}
+    <h3 className="blk">💾 データのバックアップ（書き出し）</h3>
+    <p className="tiny">利用者情報・記録・勤怠・日誌・設定・アクセスログなどをJSONファイルに書き出します。万一に備え、定期的に保存してください。</p>
+    <p className="tiny"><b>軽量</b>＝写真・計画ファイルの画像は含めず（小さい）。<b>フル</b>＝写真・個別訓練計画の画像も全部含める（大きく時間がかかります）。</p>
+    <div className="row-end" style={{gap:"8px",flexWrap:"wrap"}}><Btn kind="ghost2" onClick={()=>doBackup(false)} disabled={bkBusy}>{bkBusy?"書き出し中…":"⬇ 軽量バックアップ"}</Btn><Btn onClick={()=>doBackup(true)} disabled={bkBusy}>{bkBusy?"書き出し中…":"⬇ フルバックアップ（画像込み）"}</Btn></div>
+    {bkProg&&<p className="tiny" style={{color:"#B25E77"}}>{bkProg}</p>}
     <h3 className="blk">📋 アクセスログ（誰がいつ開いたか）</h3>
     <p className="tiny">職員が名前を選んで開くたびに記録が残ります（削除されず蓄積されます）。</p>
     {!alShow?<div className="row-end"><Btn kind="ghost2" onClick={()=>{setAlShow(true); if(alog===null) loadAlog();}}>ログを表示</Btn></div>:<>
