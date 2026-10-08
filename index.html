@@ -861,10 +861,12 @@ function DayPlanModal({data,persist,date,onClose}){
       <span className="tiny">※ 対象は「{fmtDate(date)} 15:30〜翌9:30」の勤務です。反映を見るときは<b>同じ勤務日</b>で確認してください。逆に、タイムスケジュールや職員シフトで入力しても、ここへ反映されます。</span>
     </div>
     <div className="rec-sub" style={{marginTop:0}}>支援員（夜勤A＝支援員1／夜勤B＝支援員2／夕勤＝支援員3）</div>
-    <label className="field"><span>支援員1（夜勤A）</span><select value={s1} onChange={e=>setS1(e.target.value)}><option value="">（未設定）</option>{accounts.map(a=><option key={a.id} value={a.name}>{a.name}</option>)}</select></label>
-    <label className="field"><span>支援員2（夜勤B）</span><select value={s2} onChange={e=>setS2(e.target.value)}><option value="">（未設定）</option>{accounts.map(a=><option key={a.id} value={a.name}>{a.name}</option>)}</select></label>
-    <label className="field"><span>支援員3（夕勤① 15:30–21:30）</span><select value={s3} onChange={e=>setS3(e.target.value)}><option value="">（未設定）</option>{accounts.map(a=><option key={a.id} value={a.name}>{a.name}</option>)}</select></label>
-    <label className="field"><span>夕勤②（必要な場合）</span><select value={s4} onChange={e=>setS4(e.target.value)}><option value="">（未設定）</option>{accounts.map(a=><option key={a.id} value={a.name}>{a.name}</option>)}</select></label>
+    <p className="tiny">登録職員は候補から選べます。<b>ヘルプ（アプリ未登録）の方は名前を直接入力</b>できます。</p>
+    <datalist id="dpstaff">{accounts.map(a=><option key={a.id} value={a.name}/>)}</datalist>
+    <label className="field"><span>支援員1（夜勤A）</span><input list="dpstaff" value={s1} onChange={e=>setS1(e.target.value)} placeholder="選択 または 名前を入力"/></label>
+    <label className="field"><span>支援員2（夜勤B）</span><input list="dpstaff" value={s2} onChange={e=>setS2(e.target.value)} placeholder="選択 または 名前を入力"/></label>
+    <label className="field"><span>支援員3（夕勤① 15:30–21:30）</span><input list="dpstaff" value={s3} onChange={e=>setS3(e.target.value)} placeholder="選択 または 名前を入力"/></label>
+    <label className="field"><span>夕勤②（必要な場合）</span><input list="dpstaff" value={s4} onChange={e=>setS4(e.target.value)} placeholder="選択 または 名前を入力"/></label>
     <div className="rec-sub">利用者（最大4名・キャンセルは選ばない）</div>
     {u.map((v,i)=>(<label className="field" key={i}><span>利用者{i+1}</span><select value={v} onChange={e=>{const nv=e.target.value; setU(p=>p.map((x,j)=>j===i?nv:x));}}><option value="">（なし）</option>{allUsers.map(n=><option key={n} value={n}>{n}</option>)}</select></label>))}
     <div className="composer" style={{marginTop:4}}><textarea rows={1} value={newU} placeholder="リストに無い利用者名を追加" onChange={e=>setNewU(e.target.value)}/><button className="send" onClick={addUser} title="利用者名を追加">＋</button></div>
@@ -1117,7 +1119,7 @@ function Records({me,data,persist,reload}){
   const effDate=useTime?mDate:date; const rplan=(data.dayPlans||{})[effDate]||{}; const dayUsers=(rplan.users&&rplan.users.length)?rplan.users:USERS4;
   const pushRecords=async(item,extra,tsOverride)=>{ if(sel.length===0){ flash("利用者を選んでください"); return false; } const ts=tsOverride||new Date().toISOString(); const targets=sel.filter(u=>dayUsers.includes(u)); if(!targets.length){ flash("利用者を選んでください"); return false; } const recs=targets.map(u=>Object.assign({id:uid(),ts,user:u,item},extra||{})); try{ for(const rc of recs) await recAdd(rc); await reload(); return true; }catch(e){ flash("保存に失敗しました"); return false; } };
   const bizTs=()=>{ const bd=new Date(mDate+"T00:00:00"); const cal=(+mH>=15)?bd:addDays(bd,1); cal.setHours(+mH,+mM,0,0); return cal.toISOString(); };
-  const tapItem=(it)=>{ const nm=(typeof it==="string")?it:it.name; const vars=(it&&it.variants)||[]; if(nm==="巡回") setSp({type:"patrol",checks:{},val:""}); else if(nm==="服薬") setSp({type:"med",checks:{},val:""}); else if(nm==="血糖値測定") setSp({type:"glu",checks:{},val:""}); else if(nm==="メニュー") setSp({type:"menu",checks:{},val:""}); else if(nm==="介助") setSp({type:"care",checks:{},level:"部分介助",val:""}); else if(vars.length){ setSp({type:"variant",name:nm,variants:vars,multi:!!(it&&it.multi),checks:{},val:""}); } else addRecord(nm); };
+  const tapItem=(it)=>{ if(!sel.filter(u=>dayUsers.includes(u)).length){ flash("⚠️ 先に『利用者』を選んでください（上のボタンから利用者を選択）"); return; } const nm=(typeof it==="string")?it:it.name; const vars=(it&&it.variants)||[]; if(nm==="巡回") setSp({type:"patrol",checks:{},val:""}); else if(nm==="服薬") setSp({type:"med",checks:{},val:""}); else if(nm==="血糖値測定") setSp({type:"glu",checks:{},val:""}); else if(nm==="メニュー") setSp({type:"menu",checks:{},val:""}); else if(nm==="介助") setSp({type:"care",checks:{},level:"部分介助",val:""}); else if(vars.length){ setSp({type:"variant",name:nm,variants:vars,multi:!!(it&&it.multi),checks:{},val:""}); } else addRecord(nm); };
   const chooseVariant=async(v)=>{ const item=sp.name+"（"+v+"）"+((sp.val||"").trim()?("："+sp.val.trim()):""); if(await pushRecords(item,null,useTime?bizTs():undefined)){ flash(useTime?"記録しました（指定日時）":"記録しました"); setSp(null); } };
   const submitVariantMulti=async()=>{ const sel2=(sp.variants||[]).filter(v=>(sp.checks||{})[v]); if(!sel2.length){flash("種類を選んでください");return;} const item=sp.name+"（"+sel2.join("・")+"）"+((sp.val||"").trim()?("："+sp.val.trim()):""); if(await pushRecords(item,null,useTime?bizTs():undefined)){ flash(useTime?"記録しました（指定日時）":"記録しました"); setSp(null); } };
   const submitSp=async()=>{ let item=""; if(sp.type==="patrol"){ const c=PATROL_OPTS.filter(o=>sp.checks[o]); if(!c.length){flash("項目を選んでください");return;} item="巡回："+c.join("・"); } else if(sp.type==="med"){ const c=MED_OPTS.filter(o=>sp.checks[o]); if(!c.length){flash("項目を選んでください");return;} item="服薬："+c.join("・"); } else if(sp.type==="glu"){ if(!sp.val){flash("数値を入力してください");return;} item="血糖値 "+sp.val+" mg/dL"; } else if(sp.type==="care"){ const types=CARE_OPTS.filter(o=>sp.checks[o]); if(!types.length){flash("介助の種類を選んでください");return;} item="介助（"+types.join("・")+"／"+(sp.level||"部分介助")+"）："+(sp.val||"").trim(); } else { const meals=["晩","朝"].filter(m=>sp.checks[m]); if(!meals.length){flash("晩か朝を選んでください");return;} if(!sp.val.trim()){flash("メニューを入力してください");return;} item="メニュー（"+meals.join("・")+"）："+sp.val.trim(); } if(await pushRecords(item,null,useTime?bizTs():undefined)){ flash(useTime?"記録しました（指定日時）":"記録しました"); setSp(null); } };
@@ -1441,7 +1443,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.73〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.74〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
