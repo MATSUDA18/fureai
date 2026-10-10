@@ -680,7 +680,7 @@ const NISSHI_SYS = `あなたは、障害者生活訓練事業所「ふれあい
  "program":"時間ごとの行動。各行『16:20 塗り絵』の形式で改行区切り",
  "dinnerMenu":"夕食メニュー","dinnerAmount":"夕食量（完食／主x副y など）",
  "breakfastMenu":"朝食メニュー","breakfastAmount":"朝食量",
- "appearance":"【利用のご様子】本文。上記トーンで200〜500字程度の読みやすい文章。",
+ "appearance":"【利用のご様子】本文。12ptで読みやすくA4一枚に収まるよう120〜220字程度の簡潔な全体像。具体的な出来事・エピソードは時刻つきの活動記録に残っているので、まとめでは細かく繰り返さず、一日の様子・変化・できたことの要点だけにする。",
  "special":"特記事項（簡潔に。なければ空）",
  "nextRequest":"次回へのお願い（なければ空）"
 }
@@ -789,9 +789,9 @@ function Nisshi({me,data,persist}){
     if(recs.length===0){ setErr("この日の「"+user+"」の記録がありません。"); return; }
     setLoading(true); setErr("");
     try{
-      const styleMap={detail:"できごとや本人の取り組みを具体的に、やや詳しめに（長めでも可）。",soft:"簡潔で控えめに、要点だけやわらかく短めに。",normal:"あたたかく前向きに、読みやすい分量で。"};
+      const styleMap={detail:"要点を少し具体的に（ただし全体で260字以内）。",soft:"ごく簡潔に、要点だけやわらかく（100字前後）。",normal:"あたたかく前向きに、簡潔に（180字前後）。"};
       const ctx=await gatherCtx();
-      const um="利用者："+user+"\n対象："+fmtDate(date)+" 16:00〜翌朝\n\n【この日の記録（時刻 内容）】\n"+recText+ctx+"\n\n【指示】上記をもとに【利用のご様子】の本文のみを書いてください（JSONやラベル・前置きは不要、本文だけ）。個別訓練計画や前回の記録があれば、目標に沿ってできた点・前回より良くなった点を前向きに自然に触れてください。トーン："+(styleMap[style]||styleMap.normal);
+      const um="利用者："+user+"\n対象："+fmtDate(date)+" 16:00〜翌朝\n\n【この日の記録（時刻 内容）】\n"+recText+ctx+"\n\n【指示】上記をもとに【利用のご様子】の本文のみを書いてください（JSONやラベル・前置きは不要、本文だけ）。12ptで読みやすくA4一枚に収まるよう簡潔に。具体的な出来事は時刻つきの活動記録に残っているので、まとめでは繰り返さず一日の様子・変化・できたことの要点だけにしてください。個別訓練計画や前回の記録があれば、目標に沿ってできた点・前回より良くなった点を前向きに自然に触れてください。トーン："+(styleMap[style]||styleMap.normal);
       const res=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"content-type":"application/json","x-api-key":apiKey,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},body:JSON.stringify({model:"claude-sonnet-5",max_tokens:1500,system:NISSHI_SYS,messages:[{role:"user",content:um}]})});
       const d=await res.json(); if(d.error){ setErr("AIエラー："+(d.error.message||"")); setLoading(false); return; }
       let txt=(d.content||[]).filter(b=>b.type==="text").map(b=>b.text).join("").trim().replace(/```/g,"").trim();
@@ -950,7 +950,8 @@ function Nisshi({me,data,persist}){
           <Btn kind="ghost2" onClick={()=>adjustAppearance("detail")}>✍ もっと具体的に</Btn>
           <Btn kind="ghost2" onClick={()=>adjustAppearance("soft")}>🍃 もっと控えめに</Btn>
           <Btn kind="ghost2" onClick={()=>adjustAppearance("normal")}>🔁 標準で作り直す</Btn>
-        </div>}</div>
+        </div>}
+        {(()=>{ const n=(f.appearance||"").length; const over=n>220; return <div className="tiny" style={{marginTop:4,textAlign:"right",color:over?"#C0392B":"#B0895A"}}>{n}字 ／ 目安：約220字まで（12ptで読みやすく1枚に収まります）{over?"。超える分はまとめ欄が少し広がります。具体的な出来事は活動記録に残し、まとめは簡潔に。":""}</div>; })()}</div>
       <div className="nf"><label>特記事項</label><textarea rows={3} value={f.special} onChange={e=>setField("special",e.target.value)}/></div>
       <div className="nf"><label>次回利用予定日</label><input type="date" value={f.nextVisitDate||""} onChange={e=>setField("nextVisitDate",e.target.value)}/>{f.nextVisitDate&&<div className="tiny">{(()=>{const d=new Date(f.nextVisitDate+"T00:00:00");return (d.getMonth()+1)+"月"+d.getDate()+"日（"+["日","月","火","水","木","金","土"][d.getDay()]+"曜日）";})()}</div>}</div>
       <div className="nf"><label>次回へのお願い（日程・ご連絡など。※家族向けのAI文は入りません）</label><input value={f.nextRequest} onChange={e=>setField("nextRequest",e.target.value)}/>{activeNotices(date).length>0&&<div className="tiny" style={{marginTop:4,color:"#B25E77"}}>この期間の共通連絡（自動で出力に入ります）：{activeNotices(date).map((t,i)=><div key={i}>・{t}</div>)}</div>}</div>
@@ -1367,12 +1368,12 @@ function Records({me,data,persist,reload}){
       {(function(){ const orphans=rItems.filter(i=>!cats.includes(i.cat)); if(!orphans.length) return null; return <div className="rec-group"><div className="rec-gtitle">その他</div><div className="rec-items">{orphans.map(i=>(<button key={i.id} className="recbtn" onClick={()=>tapItem(i)}>{i.name}{i.variants&&i.variants.length?" ▾":""}</button>))}</div></div>; })()}
       </div>
       <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={onFile} style={{display:"none"}}/>
-      <div className="rec-sub">自由に記録</div>
+      <div className="rec-sub">自由に記録（様子・エピソード）</div>
       <div className="composer">
-        <textarea rows={1} value={note} placeholder="自由に記録（例：トイレ小で笑顔）" onChange={e=>setNote(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();addNote();}}}/>
+        <textarea rows={1} value={note} placeholder="様子を具体的に（例：夕食後、笑顔で職員と将棋。勝って嬉しそう）" onChange={e=>setNote(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();addNote();}}}/>
         <button className="send" onClick={addNote} title="現在時刻で記録">＋</button>
       </div>
-      <p className="tiny" style={{marginTop:4}}>「＋」を押すと<b>現在の時刻</b>のまま記録します。</p>
+      <p className="tiny" style={{marginTop:4}}>「＋」を押すと<b>現在の時刻</b>のまま記録します。💡 具体的な様子はここに残すと、日誌の「ご様子まとめ」を簡潔にできます（活動記録はそのまま印刷されます）。</p>
       <button className={"time-toggle"+(useTime?" active":"")} onClick={()=>{ if(!useTime){ setMDate(date); const n=new Date(); const nh=n.getHours(); setMH(String((nh>=15||nh<=9)?nh:16)); setMM(String(Math.floor(n.getMinutes()/5)*5)); } setUseTime(!useTime); }}>{useTime?"× 日時の指定を閉じる":"🕒 過去の日時を指定して記録"}</button>
       {useTime&&<div className="timepick">
         <div className="rec-sub" style={{marginTop:0}}>日時を選んで記録</div>
@@ -1635,7 +1636,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.81〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.83〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
