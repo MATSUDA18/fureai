@@ -675,6 +675,28 @@ function Nisshi({me,data,persist}){
   const [planYear,setPlanYear]=useState(()=>{const n=new Date();return (n.getMonth()+1)>=4?n.getFullYear():n.getFullYear()-1;});
   const [planMsg,setPlanMsg]=useState("");
   const planRef=useRef(null);
+  const [planOneName,setPlanOneName]=useState("");
+  const planOneRef=useRef(null);
+  const onPlanFileOne=async(e)=>{
+    const file=e.target.files&&e.target.files[0]; e.target.value=""; if(!file) return;
+    const who=planOneName||user; const nm=normName(who);
+    if(!nm){ setPlanMsg("利用者名を入力してください。"); return; }
+    if(!window.XLSX){ setPlanMsg("Excel機能の読み込み中です。少し待って再度お試しください。"); return; }
+    setPlanMsg("取り込み中…");
+    try{
+      const buf=await file.arrayBuffer();
+      const wb=XLSX.read(buf,{type:"array"});
+      let text="";
+      wb.SheetNames.forEach(sn=>{ const ws=wb.Sheets[sn]; if(!ws) return; const rows=XLSX.utils.sheet_to_json(ws,{header:1,blankrows:false,defval:""}); const t=rows.map(r=>(r||[]).map(c=>String(c==null?"":c).replace(/\s+/g," ").trim()).filter(Boolean).join(" ")).filter(Boolean).join("\n"); if(t) text+=(text?"\n":"")+t; });
+      text=text.slice(0,2000);
+      if(!text){ setPlanMsg("内容を読み取れませんでした。"); return; }
+      const yr=String(planYear);
+      const yearMap=Object.assign({},(data.trainingPlans||{})[yr]||{},{[nm]:text});
+      const next=Object.assign({},data,{trainingPlans:Object.assign({},data.trainingPlans||{},{[yr]:yearMap})});
+      if(persist) persist(next);
+      setPlanMsg("「"+who+"」を取り込みました（"+yr+"年度・1名分）。");
+    }catch(err){ setPlanMsg("取り込みに失敗しました："+String(err&&err.message||err)); }
+  };
   const onPlanFile=async(e)=>{
     const file=e.target.files&&e.target.files[0]; e.target.value=""; if(!file) return;
     if(!window.XLSX){ setPlanMsg("Excel機能の読み込み中です。少し待って再度お試しください。"); return; }
@@ -691,7 +713,8 @@ function Nisshi({me,data,persist}){
         if(nm&&text){ map[nm]=text; names.push(sn); }
       });
       const yr=String(planYear);
-      const next=Object.assign({},data,{trainingPlans:Object.assign({},data.trainingPlans||{},{[yr]:map})});
+      const yearMap=Object.assign({},(data.trainingPlans||{})[yr]||{},map); // 既存に追加・上書き（他の人は消さない）
+      const next=Object.assign({},data,{trainingPlans:Object.assign({},data.trainingPlans||{},{[yr]:yearMap})});
       if(persist) persist(next);
       setPlanMsg("取り込み完了："+Object.keys(map).length+"名分を保存しました（"+yr+"年度）。／タブ："+names.join("、"));
     }catch(err){ setPlanMsg("取り込みに失敗しました："+String(err&&err.message||err)); }
@@ -831,9 +854,17 @@ function Nisshi({me,data,persist}){
       <Btn kind="ghost2" onClick={emptyForm}>空フォーム</Btn>
     </div>
     {me.isAdmin&&<details className="tl-editpanel" style={{marginBottom:8}}><summary style={{cursor:"pointer",fontWeight:700,color:"#C9788F"}}>⚙ 個別訓練計画の年度取り込み（管理者）</summary>
-      <div className="wheel" style={{marginTop:8}}><input type="number" value={planYear} onChange={e=>setPlanYear(e.target.value)} placeholder="年度（西暦）" style={{flex:1,padding:"10px",border:"1px solid #F0D3DB",borderRadius:"10px"}}/><button className="btn ghost2" onClick={()=>planRef.current&&planRef.current.click()}>⬆ Excelを取り込む</button></div>
-      <input ref={planRef} type="file" accept=".xlsx,.xls" onChange={onPlanFile} style={{display:"none"}}/>
-      <p className="tiny">お一人ずつタブに分かれたExcel（タブ名＝利用者名）を選ぶと、各タブの内容を読み取り、AIまとめ生成時に「本人の目標・取り組むこと」として反映します。年度ごとに上書き保存されます（タブ名の丸数字などは自動で除いて氏名で照合）。</p>
+      <div className="tiny" style={{marginTop:8,fontWeight:700}}>① 全員分（タブ＝お一人）をまとめて取り込む</div>
+      <div className="wheel" style={{marginTop:6}}><input type="number" value={planYear} onChange={e=>setPlanYear(e.target.value)} placeholder="年度（西暦）" style={{flex:1,padding:"10px",border:"1px solid #F0D3DB",borderRadius:"10px"}}/><button className="btn ghost2" onClick={()=>planRef.current&&planRef.current.click()}>⬆ まとめて取り込む</button></div>
+      <input ref={planRef} type="file" accept=".xlsx,.xls,.ods,.csv" onChange={onPlanFile} style={{display:"none"}}/>
+      <p className="tiny">お一人ずつタブに分かれたファイル（タブ名＝利用者名）を選ぶと、各タブの内容を読み取り、AIまとめ生成時に「本人の目標・取り組むこと」として反映します（タブ名の丸数字などは自動で除いて氏名で照合）。※既存の人は上書き・追加され、載っていない人は消えません。</p>
+      <div style={{marginTop:10,borderTop:"1px dashed #F0D3DB",paddingTop:8}}>
+        <div className="tiny" style={{fontWeight:700}}>② 1名だけ取り込む（年度途中の更新・新規の方）</div>
+        <div className="wheel" style={{marginTop:6}}><input value={planOneName} onChange={e=>setPlanOneName(e.target.value)} placeholder={"利用者名（空欄なら選択中："+user+"）"} style={{flex:1,padding:"10px",border:"1px solid #F0D3DB",borderRadius:"10px"}}/><button className="btn ghost2" onClick={()=>planOneRef.current&&planOneRef.current.click()}>⬆ 1名分を取り込む</button></div>
+        <input ref={planOneRef} type="file" accept=".xlsx,.xls,.ods,.csv" onChange={onPlanFileOne} style={{display:"none"}}/>
+        <p className="tiny">その方1名分のファイルを選ぶと、上の年度にその利用者だけ上書き保存します（氏名が未入力のときは、上で選択中の利用者になります）。</p>
+      </div>
+      <p className="tiny" style={{marginTop:8,color:"#8A6B74"}}>Googleスプレッドシートの場合は「ファイル → ダウンロード → Microsoft Excel(.xlsx)」で保存してから選んでください（タブも保持されます）。</p>
       {planMsg&&<p className="tiny" style={{color:"#B25E77"}}>{planMsg}</p>}
     </details>}
     {err&&<p className="err">{err}</p>}
@@ -1496,7 +1527,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.77〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.78〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
