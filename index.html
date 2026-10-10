@@ -689,6 +689,7 @@ function Nisshi({me,data}){
   const start=new Date(date+"T15:00:00"); const end=(()=>{ const e=addDays(new Date(date+"T00:00:00"),1); e.setHours(15,0,0,0); return e; })();
   const recs=(data.records||[]).filter(r=>r.user===user && new Date(r.ts)>=start && new Date(r.ts)<end).sort((a,b)=>String(a.ts||"").localeCompare(String(b.ts||"")));
   const recText=recs.map(r=>hm(r.ts)+" "+r.item).join("\n");
+  const progText=recs.filter(r=>(r.item||"").indexOf("🩺")!==0).map(r=>hm(r.ts)+" "+r.item).join("\n");
   const nplan=(data.dayPlans||{})[date]||{}; const dayUsers=(nplan.users&&nplan.users.length)?nplan.users:USERS4;
   const _vitRecs=recs.filter(r=>(r.item||"").indexOf("🩺")===0);
   const _pV=(r)=>{const s=r.item||"";const bp=s.match(/(\d{2,3})\s*mmHg\s*[\/／]\s*(\d{2,3})/)||s.match(/(\d{2,3})\s*[\/／]\s*(\d{2,3})/);const hr=s.match(/(\d{2,3})\s*回/);const tp=s.match(/体温\s*([\d.]+)/);return {time:hm(r.ts),bp:bp?(bp[1]+"/"+bp[2]):"",pulse:hr?hr[1]:"",temp:tp?tp[1]:""};};
@@ -696,8 +697,8 @@ function Nisshi({me,data}){
   const _V2=_vitRecs.length>1?_pV(_vitRecs[_vitRecs.length-1]):{time:"",bp:"",pulse:"",temp:""};
   const _findT=(re)=>{const r=recs.find(x=>re.test(x.item||""));return r?hm(r.ts):"";};
   const _vtext=(v)=>v.time?("測定"+v.time+" "+(v.temp?"体温"+v.temp+"℃ ":"")+(v.bp?"血圧"+v.bp+" ":"")+(v.pulse?"脈"+v.pulse+"回/分":"")).trim():"";
-  const buildInitial=(obj)=>Object.assign({name:user,period:fmtDate(date)+" 16:00 〜 翌朝",writer:me.name,v1:_V1,v2:_V2,vitals1:_vtext(_V1),vitals2:_vtext(_V2),urine:_findT(/排\s*尿/),stool:_findT(/排\s*便/),medication:"",staff:[nplan.s1,nplan.s2].filter(Boolean).join("・"),program:recText,dinnerMenu:"",dinnerAmount:"",breakfastMenu:"",breakfastAmount:"",appearance:"",special:"",nextRequest:"",nextVisitDate:""}, obj||{}, {name:user,period:fmtDate(date)+" 16:00 〜 翌朝"});
-  const emptyForm=()=>{ setErr(""); setF(buildInitial({program:recText})); };
+  const buildInitial=(obj)=>Object.assign({name:user,period:fmtDate(date)+" 16:00 〜 翌朝",writer:me.name,v1:_V1,v2:_V2,vitals1:_vtext(_V1),vitals2:_vtext(_V2),urine:_findT(/排\s*尿/),stool:_findT(/排\s*便/),medication:"",staff:[nplan.s1,nplan.s2].filter(Boolean).join("・"),program:progText,dinnerMenu:"",dinnerAmount:"",dinnerMainLeft:"",dinnerSideLeft:"",breakfastMenu:"",breakfastAmount:"",breakfastMainLeft:"",breakfastSideLeft:"",appearance:"",special:"",nextRequest:"",nextVisitDate:""}, obj||{}, {name:user,period:fmtDate(date)+" 16:00 〜 翌朝"});
+  const emptyForm=()=>{ setErr(""); setF(buildInitial({program:progText})); };
   const saveNisshi=async()=>{ if(!f)return; if(!SB_ON){flash2("共有DBが必要です");return;} try{ const id="ns_"+(f.name||"user")+"_"+date; const kw=[f.name,f.appearance,f.special,f.program,f.staff,f.dinnerMenu,f.breakfastMenu,f.vitals1].filter(Boolean).join(" "); await nsSave({id,user_name:f.name||"",biz_date:date,sex:(resSex[f.name]||""),keywords:kw,data:f,created:new Date().toISOString()}); flash2("日誌を保存しました"); }catch(e){ setErr("保存に失敗（nisshi表の設定をご確認ください）"); } };
   const setField=(k,v)=>setF(p=>Object.assign({},p,{[k]:v}));
   const genDraft=async()=>{
@@ -706,13 +707,14 @@ function Nisshi({me,data}){
     setLoading(true); setErr("");
     try{
       const um="利用者："+user+"\n対象："+fmtDate(date)+" 16:00〜翌朝\n\n【この日の記録（時刻 内容）】\n"+recText+"\n\n上記からJSONを作成してください。";
-      const res=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"content-type":"application/json","x-api-key":apiKey,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},body:JSON.stringify({model:"claude-sonnet-5",max_tokens:2000,system:NISSHI_SYS,messages:[{role:"user",content:um}]})});
+      const res=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"content-type":"application/json","x-api-key":apiKey,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},body:JSON.stringify({model:"claude-sonnet-5",max_tokens:4000,system:NISSHI_SYS,messages:[{role:"user",content:um}]})});
       const d=await res.json();
       if(d.error){ setErr("AIエラー："+(d.error.message||"")); setLoading(false); return; }
       let txt=(d.content||[]).filter(b=>b.type==="text").map(b=>b.text).join("").trim();
       txt=txt.replace(/```json/g,"").replace(/```/g,"").trim();
-      let obj={}; try{ obj=JSON.parse(txt); }catch(e){ obj={appearance:txt}; }
-      if(!obj.program) obj.program=recText;
+      let obj=null; try{ obj=JSON.parse(txt); }catch(e){ const mm=txt.match(/\{[\s\S]*\}/); if(mm){ try{ obj=JSON.parse(mm[0]); }catch(e2){ obj=null; } } }
+      if(!obj){ setErr("AIの下書きを読み取れませんでした。お手数ですが、もう一度「AIで下書きを作成」を押してください。"); setLoading(false); return; }
+      obj.program=progText;
       setF(buildInitial(obj));
     }catch(e){ setErr("接続に失敗しました。通信状況をご確認ください。"); }
     setLoading(false);
@@ -800,7 +802,7 @@ function Nisshi({me,data}){
     {f&&<div className="nisshi">
       <div className="nisshi-head">ふれあいホームみずほ 利用日誌</div>
       <div className="nf2"><div className="nf"><label>利用者名</label><input value={f.name} onChange={e=>setField("name",e.target.value)}/></div>
-        <div className="nf"><label>記入者</label><input value={f.writer} onChange={e=>setField("writer",e.target.value)}/></div></div>
+        <div className="nf"><label>記録者</label><input list="nsstaff" value={f.writer||""} onChange={e=>setField("writer",e.target.value)} placeholder="選択 または 入力"/><datalist id="nsstaff">{(data.accounts||[]).map(a=><option key={a.id} value={a.name}/>)}</datalist></div></div>
       <div className="nf"><label>期間</label><input value={f.period} onChange={e=>setField("period",e.target.value)}/></div>
       <div className="nf2"><div className="nf"><label>バイタル（来所）</label><input value={f.vitals1} onChange={e=>setField("vitals1",e.target.value)}/></div>
         <div className="nf"><label>バイタル（起床）</label><input value={f.vitals2} onChange={e=>setField("vitals2",e.target.value)}/></div></div>
@@ -811,8 +813,12 @@ function Nisshi({me,data}){
       <div className="nf"><label>プログラム（時間ごとの行動）</label><textarea rows={6} value={f.program} onChange={e=>setField("program",e.target.value)}/></div>
       <div className="nf2"><div className="nf"><label>夕食メニュー</label><input value={f.dinnerMenu} onChange={e=>setField("dinnerMenu",e.target.value)}/></div>
         <div className="nf"><label>夕食量</label><input value={f.dinnerAmount} onChange={e=>setField("dinnerAmount",e.target.value)}/></div></div>
+      <div className="nf2"><div className="nf"><label>夕食 主食の残量</label><select value={f.dinnerMainLeft==null?"":f.dinnerMainLeft} onChange={e=>setField("dinnerMainLeft",e.target.value)}><option value="">—（未記入）</option>{[0,1,2,3,4,5,6,7,8,9,10].map(n=><option key={n} value={n}>{n===0?"完食":n+"割残し"}</option>)}</select></div>
+        <div className="nf"><label>夕食 副食の残量</label><select value={f.dinnerSideLeft==null?"":f.dinnerSideLeft} onChange={e=>setField("dinnerSideLeft",e.target.value)}><option value="">—（未記入）</option>{[0,1,2,3,4,5,6,7,8,9,10].map(n=><option key={n} value={n}>{n===0?"完食":n+"割残し"}</option>)}</select></div></div>
       <div className="nf2"><div className="nf"><label>朝食メニュー</label><input value={f.breakfastMenu} onChange={e=>setField("breakfastMenu",e.target.value)}/></div>
         <div className="nf"><label>朝食量</label><input value={f.breakfastAmount} onChange={e=>setField("breakfastAmount",e.target.value)}/></div></div>
+      <div className="nf2"><div className="nf"><label>朝食 主食の残量</label><select value={f.breakfastMainLeft==null?"":f.breakfastMainLeft} onChange={e=>setField("breakfastMainLeft",e.target.value)}><option value="">—（未記入）</option>{[0,1,2,3,4,5,6,7,8,9,10].map(n=><option key={n} value={n}>{n===0?"完食":n+"割残し"}</option>)}</select></div>
+        <div className="nf"><label>朝食 副食の残量</label><select value={f.breakfastSideLeft==null?"":f.breakfastSideLeft} onChange={e=>setField("breakfastSideLeft",e.target.value)}><option value="">—（未記入）</option>{[0,1,2,3,4,5,6,7,8,9,10].map(n=><option key={n} value={n}>{n===0?"完食":n+"割残し"}</option>)}</select></div></div>
       <div className="nf"><label>【利用のご様子】</label><textarea rows={10} value={f.appearance} onChange={e=>setField("appearance",e.target.value)}/></div>
       <div className="nf"><label>特記事項</label><textarea rows={3} value={f.special} onChange={e=>setField("special",e.target.value)}/></div>
       <div className="nf"><label>次回利用予定日</label><input type="date" value={f.nextVisitDate||""} onChange={e=>setField("nextVisitDate",e.target.value)}/>{f.nextVisitDate&&<div className="tiny">{(()=>{const d=new Date(f.nextVisitDate+"T00:00:00");return (d.getMonth()+1)+"月"+d.getDate()+"日（"+["日","月","火","水","木","金","土"][d.getDay()]+"曜日）";})()}</div>}</div>
