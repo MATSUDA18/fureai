@@ -674,6 +674,11 @@ function Nisshi({me,data,persist}){
   const nendoOf=(ds)=>{const dt=new Date(ds+"T00:00:00");const y=dt.getFullYear();return (dt.getMonth()+1)>=4?y:y-1;};
   const [planYear,setPlanYear]=useState(()=>{const n=new Date();return (n.getMonth()+1)>=4?n.getFullYear():n.getFullYear()-1;});
   const [planMsg,setPlanMsg]=useState("");
+  const commonNotices=data.commonNotices||[];
+  const activeNotices=(ds)=>commonNotices.filter(n=>n&&n.from&&n.to&&n.from<=ds&&ds<=n.to).map(n=>n.text).filter(Boolean);
+  const [noteFrom,setNoteFrom]=useState(""); const [noteTo,setNoteTo]=useState(""); const [noteText,setNoteText]=useState("");
+  const addCommonNotice=()=>{ if(!noteFrom||!noteTo||!String(noteText).trim()){ setPlanMsg("共通連絡：期間（開始・終了）と内容を入力してください。"); return; } const n={id:"cn_"+Date.now(),from:noteFrom,to:noteTo,text:String(noteText).trim()}; if(persist) persist(Object.assign({},data,{commonNotices:[...commonNotices,n]})); setNoteFrom("");setNoteTo("");setNoteText(""); setPlanMsg("共通連絡を追加しました。"); };
+  const delCommonNotice=(id)=>{ if(persist) persist(Object.assign({},data,{commonNotices:commonNotices.filter(n=>n.id!==id)})); };
   const planRef=useRef(null);
   const [planOneName,setPlanOneName]=useState("");
   const planOneRef=useRef(null);
@@ -770,13 +775,15 @@ function Nisshi({me,data,persist}){
       if(!obj){ setErr("AIの下書きを読み取れませんでした。お手数ですが、もう一度「AIで下書きを作成」を押してください。"); setLoading(false); return; }
       obj.program=progText;
       obj.dinnerAmount=""; obj.breakfastAmount=""; // 量は0〜10の残量で記録するため未使用
+      obj.nextRequest=""; // 次回へのお願いはAIで自動入力しない（手入力＋共通連絡を使用）
       setF(buildInitial(obj));
     }catch(e){ setErr("接続に失敗しました。通信状況をご確認ください。"); }
     setLoading(false);
   };
   const toExcel=async()=>{
     try{
-      const res=await authFetch(SUPABASE_URL+"/functions/v1/nisshi-excel",{method:"POST",body:JSON.stringify(Object.assign({},f,{date}))});
+      const _next=[f.nextRequest,...activeNotices(date)].filter(x=>x&&String(x).trim()).join("\n");
+      const res=await authFetch(SUPABASE_URL+"/functions/v1/nisshi-excel",{method:"POST",body:JSON.stringify(Object.assign({},f,{date,nextRequest:_next}))});
       if(!res.ok){ let m=""; try{ m=(await res.json()).error||""; }catch(e){} throw new Error("func "+res.status+" "+m); }
       const blob=await res.blob();
       const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="利用日誌_"+(f.name||"")+"_"+date+".xlsx"; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),4000);
@@ -809,7 +816,7 @@ function Nisshi({me,data,persist}){
     S("F18","【朝食】"+(f.breakfastMenu||"")+(f.breakfastAmount?"（"+f.breakfastAmount+"）":""));
     S("F19","【特記】"+(f.special||""));
     S("B36","【利用のご様子】"); S("B37",f.appearance||"");
-    S("B43","【次回へのお願い】"); S("D43",f.nextRequest||"");
+    S("B43","【次回へのお願い】"); S("D43",[f.nextRequest,...activeNotices(date)].filter(x=>x&&String(x).trim()).join("\n"));
     S("I47","記入者名　"+(f.writer||""));
     ws["!ref"]="A1:L48";
     const mg=["B1:K1","C6:K6","B7:B8","G7:H7","G8:H8","B9:B10","C9:K9","C10:K10","C11:K11","C12:K12","C13:K13","B16:E16","F16:K16","B36:C36","B37:K37","B38:K38","B39:K39","B40:K40","B41:K41","B43:C43","D43:K43","B44:K44","B45:K45","I47:K47"];
@@ -867,6 +874,13 @@ function Nisshi({me,data,persist}){
       <p className="tiny" style={{marginTop:8,color:"#8A6B74"}}>Googleスプレッドシートの場合は「ファイル → ダウンロード → Microsoft Excel(.xlsx)」で保存してから選んでください（タブも保持されます）。</p>
       {planMsg&&<p className="tiny" style={{color:"#B25E77"}}>{planMsg}</p>}
     </details>}
+    {me.isAdmin&&<details className="tl-editpanel" style={{marginBottom:8}}><summary style={{cursor:"pointer",fontWeight:700,color:"#C9788F"}}>📢 共通連絡（期間指定でExcel出力に自動追加）</summary>
+      <p className="tiny" style={{marginTop:6}}>ここに登録した内容は、その期間に作成する<b>全員のExcel</b>の「次回へのお願い」欄に自動で入ります（例：「年末は12/28〜1/5まで休止となります」）。複数が重なる場合は両方入ります。</p>
+      {commonNotices.length>0&&<div style={{marginTop:6}}>{commonNotices.slice().sort((a,b)=>String(a.from).localeCompare(String(b.from))).map(n=>(<div key={n.id} className="plan-row"><span className="tiny">{n.from}〜{n.to}：{n.text}</span><button className="mini-del" onClick={()=>delCommonNotice(n.id)}>🗑</button></div>))}</div>}
+      <div className="nf2" style={{marginTop:8}}><div className="nf"><label>開始日</label><input type="date" value={noteFrom} onChange={e=>setNoteFrom(e.target.value)}/></div><div className="nf"><label>終了日</label><input type="date" value={noteTo} onChange={e=>setNoteTo(e.target.value)}/></div></div>
+      <div className="nf"><label>内容</label><textarea rows={2} value={noteText} onChange={e=>setNoteText(e.target.value)} placeholder="例：年末は12月28日〜1月5日まではふれあいは休止となります"/></div>
+      <div className="row-end"><Btn onClick={addCommonNotice}>＋ 追加</Btn></div>
+    </details>}
     {err&&<p className="err">{err}</p>}
     {f&&<div className="nisshi">
       <div className="nisshi-head">ふれあいホームみずほ 利用日誌</div>
@@ -893,7 +907,7 @@ function Nisshi({me,data,persist}){
       <div className="nf"><label>【利用のご様子】</label><textarea rows={10} value={f.appearance} onChange={e=>setField("appearance",e.target.value)}/></div>
       <div className="nf"><label>特記事項</label><textarea rows={3} value={f.special} onChange={e=>setField("special",e.target.value)}/></div>
       <div className="nf"><label>次回利用予定日</label><input type="date" value={f.nextVisitDate||""} onChange={e=>setField("nextVisitDate",e.target.value)}/>{f.nextVisitDate&&<div className="tiny">{(()=>{const d=new Date(f.nextVisitDate+"T00:00:00");return (d.getMonth()+1)+"月"+d.getDate()+"日（"+["日","月","火","水","木","金","土"][d.getDay()]+"曜日）";})()}</div>}</div>
-      <div className="nf"><label>次回へのお願い</label><input value={f.nextRequest} onChange={e=>setField("nextRequest",e.target.value)}/></div>
+      <div className="nf"><label>次回へのお願い（日程・ご連絡など。※家族向けのAI文は入りません）</label><input value={f.nextRequest} onChange={e=>setField("nextRequest",e.target.value)}/>{activeNotices(date).length>0&&<div className="tiny" style={{marginTop:4,color:"#B25E77"}}>この期間の共通連絡（自動で出力に入ります）：{activeNotices(date).map((t,i)=><div key={i}>・{t}</div>)}</div>}</div>
       <div className="n-actions no-print">
         <Btn onClick={saveNisshi}>💾 保存</Btn>
         <Btn onClick={()=>window.print()}>🖨 印刷</Btn>
@@ -1527,7 +1541,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.78〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.79〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
