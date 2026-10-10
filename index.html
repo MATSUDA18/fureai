@@ -398,6 +398,23 @@
     .bubble{max-width:78%;font-size:15px;}
   }
   @media (min-width:1024px){.inside{max-width:1040px;}}
+  .care-band{background:#FFF8EF;border:1px solid #F3DEC2;border-radius:14px;padding:10px 12px;margin:4px 0 12px;}
+  .care-head{font-weight:800;color:#C08A3E;font-size:14px;margin-bottom:6px;}
+  .care-note{background:#fff;border:1px solid #F0E2C9;border-radius:12px;padding:8px 10px;margin-bottom:6px;}
+  .care-note.care-mine{border-color:#E7B98A;box-shadow:0 0 0 2px #FBE7CE inset;}
+  .care-note-text{color:#5A4A50;font-size:14px;line-height:1.5;white-space:pre-wrap;}
+  .care-meta{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:5px;}
+  .care-for{background:#FBEAEE;color:#C9788F;font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;}
+  .care-mine .care-for{background:#F6C98E;color:#8A5A1E;}
+  .care-lv{background:#F7C7C7;color:#B23A3A;font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;}
+  .care-by{font-size:11px;color:#B0895A;margin-left:auto;}
+  .care-admin{background:#FFF0F3;border:1px dashed #E7A6B8;border-radius:12px;padding:8px 10px;margin:6px 0;}
+  .care-adminnote{border-color:#F0CBD6;}
+  .care-form{background:#fff;border:1px solid #F0E2C9;border-radius:12px;padding:10px;margin-top:6px;}
+  .care-form textarea{width:100%;padding:10px;border:1px solid #F0D3DB;border-radius:10px;font-size:14px;box-sizing:border-box;}
+  .care-tpls{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px;}
+  .care-tpl{padding:5px 9px;border-radius:999px;border:1px solid #E7D3B8;background:#FFF6E8;color:#B07A2E;font-size:12px;cursor:pointer;}
+  .care-levels{display:flex;flex-direction:column;gap:4px;margin:6px 0;}
 </style>
 </head>
 <body>
@@ -755,17 +772,41 @@ function Nisshi({me,data,persist}){
   const emptyForm=()=>{ setErr(""); setF(buildInitial({program:progText})); };
   const saveNisshi=async()=>{ if(!f)return; if(!SB_ON){flash2("共有DBが必要です");return;} try{ const id="ns_"+(f.name||"user")+"_"+date; const kw=[f.name,f.appearance,f.special,f.program,f.staff,f.dinnerMenu,f.breakfastMenu,f.vitals1].filter(Boolean).join(" "); await nsSave({id,user_name:f.name||"",biz_date:date,sex:(resSex[f.name]||""),keywords:kw,data:f,created:new Date().toISOString()}); flash2("日誌を保存しました"); }catch(e){ setErr("保存に失敗（nisshi表の設定をご確認ください）"); } };
   const setField=(k,v)=>setF(p=>Object.assign({},p,{[k]:v}));
+  // 計画＋前回記録のコンテキストをまとめる
+  const gatherCtx=async()=>{
+    let s="";
+    const _tp=data.trainingPlans||{}; const _key=normName(user); const _nd=String(nendoOf(date));
+    let _plan=(_tp[_nd]&&_tp[_nd][_key])||"";
+    if(!_plan){ const ys=Object.keys(_tp).sort((a,b)=>Number(b)-Number(a)); for(const y of ys){ if(_tp[y]&&_tp[y][_key]){ _plan=_tp[y][_key]; break; } } }
+    if(_plan) s+="\n\n【個別訓練計画（本人の目標・取り組むこと）】\n"+_plan;
+    try{ if(SB_ON){ const list=await nsList(); const mine=(list||[]).filter(r=>r.user_name===user && String(r.biz_date)<date).sort((a,b)=>String(b.biz_date).localeCompare(String(a.biz_date))); if(mine[0]){ const full=await nsGet(mine[0].id); if(full&&full.data&&full.data.appearance){ s+="\n\n【前回（"+mine[0].biz_date+"）のご様子】\n"+String(full.data.appearance).slice(0,800); } } } }catch(e){}
+    return s;
+  };
+  // トーン調整（ご様子の本文だけ作り直す）
+  const adjustAppearance=async(style)=>{
+    if(!f) return;
+    if(!apiKey){ setErr("AI調整にはAPIキーの設定が必要です（AI相談タブの「AIの設定」から）。"); return; }
+    if(recs.length===0){ setErr("この日の「"+user+"」の記録がありません。"); return; }
+    setLoading(true); setErr("");
+    try{
+      const styleMap={detail:"できごとや本人の取り組みを具体的に、やや詳しめに（長めでも可）。",soft:"簡潔で控えめに、要点だけやわらかく短めに。",normal:"あたたかく前向きに、読みやすい分量で。"};
+      const ctx=await gatherCtx();
+      const um="利用者："+user+"\n対象："+fmtDate(date)+" 16:00〜翌朝\n\n【この日の記録（時刻 内容）】\n"+recText+ctx+"\n\n【指示】上記をもとに【利用のご様子】の本文のみを書いてください（JSONやラベル・前置きは不要、本文だけ）。個別訓練計画や前回の記録があれば、目標に沿ってできた点・前回より良くなった点を前向きに自然に触れてください。トーン："+(styleMap[style]||styleMap.normal);
+      const res=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"content-type":"application/json","x-api-key":apiKey,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},body:JSON.stringify({model:"claude-sonnet-5",max_tokens:1500,system:NISSHI_SYS,messages:[{role:"user",content:um}]})});
+      const d=await res.json(); if(d.error){ setErr("AIエラー："+(d.error.message||"")); setLoading(false); return; }
+      let txt=(d.content||[]).filter(b=>b.type==="text").map(b=>b.text).join("").trim().replace(/```/g,"").trim();
+      if(txt) setField("appearance",txt);
+    }catch(e){ setErr("接続に失敗しました。通信状況をご確認ください。"); }
+    setLoading(false);
+  };
   const genDraft=async()=>{
     if(!apiKey){ setErr("AI下書きには、AI相談と同じAPIキーの設定が必要です（AI相談タブの「AIの設定」から）。"); return; }
     if(recs.length===0){ setErr("この日の「"+user+"」の記録がありません。先に記録タブで入力してください。"); return; }
     setLoading(true); setErr("");
     try{
       let um="利用者："+user+"\n対象："+fmtDate(date)+" 16:00〜翌朝\n\n【この日の記録（時刻 内容）】\n"+recText;
-      const _tp=data.trainingPlans||{}; const _key=normName(user); const _nd=String(nendoOf(date));
-      let _plan=(_tp[_nd]&&_tp[_nd][_key])||"";
-      if(!_plan){ const ys=Object.keys(_tp).sort((a,b)=>Number(b)-Number(a)); for(const y of ys){ if(_tp[y]&&_tp[y][_key]){ _plan=_tp[y][_key]; break; } } }
-      if(_plan) um+="\n\n【個別訓練計画（本人の目標・取り組むこと）】\n"+_plan+"\n\n※この計画をふまえ、本人が目標に沿ってできていたこと・取り組めていた点・伸びている点があれば、ご様子の中で前向きに自然に触れてください（無理に全部を盛り込まなくてよい）。";
-      um+="\n\n上記からJSONを作成してください。";
+      um+=await gatherCtx();
+      um+="\n\n※個別訓練計画があれば本人の目標に沿ってできた点を、前回の記録があれば前回より良くなった点・続けられている点を、ご様子の中で前向きに自然に触れてください（決めつけず事実ベース、無理に全部は入れない）。\n\n上記からJSONを作成してください。";
       const res=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"content-type":"application/json","x-api-key":apiKey,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},body:JSON.stringify({model:"claude-sonnet-5",max_tokens:4000,system:NISSHI_SYS,messages:[{role:"user",content:um}]})});
       const d=await res.json();
       if(d.error){ setErr("AIエラー："+(d.error.message||"")); setLoading(false); return; }
@@ -904,7 +945,12 @@ function Nisshi({me,data,persist}){
       <div className="nf"><label>朝食メニュー</label><input value={f.breakfastMenu} onChange={e=>setField("breakfastMenu",e.target.value)}/></div>
       <div className="nf2"><div className="nf"><label>朝食 主食の残量</label><select value={f.breakfastMainLeft==null?"":f.breakfastMainLeft} onChange={e=>setField("breakfastMainLeft",e.target.value)}><option value="">—（未記入）</option>{[0,1,2,3,4,5,6,7,8,9,10].map(n=><option key={n} value={n}>{n===0?"完食":n+"割残し"}</option>)}</select></div>
         <div className="nf"><label>朝食 副食の残量</label><select value={f.breakfastSideLeft==null?"":f.breakfastSideLeft} onChange={e=>setField("breakfastSideLeft",e.target.value)}><option value="">—（未記入）</option>{[0,1,2,3,4,5,6,7,8,9,10].map(n=><option key={n} value={n}>{n===0?"完食":n+"割残し"}</option>)}</select></div></div>
-      <div className="nf"><label>【利用のご様子】</label><textarea rows={10} value={f.appearance} onChange={e=>setField("appearance",e.target.value)}/></div>
+      <div className="nf"><label>【利用のご様子】</label><textarea rows={10} value={f.appearance} onChange={e=>setField("appearance",e.target.value)}/>
+        {f.appearance&&<div className="n-actions no-print" style={{marginTop:4}}>
+          <Btn kind="ghost2" onClick={()=>adjustAppearance("detail")}>✍ もっと具体的に</Btn>
+          <Btn kind="ghost2" onClick={()=>adjustAppearance("soft")}>🍃 もっと控えめに</Btn>
+          <Btn kind="ghost2" onClick={()=>adjustAppearance("normal")}>🔁 標準で作り直す</Btn>
+        </div>}</div>
       <div className="nf"><label>特記事項</label><textarea rows={3} value={f.special} onChange={e=>setField("special",e.target.value)}/></div>
       <div className="nf"><label>次回利用予定日</label><input type="date" value={f.nextVisitDate||""} onChange={e=>setField("nextVisitDate",e.target.value)}/>{f.nextVisitDate&&<div className="tiny">{(()=>{const d=new Date(f.nextVisitDate+"T00:00:00");return (d.getMonth()+1)+"月"+d.getDate()+"日（"+["日","月","火","水","木","金","土"][d.getDay()]+"曜日）";})()}</div>}</div>
       <div className="nf"><label>次回へのお願い（日程・ご連絡など。※家族向けのAI文は入りません）</label><input value={f.nextRequest} onChange={e=>setField("nextRequest",e.target.value)}/>{activeNotices(date).length>0&&<div className="tiny" style={{marginTop:4,color:"#B25E77"}}>この期間の共通連絡（自動で出力に入ります）：{activeNotices(date).map((t,i)=><div key={i}>・{t}</div>)}</div>}</div>
@@ -1209,6 +1255,19 @@ function Records({me,data,persist,reload}){
   const [af,setAf]=useState(iso(addDays(new Date(),-7))); const [at,setAt]=useState(iso(new Date()));
   const [dpOpen,setDpOpen]=useState(false);
   const fileRef=useRef(null);
+  // 配慮メモ（本人の取扱説明）
+  const careNotes=data.careNotes||[];
+  const visibleNotes=careNotes.filter(n=>sel.includes(n.user)&&n.level!=="管理者へ");
+  const adminNotes=careNotes.filter(n=>sel.includes(n.user)&&n.level==="管理者へ");
+  const [cnOpen,setCnOpen]=useState(false);
+  const [cnUser,setCnUser]=useState("");
+  const [cnTarget,setCnTarget]=useState("全体");
+  const [cnText,setCnText]=useState("");
+  const [cnLevel,setCnLevel]=useState("ふつう");
+  const [cnByAdmin,setCnByAdmin]=useState(false);
+  const cnTpls=["先に予定を伝えると安心されます。","ゆっくり話すと伝わりやすいです。","少し離れて見守ると落ち着かれます。","できたことを言葉にすると喜ばれます。"];
+  const addCareNote=()=>{ const u=cnUser||sel[0]; if(!u){flash("どなたのことか選んでください");return;} if(!cnText.trim()){flash("内容を入力してください");return;} const note={id:uid(),user:u,target:cnTarget,text:cnText.trim(),level:cnLevel,by:me.name,byAdmin:(me.isAdmin&&cnByAdmin),ts:new Date().toISOString()}; persist({...data,careNotes:[...careNotes,note]}); setCnText("");setCnLevel("ふつう");setCnByAdmin(false);setCnTarget("全体");setCnOpen(false); flash("配慮メモを登録しました"); };
+  const delCareNote=(id)=>{ if(!confirm("この配慮メモを削除しますか？"))return; persist({...data,careNotes:careNotes.filter(n=>n.id!==id)}); };
   const toggleUser=(u)=> setSel(s=> s.includes(u)? s.filter(x=>x!==u):[...s,u]);
   const flash=(m)=>{ setToast(m); setTimeout(()=>setToast(""),1800); };
   const hm=(ts)=>{ const d=new Date(ts); return String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0"); };
@@ -1257,6 +1316,41 @@ function Records({me,data,persist,reload}){
     <button className="time-toggle" style={{marginTop:0,marginBottom:4}} onClick={()=>setDpOpen(true)}>👥 この日の利用者・支援員を設定</button>
     <p className="tiny" style={{textAlign:"center",marginBottom:8,color:"#B0895A"}}>💡 ここで設定すると、シフト・タイムスケジュール・日誌にも反映されます</p>
     <div className="rec-users">{dayUsers.map(u=>(<button key={u} className={"ruser "+(sel.includes(u)?"on":"")} onClick={()=>toggleUser(u)}>{u}</button>))}</div>
+    {sel.length>0&&<div className="care-band">
+      <div className="care-head">💡 {sel.join("・")} さんへの配慮メモ</div>
+      {visibleNotes.length===0&&<p className="tiny" style={{margin:"2px 0 6px"}}>まだありません。気づいた「こうすると安心・喜ばれる」を下から残せます。</p>}
+      {visibleNotes.map(n=>{ const mine=(n.target===me.name); return <div key={n.id} className={"care-note"+(mine?" care-mine":"")}>
+        <div className="care-note-text">{n.text}</div>
+        <div className="care-meta">
+          <span className="care-for">{n.target==="全体"?"みんなで":(n.target+"さんへ")}{mine?"（あなた）":""}</span>
+          {n.level==="要配慮"&&<span className="care-lv">要配慮</span>}
+          <span className="care-by">{n.byAdmin?"管理者より":("記録："+n.by)}</span>
+          {(n.by===me.name||me.isAdmin)&&<button className="mini-del" onClick={()=>delCareNote(n.id)}>🗑</button>}
+        </div>
+      </div>; })}
+      {me.isAdmin&&adminNotes.length>0&&<div className="care-admin">
+        <div className="tiny" style={{fontWeight:700,color:"#B25E77",marginBottom:4}}>🔒 管理者のみ（共有されていません）</div>
+        {adminNotes.map(n=>(<div key={n.id} className="care-note care-adminnote">
+          <div className="care-note-text">{n.text}</div>
+          <div className="care-meta"><span className="care-for">{n.target==="全体"?"全体":(n.target+"さん")}</span><span className="care-by">記録：{n.by}</span><button className="mini-del" onClick={()=>delCareNote(n.id)}>🗑</button></div>
+        </div>))}
+      </div>}
+      <button className="link-btn" onClick={()=>{ if(!cnOpen){setCnUser(sel[0]||"");} setCnOpen(!cnOpen); }}>{cnOpen?"× 追加を閉じる":"＋ 配慮メモを追加"}</button>
+      {cnOpen&&<div className="care-form">
+        <label className="field"><span>どなたのこと</span><select value={cnUser} onChange={e=>setCnUser(e.target.value)}>{dayUsers.map(u=><option key={u} value={u}>{u}</option>)}</select></label>
+        <label className="field"><span>どなたへ（配慮をお願いしたい相手）</span><select value={cnTarget} onChange={e=>setCnTarget(e.target.value)}><option value="全体">全体（みんなで揃えたい）</option>{(data.accounts||[]).map(a=><option key={a.id} value={a.name}>{a.name}</option>)}</select></label>
+        <div className="care-tpls">{cnTpls.map((t,i)=><button key={i} className="care-tpl" onClick={()=>setCnText(p=>(p?p+" ":"")+((cnUser||sel[0]||"本人")+"さんは、")+t)}>＋{t.slice(0,8)}…</button>)}</div>
+        <textarea rows={3} value={cnText} placeholder={"例："+((cnUser||sel[0]||"本人")+"さん")+"は、先に予定を伝えると安心されます。"} onChange={e=>setCnText(e.target.value)}/>
+        <p className="tiny">前向きな言い方で（「気を付けて」より「〜だと安心されます・喜ばれます」）。</p>
+        <div className="care-levels">
+          <label className="chk"><input type="radio" name="cnlv" checked={cnLevel==="ふつう"} onChange={()=>setCnLevel("ふつう")}/> ふつう（みんなに共有）</label>
+          <label className="chk"><input type="radio" name="cnlv" checked={cnLevel==="要配慮"} onChange={()=>setCnLevel("要配慮")}/> 要配慮（目立たせる）</label>
+          <label className="chk"><input type="radio" name="cnlv" checked={cnLevel==="管理者へ"} onChange={()=>setCnLevel("管理者へ")}/> 管理者へ（共有せず管理者だけに伝える）</label>
+        </div>
+        {me.isAdmin&&<label className="chk"><input type="checkbox" checked={cnByAdmin} onChange={e=>setCnByAdmin(e.target.checked)}/> 管理者からの一言として表示（「管理者より」）</label>}
+        <div className="row-end"><Btn onClick={addCareNote}>登録する</Btn></div>
+      </div>}
+    </div>}
     <div className="tl-modes" style={{marginBottom:12}}>
       <button className={"seg "+(view==="log"?"on":"")} onClick={()=>setView("log")}>記録</button>
       <button className={"seg "+(view==="album"?"on":"")} onClick={()=>setView("album")}>アルバム</button>
@@ -1541,7 +1635,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.79〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.81〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
@@ -2359,6 +2453,13 @@ function AdminPanel({data,persist}){
   const [alog,setAlog]=useState(null); const [alShow,setAlShow]=useState(false);
   const [bkBusy,setBkBusy]=useState(false);
   const [bkProg,setBkProg]=useState("");
+  const careNotes=data.careNotes||[];
+  const [cnResNames,setCnResNames]=useState([]);
+  useEffect(()=>{ (async()=>{ if(!SB_ON)return; try{ const rows=await resList(); setCnResNames(rows.map(r=>r.data&&r.data.name).filter(Boolean)); }catch(e){} })(); },[]);
+  const cnAllUsers=Array.from(new Set([].concat(cnResNames,(data.userList||[]),USERS4).filter(Boolean)));
+  const [acnUser,setAcnUser]=useState(""); const [acnTarget,setAcnTarget]=useState("全体"); const [acnText,setAcnText]=useState(""); const [acnLevel,setAcnLevel]=useState("ふつう"); const [acnAdminVoice,setAcnAdminVoice]=useState(true);
+  const addAdminCare=()=>{ const u=acnUser||cnAllUsers[0]; if(!u){setMsg("利用者を選んでください");return;} if(!acnText.trim()){setMsg("内容を入力してください");return;} const note={id:uid(),user:u,target:acnTarget,text:acnText.trim(),level:acnLevel,by:"管理者",byAdmin:(acnLevel!=="管理者へ"&&acnAdminVoice),ts:new Date().toISOString()}; persist({...data,careNotes:[...careNotes,note]}); setAcnText(""); setMsg("配慮メモを追加しました（記録ページで表示されます）。"); };
+  const delAdminCare=(id)=>{ if(!confirm("この配慮メモを削除しますか？"))return; persist({...data,careNotes:careNotes.filter(n=>n.id!==id)}); };
   const dlJson=(obj,name)=>{ const blob=new Blob([JSON.stringify(obj)],{type:"application/json"}); const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),6000); };
   const fetchAll=async(path)=>{ const out=[]; let off=0; const page=1000; for(;;){ const r=await authFetch(`${SUPABASE_URL}/rest/v1/${path}${path.indexOf("?")>=0?"&":"?"}limit=${page}&offset=${off}`); if(!r.ok) break; const j=await r.json(); out.push.apply(out,j); if(j.length<page) break; off+=page; if(off>200000) break; } return out; };
   const doBackup=async(full)=>{ if(!SB_ON){alert("共有DBが必要です");return;} setBkBusy(true); setBkProg(""); try{
@@ -2449,6 +2550,27 @@ function AdminPanel({data,persist}){
     {!qrShown?<div className="row-end"><Btn kind="ghost2" onClick={()=>setQrShown(true)}>QRコードを表示</Btn></div>:<div style={{textAlign:"center"}}>
       <div ref={qrRef} style={{display:"inline-block",background:"#fff",padding:"12px",borderRadius:"12px"}}></div>
       <p className="tiny">この画面を見せて読み取ってもらうか、スクリーンショットで配布できます。<br/>読み取った端末で「ホーム画面に追加」→以後はアイコンから開けます。</p>
+    </div>}
+    <h3 className="blk">💡 配慮メモ（本人の取扱説明）</h3>
+    <p className="tiny">利用者が心地よく過ごすための「こうすると安心・喜ばれる」を登録します。記録ページで利用者を選ぶと、全職員に表示されます。角が立たないよう、前向きな言い方で。</p>
+    <div className="care-form" style={{background:"#FFF8EF",borderColor:"#F3DEC2"}}>
+      <label className="field"><span>どなたのこと</span><select value={acnUser} onChange={e=>setAcnUser(e.target.value)}><option value="">（選択）</option>{cnAllUsers.map(u=><option key={u} value={u}>{u}</option>)}</select></label>
+      <label className="field"><span>どなたへ</span><select value={acnTarget} onChange={e=>setAcnTarget(e.target.value)}><option value="全体">全体（みんなで揃えたい）</option>{(data.accounts||[]).map(a=><option key={a.id} value={a.name}>{a.name}</option>)}</select></label>
+      <textarea rows={3} value={acnText} placeholder={"例："+((acnUser||"本人")+"さん")+"は、ゆっくり話すと伝わりやすい方です。"} onChange={e=>setAcnText(e.target.value)}/>
+      <div className="care-levels">
+        <label className="chk"><input type="radio" name="acnlv" checked={acnLevel==="ふつう"} onChange={()=>setAcnLevel("ふつう")}/> ふつう（みんなに共有）</label>
+        <label className="chk"><input type="radio" name="acnlv" checked={acnLevel==="要配慮"} onChange={()=>setAcnLevel("要配慮")}/> 要配慮（目立たせる）</label>
+        <label className="chk"><input type="radio" name="acnlv" checked={acnLevel==="管理者へ"} onChange={()=>setAcnLevel("管理者へ")}/> 管理者へ（共有せず管理者だけに表示）</label>
+      </div>
+      {acnLevel!=="管理者へ"&&<label className="chk"><input type="checkbox" checked={acnAdminVoice} onChange={e=>setAcnAdminVoice(e.target.checked)}/> 「管理者より」と表示する</label>}
+      <div className="row-end"><Btn onClick={addAdminCare}>追加する</Btn></div>
+    </div>
+    {careNotes.length>0&&<div style={{marginTop:10}}>
+      <div className="rec-gtitle">登録済みの配慮メモ（{careNotes.length}件）</div>
+      {careNotes.slice().sort((a,b)=>String(b.ts).localeCompare(String(a.ts))).map(n=>(<div key={n.id} className="care-note" style={{marginTop:6}}>
+        <div className="care-note-text">{n.text}</div>
+        <div className="care-meta"><span className="care-for">{n.user}さん → {n.target==="全体"?"全体":(n.target+"さん")}</span>{n.level!=="ふつう"&&<span className="care-lv">{n.level}</span>}<span className="care-by">{n.byAdmin?"管理者より":("記録："+n.by)}</span><button className="mini-del" onClick={()=>delAdminCare(n.id)}>🗑</button></div>
+      </div>))}
     </div>}
     <h3 className="blk">💾 データのバックアップ（書き出し）</h3>
     {(()=>{ let last=""; try{ last=localStorage.getItem("mizuho_last_backup")||""; }catch(e){} const days=last?Math.floor((Date.now()-new Date(last).getTime())/86400000):null; if(last===""){ return <div className="bk-remind">⏰ まだバックアップをしていません。今すぐ1回、書き出して保存しましょう。</div>; } if(days!==null&&days>=7){ return <div className="bk-remind">⏰ 前回のバックアップから<b>{days}日</b>たちました。週1回のバックアップをおすすめします（前回：{last.slice(0,10)}）。</div>; } return <p className="tiny">前回のバックアップ：{last.slice(0,10)}（{days}日前）</p>; })()}
