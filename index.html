@@ -715,6 +715,7 @@ function Nisshi({me,data}){
       let obj=null; try{ obj=JSON.parse(txt); }catch(e){ const mm=txt.match(/\{[\s\S]*\}/); if(mm){ try{ obj=JSON.parse(mm[0]); }catch(e2){ obj=null; } } }
       if(!obj){ setErr("AIの下書きを読み取れませんでした。お手数ですが、もう一度「AIで下書きを作成」を押してください。"); setLoading(false); return; }
       obj.program=progText;
+      obj.dinnerAmount=""; obj.breakfastAmount=""; // 量は0〜10の残量で記録するため未使用
       setF(buildInitial(obj));
     }catch(e){ setErr("接続に失敗しました。通信状況をご確認ください。"); }
     setLoading(false);
@@ -802,7 +803,7 @@ function Nisshi({me,data}){
     {f&&<div className="nisshi">
       <div className="nisshi-head">ふれあいホームみずほ 利用日誌</div>
       <div className="nf2"><div className="nf"><label>利用者名</label><input value={f.name} onChange={e=>setField("name",e.target.value)}/></div>
-        <div className="nf"><label>記録者</label><input list="nsstaff" value={f.writer||""} onChange={e=>setField("writer",e.target.value)} placeholder="選択 または 入力"/><datalist id="nsstaff">{(data.accounts||[]).map(a=><option key={a.id} value={a.name}/>)}</datalist></div></div>
+        <div className="nf"><label>記録者</label><select value={f.writer||""} onChange={e=>setField("writer",e.target.value)}><option value="">（選択してください）</option>{(data.accounts||[]).map(a=><option key={a.id} value={a.name}>{a.name}</option>)}{f.writer&&!(data.accounts||[]).some(a=>a.name===f.writer)&&<option value={f.writer}>{f.writer}</option>}</select></div></div>
       <div className="nf"><label>期間</label><input value={f.period} onChange={e=>setField("period",e.target.value)}/></div>
       <div className="nf2"><div className="nf"><label>バイタル（来所）</label><input value={f.vitals1} onChange={e=>setField("vitals1",e.target.value)}/></div>
         <div className="nf"><label>バイタル（起床）</label><input value={f.vitals2} onChange={e=>setField("vitals2",e.target.value)}/></div></div>
@@ -811,12 +812,10 @@ function Nisshi({me,data}){
       <div className="nf2"><div className="nf"><label>投薬</label><input value={f.medication} onChange={e=>setField("medication",e.target.value)}/></div>
         <div className="nf"><label>担当職員</label><input value={f.staff} onChange={e=>setField("staff",e.target.value)}/></div></div>
       <div className="nf"><label>プログラム（時間ごとの行動）</label><textarea rows={6} value={f.program} onChange={e=>setField("program",e.target.value)}/></div>
-      <div className="nf2"><div className="nf"><label>夕食メニュー</label><input value={f.dinnerMenu} onChange={e=>setField("dinnerMenu",e.target.value)}/></div>
-        <div className="nf"><label>夕食量</label><input value={f.dinnerAmount} onChange={e=>setField("dinnerAmount",e.target.value)}/></div></div>
+      <div className="nf"><label>夕食メニュー</label><input value={f.dinnerMenu} onChange={e=>setField("dinnerMenu",e.target.value)}/></div>
       <div className="nf2"><div className="nf"><label>夕食 主食の残量</label><select value={f.dinnerMainLeft==null?"":f.dinnerMainLeft} onChange={e=>setField("dinnerMainLeft",e.target.value)}><option value="">—（未記入）</option>{[0,1,2,3,4,5,6,7,8,9,10].map(n=><option key={n} value={n}>{n===0?"完食":n+"割残し"}</option>)}</select></div>
         <div className="nf"><label>夕食 副食の残量</label><select value={f.dinnerSideLeft==null?"":f.dinnerSideLeft} onChange={e=>setField("dinnerSideLeft",e.target.value)}><option value="">—（未記入）</option>{[0,1,2,3,4,5,6,7,8,9,10].map(n=><option key={n} value={n}>{n===0?"完食":n+"割残し"}</option>)}</select></div></div>
-      <div className="nf2"><div className="nf"><label>朝食メニュー</label><input value={f.breakfastMenu} onChange={e=>setField("breakfastMenu",e.target.value)}/></div>
-        <div className="nf"><label>朝食量</label><input value={f.breakfastAmount} onChange={e=>setField("breakfastAmount",e.target.value)}/></div></div>
+      <div className="nf"><label>朝食メニュー</label><input value={f.breakfastMenu} onChange={e=>setField("breakfastMenu",e.target.value)}/></div>
       <div className="nf2"><div className="nf"><label>朝食 主食の残量</label><select value={f.breakfastMainLeft==null?"":f.breakfastMainLeft} onChange={e=>setField("breakfastMainLeft",e.target.value)}><option value="">—（未記入）</option>{[0,1,2,3,4,5,6,7,8,9,10].map(n=><option key={n} value={n}>{n===0?"完食":n+"割残し"}</option>)}</select></div>
         <div className="nf"><label>朝食 副食の残量</label><select value={f.breakfastSideLeft==null?"":f.breakfastSideLeft} onChange={e=>setField("breakfastSideLeft",e.target.value)}><option value="">—（未記入）</option>{[0,1,2,3,4,5,6,7,8,9,10].map(n=><option key={n} value={n}>{n===0?"完食":n+"割残し"}</option>)}</select></div></div>
       <div className="nf"><label>【利用のご様子】</label><textarea rows={10} value={f.appearance} onChange={e=>setField("appearance",e.target.value)}/></div>
