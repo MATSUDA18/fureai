@@ -669,7 +669,33 @@ const NISSHI_SYS = `あなたは、障害者生活訓練事業所「ふれあい
 }
 記録から読み取れない項目は空文字にする。推測で医療的判断はしない。`;
 
-function Nisshi({me,data}){
+function normName(s){return String(s||"").replace(/[\s　]/g,"").replace(/^[^぀-ヿ一-鿿]+/,"");}
+function Nisshi({me,data,persist}){
+  const nendoOf=(ds)=>{const dt=new Date(ds+"T00:00:00");const y=dt.getFullYear();return (dt.getMonth()+1)>=4?y:y-1;};
+  const [planYear,setPlanYear]=useState(()=>{const n=new Date();return (n.getMonth()+1)>=4?n.getFullYear():n.getFullYear()-1;});
+  const [planMsg,setPlanMsg]=useState("");
+  const planRef=useRef(null);
+  const onPlanFile=async(e)=>{
+    const file=e.target.files&&e.target.files[0]; e.target.value=""; if(!file) return;
+    if(!window.XLSX){ setPlanMsg("Excel機能の読み込み中です。少し待って再度お試しください。"); return; }
+    setPlanMsg("取り込み中…");
+    try{
+      const buf=await file.arrayBuffer();
+      const wb=XLSX.read(buf,{type:"array"});
+      const map={}; const names=[];
+      wb.SheetNames.forEach(sn=>{
+        const ws=wb.Sheets[sn]; if(!ws) return;
+        const rows=XLSX.utils.sheet_to_json(ws,{header:1,blankrows:false,defval:""});
+        const text=rows.map(r=>(r||[]).map(c=>String(c==null?"":c).replace(/\s+/g," ").trim()).filter(Boolean).join(" ")).filter(Boolean).join("\n").slice(0,2000);
+        const nm=normName(sn);
+        if(nm&&text){ map[nm]=text; names.push(sn); }
+      });
+      const yr=String(planYear);
+      const next=Object.assign({},data,{trainingPlans:Object.assign({},data.trainingPlans||{},{[yr]:map})});
+      if(persist) persist(next);
+      setPlanMsg("取り込み完了："+Object.keys(map).length+"名分を保存しました（"+yr+"年度）。／タブ："+names.join("、"));
+    }catch(err){ setPlanMsg("取り込みに失敗しました："+String(err&&err.message||err)); }
+  };
   const [user,setUser]=useState("利用者1");
   const [date,setDate]=useState(()=>{const n=new Date();return (n.getHours()*60+n.getMinutes())<(15*60)?iso(addDays(n,-1)):iso(n);});
   const [f,setF]=useState(null);
@@ -706,7 +732,12 @@ function Nisshi({me,data}){
     if(recs.length===0){ setErr("この日の「"+user+"」の記録がありません。先に記録タブで入力してください。"); return; }
     setLoading(true); setErr("");
     try{
-      const um="利用者："+user+"\n対象："+fmtDate(date)+" 16:00〜翌朝\n\n【この日の記録（時刻 内容）】\n"+recText+"\n\n上記からJSONを作成してください。";
+      let um="利用者："+user+"\n対象："+fmtDate(date)+" 16:00〜翌朝\n\n【この日の記録（時刻 内容）】\n"+recText;
+      const _tp=data.trainingPlans||{}; const _key=normName(user); const _nd=String(nendoOf(date));
+      let _plan=(_tp[_nd]&&_tp[_nd][_key])||"";
+      if(!_plan){ const ys=Object.keys(_tp).sort((a,b)=>Number(b)-Number(a)); for(const y of ys){ if(_tp[y]&&_tp[y][_key]){ _plan=_tp[y][_key]; break; } } }
+      if(_plan) um+="\n\n【個別訓練計画（本人の目標・取り組むこと）】\n"+_plan+"\n\n※この計画をふまえ、本人が目標に沿ってできていたこと・取り組めていた点・伸びている点があれば、ご様子の中で前向きに自然に触れてください（無理に全部を盛り込まなくてよい）。";
+      um+="\n\n上記からJSONを作成してください。";
       const res=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"content-type":"application/json","x-api-key":apiKey,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},body:JSON.stringify({model:"claude-sonnet-5",max_tokens:4000,system:NISSHI_SYS,messages:[{role:"user",content:um}]})});
       const d=await res.json();
       if(d.error){ setErr("AIエラー："+(d.error.message||"")); setLoading(false); return; }
@@ -799,6 +830,12 @@ function Nisshi({me,data}){
       <Btn onClick={genDraft} kind={loading?"ghost2":"primary"}>{loading?"作成中…":"🤖 AIで下書きを作成"}</Btn>
       <Btn kind="ghost2" onClick={emptyForm}>空フォーム</Btn>
     </div>
+    {me.isAdmin&&<details className="tl-editpanel" style={{marginBottom:8}}><summary style={{cursor:"pointer",fontWeight:700,color:"#C9788F"}}>⚙ 個別訓練計画の年度取り込み（管理者）</summary>
+      <div className="wheel" style={{marginTop:8}}><input type="number" value={planYear} onChange={e=>setPlanYear(e.target.value)} placeholder="年度（西暦）" style={{flex:1,padding:"10px",border:"1px solid #F0D3DB",borderRadius:"10px"}}/><button className="btn ghost2" onClick={()=>planRef.current&&planRef.current.click()}>⬆ Excelを取り込む</button></div>
+      <input ref={planRef} type="file" accept=".xlsx,.xls" onChange={onPlanFile} style={{display:"none"}}/>
+      <p className="tiny">お一人ずつタブに分かれたExcel（タブ名＝利用者名）を選ぶと、各タブの内容を読み取り、AIまとめ生成時に「本人の目標・取り組むこと」として反映します。年度ごとに上書き保存されます（タブ名の丸数字などは自動で除いて氏名で照合）。</p>
+      {planMsg&&<p className="tiny" style={{color:"#B25E77"}}>{planMsg}</p>}
+    </details>}
     {err&&<p className="err">{err}</p>}
     {f&&<div className="nisshi">
       <div className="nisshi-head">ふれあいホームみずほ 利用日誌</div>
@@ -1459,7 +1496,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.76〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.77〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
@@ -1725,7 +1762,7 @@ function Inside({me,data,tab,setTab,onLogout,persist,reload}){
       {tab==="vitals"&&<VitalsView data={data} persist={persist} reload={reload}/>}
       {tab==="plans"&&<Plans me={me} data={data} persist={persist}/>}
       {tab==="album"&&<Album me={me} data={data}/>}
-      {tab==="nisshi"&&<Nisshi me={me} data={data}/>}
+      {tab==="nisshi"&&<Nisshi me={me} data={data} persist={persist}/>}
       {tab==="work"&&<Work/>}
       {tab==="traits"&&<Traits/>}
       {tab==="materials"&&<Materials me={me} data={data} persist={persist}/>}
