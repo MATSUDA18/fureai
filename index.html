@@ -511,7 +511,7 @@ const REC_GROUPS=[
   {g:"食事・水分", items:["食事","水分補給","メニュー"]},
   {g:"排泄", items:["トイレ（小）","トイレ（大）"]},
   {g:"症状", items:["生理","くしゃみ","せき","鼻水"]},
-  {g:"生活・活動", items:["起床","就寝","入浴","巡回","来所","帰宅"]},
+  {g:"生活・活動", items:["起床","就寝","入浴","余暇活動","巡回","来所","帰宅"]},
   {g:"介助", items:["介助"]},
   {g:"その他", items:["様子・特記"]},
 ];
@@ -754,6 +754,13 @@ function Nisshi({me,data,persist}){
   const loadNs=async()=>{ if(!SB_ON){setNrows([]);return;} try{ setNrows(await nsList()); }catch(e){ setNrows([]); } };
   useEffect(()=>{ if(mode==="search"&&nrows===null) loadNs(); },[mode]);
   const results=(nrows||[]).filter(r=>{ if(qName&&!((r.user_name||"").includes(qName)))return false; if(qSex&&r.sex!==qSex)return false; if(qFrom&&(r.biz_date||"")<qFrom)return false; if(qTo&&(r.biz_date||"")>qTo)return false; if(qText&&!((r.keywords||"").includes(qText)))return false; return true; });
+  // 過去の紙ベース記録の取り込み（テキスト。AIまとめの参照データになる）
+  const allResidents=Array.from(new Set([].concat(Object.keys(resSex||{}),(data.userList||[]),USERS4).filter(Boolean)));
+  const [ipUser,setIpUser]=useState(""); const [ipDate,setIpDate]=useState(()=>iso(new Date())); const [ipText,setIpText]=useState(""); const [ipRows,setIpRows]=useState(null); const [ipMsg,setIpMsg]=useState("");
+  const loadPaper=async()=>{ if(!SB_ON){setIpRows([]);return;} try{ const all=await nsList(); setIpRows((all||[]).filter(r=>String(r.keywords||"").includes("【紙】"))); }catch(e){ setIpRows([]); } };
+  useEffect(()=>{ if(mode==="import"&&ipRows===null) loadPaper(); },[mode]);
+  const savePaper=async()=>{ if(!SB_ON){ setIpMsg("共有DBが必要です"); return; } const u=ipUser||allResidents[0]; if(!u){ setIpMsg("利用者を選んでください"); return; } if(!ipText.trim()){ setIpMsg("内容を入力してください"); return; } try{ const id="paper_"+u+"_"+ipDate; const dataObj={name:u,biz_date:ipDate,period:fmtDate(ipDate),appearance:ipText.trim(),source:"paper",writer:me.name,created:new Date().toISOString()}; await nsSave({id,user_name:u,biz_date:ipDate,sex:(resSex[u]||""),keywords:"【紙】過去記録 "+ipText.trim().slice(0,200),data:dataObj,created:new Date().toISOString()}); setIpText(""); setIpMsg("過去記録を保存しました（AIまとめの参照データになります）。"); loadPaper(); }catch(e){ setIpMsg("保存に失敗（nisshi表の設定をご確認ください）。"); } };
+  const delPaper=async(id)=>{ if(!confirm("この過去記録を削除しますか？"))return; try{ await nsDelete(id); loadPaper(); }catch(e){} };
   const openNs=async(row)=>{ try{ const full=await nsGet(row.id); if(full&&full.data){ setF(full.data); setDate(row.biz_date||date); setUser(row.user_name||user); setMode("edit"); } }catch(e){} };
   const delNs=async(id)=>{ if(!confirm("この日誌を削除しますか？"))return; try{ await nsDelete(id); loadNs(); }catch(e){} };
   const hm=(ts)=>{ const d=new Date(ts); return String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0"); };
@@ -782,7 +789,7 @@ function Nisshi({me,data,persist}){
     let _plan=(_tp[_nd]&&_tp[_nd][_key])||"";
     if(!_plan){ const ys=Object.keys(_tp).sort((a,b)=>Number(b)-Number(a)); for(const y of ys){ if(_tp[y]&&_tp[y][_key]){ _plan=_tp[y][_key]; break; } } }
     if(_plan) s+="\n\n【個別訓練計画（本人の目標・取り組むこと）】\n"+_plan;
-    try{ if(SB_ON){ const list=await nsList(); const mine=(list||[]).filter(r=>r.user_name===user && String(r.biz_date)<date).sort((a,b)=>String(b.biz_date).localeCompare(String(a.biz_date))); if(mine[0]){ const full=await nsGet(mine[0].id); if(full&&full.data&&full.data.appearance){ s+="\n\n【前回（"+mine[0].biz_date+"）のご様子】\n"+String(full.data.appearance).slice(0,800); } } } }catch(e){}
+    try{ if(SB_ON){ const list=await nsList(); const mine=(list||[]).filter(r=>r.user_name===user && String(r.biz_date)<date).sort((a,b)=>String(b.biz_date).localeCompare(String(a.biz_date))); if(mine[0]){ const full=await nsGet(mine[0].id); if(full&&full.data&&full.data.appearance){ s+="\n\n【前回（"+mine[0].biz_date+"）のご様子】\n"+String(full.data.appearance).slice(0,800); } } const paper=(list||[]).filter(r=>r.user_name===user && String(r.keywords||"").includes("【紙】")).sort((a,b)=>String(b.biz_date).localeCompare(String(a.biz_date))); if(paper[0] && (!mine[0]||paper[0].id!==mine[0].id)){ const pf=await nsGet(paper[0].id); if(pf&&pf.data&&pf.data.appearance){ s+="\n\n【過去の記録（"+paper[0].biz_date+"・参考）】\n"+String(pf.data.appearance).slice(0,800); } } } }catch(e){}
     return s;
   };
   // トーン調整（ご様子の本文だけ作り直す）
@@ -876,7 +883,26 @@ function Nisshi({me,data,persist}){
     <div className="tl-modes" style={{marginBottom:12}}>
       <button className={"seg "+(mode==="edit"?"on":"")} onClick={()=>setMode("edit")}>作成</button>
       <button className={"seg "+(mode==="search"?"on":"")} onClick={()=>setMode("search")}>過去の日誌を検索</button>
+      <button className={"seg "+(mode==="import"?"on":"")} onClick={()=>setMode("import")}>過去記録の取り込み</button>
     </div>
+    {mode==="import"&&<div>
+      <div className="tl-editpanel">
+        <p className="tiny" style={{marginTop:0}}>紙に書かれた過去の記録を<b>テキストで</b>取り込みます。ここに入れた内容は、同じ利用者の次のAIまとめを作るときに<b>参考データ</b>として使われます（印刷される日誌そのものには出ません）。</p>
+        <p className="tiny" style={{color:"#B25E77",fontWeight:700}}>💡 スマホのキーボードの「🎤マイク」ボタンで音声入力できます。写真よりも、要点をテキストで残すほうが正確に活用できます。</p>
+        <div className="nf2"><div className="nf"><label>利用者</label><select value={ipUser} onChange={e=>setIpUser(e.target.value)}><option value="">（選択）</option>{allResidents.map(u=><option key={u} value={u}>{u}</option>)}</select></div>
+          <div className="nf"><label>日付（その記録の日）</label><input type="date" value={ipDate} onChange={e=>e.target.value&&setIpDate(e.target.value)}/></div></div>
+        <div className="nf"><label>記録の内容（紙の内容をそのまま／要点でも可）</label><textarea rows={6} value={ipText} onChange={e=>setIpText(e.target.value)} placeholder="例：日中は作業に集中。昼食後に散歩、笑顔が多かった。夕方に少し疲れた様子。服薬確認済み。…（キーボードのマイクで音声入力も可）"/></div>
+        <div className="row-end"><Btn onClick={savePaper}>この内容を参考データとして保存</Btn></div>
+        {ipMsg&&<p className="ok">{ipMsg}</p>}
+      </div>
+      <div className="rec-sub">取り込み済みの過去記録</div>
+      {ipRows===null&&<p className="empty">読み込み中…</p>}
+      {ipRows!==null&&ipRows.length===0&&<p className="empty">まだありません。</p>}
+      <div className="rec-log">{(ipRows||[]).map(r=>(<div key={r.id} className="rec-row">
+        <span className="rec-time">{r.biz_date}</span><span className="chip">{r.user_name}</span>
+        <span className="rec-item" style={{fontSize:12,color:"#8A6A74"}}>{String(r.keywords||"").replace("【紙】過去記録 ","").slice(0,40)}…</span>
+        <button className="mini-del" onClick={()=>delPaper(r.id)}>🗑</button></div>))}</div>
+    </div>}
     {mode==="search"&&<div>
       <div className="tl-editpanel">
         <div className="nf"><label>名前（姓・名どちらでも）</label><input value={qName} onChange={e=>setQName(e.target.value)} placeholder="例：伊藤 / 弘隆"/></div>
@@ -899,6 +925,7 @@ function Nisshi({me,data,persist}){
       <b>{fmtDate(date)}</b>
       <button className="link-btn" onClick={()=>setDate(iso(addDays(new Date(date+"T00:00:00"),1)))}>翌日 ›</button>
     </div>
+    <div style={{margin:"0 0 6px"}}><label className="field"><span>日付を直接選ぶ（過去の日もカレンダーから）</span><input type="date" value={date} onChange={e=>e.target.value&&setDate(e.target.value)}/></label></div>
     <p className="tiny">この日の「{user}」の記録：{recs.length}件</p>
     <div className="n-actions no-print">
       <Btn onClick={genDraft} kind={loading?"ghost2":"primary"}>{loading?"作成中…":"🤖 AIで下書きを作成"}</Btn>
@@ -1243,7 +1270,7 @@ function VitalsView({data,persist,reload}){
 }
 function Records({me,data,persist,reload}){
   const cats=(data.recCats&&data.recCats.length)?data.recCats:(()=>{const c=REC_GROUPS.map(g=>g.g); if(!c.includes("その他"))c.push("その他"); return c;})();
-  const rItems=(()=>{ const base=(data.recItems&&data.recItems.length)?data.recItems.slice():(()=>{const a=[]; REC_GROUPS.forEach(g=>g.items.forEach(n=>a.push({id:g.g+"_"+n,name:n,cat:g.g}))); (data.recordItems||[]).forEach(n=>{ if(!REC_BUILTIN[n]&&!a.find(x=>x.name===n)) a.push({id:"c_"+n,name:n,cat:"その他"}); }); return a;})(); const REQ=[{name:"生理",cat:"症状"}]; REQ.forEach(r=>{ if(!base.find(x=>x.name===r.name)){ const cc=(data.recCats&&data.recCats.length&&data.recCats.includes(r.cat))?r.cat:(base[0]?base[0].cat:"その他"); base.push({id:"req_"+r.name,name:r.name,cat:cc}); } }); return base; })();
+  const rItems=(()=>{ let base=(data.recItems&&data.recItems.length)?data.recItems.slice():(()=>{const a=[]; REC_GROUPS.forEach(g=>g.items.forEach(n=>a.push({id:g.g+"_"+n,name:n,cat:g.g}))); (data.recordItems||[]).forEach(n=>{ if(!REC_BUILTIN[n]&&!a.find(x=>x.name===n)) a.push({id:"c_"+n,name:n,cat:"その他"}); }); return a;})(); const REQ=[{name:"生理",cat:"症状"},{name:"余暇活動",cat:"生活・活動"}]; REQ.forEach(r=>{ if(!base.find(x=>x.name===r.name)){ const cc=(data.recCats&&data.recCats.length&&data.recCats.includes(r.cat))?r.cat:(base[0]?base[0].cat:"その他"); base.push({id:"req_"+r.name,name:r.name,cat:cc}); } }); const VARDEF={"余暇活動":{variants:["積極的に参加","笑顔が見られた","楽しまれていた","集中されていた","落ち着いて過ごされた","他者と交流された","自分から取り組まれた","満足された様子"],multi:true},"起床":{variants:["自分で起床","声かけ1回で起床","声かけ数回で起床","時間をかけて起床","なかなか起きられず","早く目覚めていた"],multi:false}}; base=base.map(x=> (VARDEF[x.name] && !(x.variants&&x.variants.length)) ? Object.assign({},x,VARDEF[x.name]) : x ); return base; })();
   const [sel,setSel]=useState([]);
   const [date,setDate]=useState(()=>{const n=new Date();return (n.getHours()*60+n.getMinutes())<(15*60)?iso(addDays(n,-1)):iso(n);});
   const [note,setNote]=useState(""); const [toast,setToast]=useState("");
@@ -1275,7 +1302,8 @@ function Records({me,data,persist,reload}){
   const toggleUser=(u)=> setSel(s=> s.includes(u)? s.filter(x=>x!==u):[...s,u]);
   const flash=(m)=>{ setToast(m); setTimeout(()=>setToast(""),1800); };
   const hm=(ts)=>{ const d=new Date(ts); return String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0"); };
-  const _bs=new Date(date+"T15:00:00"); const _be=(()=>{const e=addDays(new Date(date+"T00:00:00"),1); e.setHours(15,0,0,0); return e;})();
+  const logDate=useTime?mDate:date;
+  const _bs=new Date(logDate+"T15:00:00"); const _be=(()=>{const e=addDays(new Date(logDate+"T00:00:00"),1); e.setHours(15,0,0,0); return e;})();
   const log=(data.records||[]).filter(r=>r&&r.ts).filter(r=>{ const t=new Date(r.ts); return t>=_bs && t<_be; }).sort((a,b)=>String(b.ts||"").localeCompare(String(a.ts||"")));
   const effDate=useTime?mDate:date; const rplan=(data.dayPlans||{})[effDate]||{}; const dayUsers=(rplan.users&&rplan.users.length)?rplan.users:USERS4;
   const pushRecords=async(item,extra,tsOverride)=>{ if(sel.length===0){ flash("利用者を選んでください"); return false; } const ts=tsOverride||new Date().toISOString(); const targets=sel.filter(u=>dayUsers.includes(u)); if(!targets.length){ flash("利用者を選んでください"); return false; } const recs=targets.map(u=>Object.assign({id:uid(),ts,user:u,item},extra||{})); try{ for(const rc of recs) await recAdd(rc); await reload(); return true; }catch(e){ flash("保存に失敗しました"); return false; } };
@@ -1412,11 +1440,11 @@ function Records({me,data,persist,reload}){
         {cats.map(cat=>{ const list=rItems.filter(i=>i.cat===cat); if(!list.length) return null; return <div key={cat} style={{marginBottom:"8px"}}><div className="tiny" style={{fontWeight:700,color:"#C9788F"}}>{cat}</div>{list.map(i=>(<div key={i.id} className="cat-row"><button className="cat-name catname-btn" onClick={()=>openItemEdit(i)} onTouchStart={()=>lpStart(i)} onTouchEnd={lpCancel} onTouchMove={lpCancel} onMouseLeave={lpCancel}>✎ {i.name}{i.variants&&i.variants.length?(" ["+i.variants.join("・")+"]"):""}{i.multi?"（複）":""}</button><button className="mini-key" onClick={()=>itemMove(i.id,-1)}>↑</button><button className="mini-key" onClick={()=>itemMove(i.id,1)}>↓</button><button className="mini-key" onClick={()=>itemSetVars(i.id)}>種</button><button className="mini-key" onClick={()=>itemToggleMulti(i.id)}>{i.multi?"複✓":"複"}</button><select className="cat-sel" value={i.cat} onChange={e=>itemSetCat(i.id,e.target.value)}>{cats.map(c=><option key={c} value={c}>{c}</option>)}</select><button className="mini-del" onClick={()=>itemDel(i.id)}>🗑</button></div>))}</div>; })}
       </div>}
       <div className="tl-datenav" style={{marginTop:14}}>
-        <button className="link-btn" onClick={()=>setDate(iso(addDays(new Date(date+"T00:00:00"),-1)))}>‹ 前の勤務</button>
-        <b>{fmtDate(date)}（勤務）</b>
-        <button className="link-btn" onClick={()=>setDate(iso(addDays(new Date(date+"T00:00:00"),1)))}>次の勤務 ›</button>
+        <button className="link-btn" onClick={()=>{ const nd=iso(addDays(new Date(logDate+"T00:00:00"),-1)); useTime?setMDate(nd):setDate(nd); }}>‹ 前の勤務</button>
+        <b>{fmtDate(logDate)}（勤務）{useTime&&<span className="tiny" style={{color:"#B25E77"}}>　指定日</span>}</b>
+        <button className="link-btn" onClick={()=>{ const nd=iso(addDays(new Date(logDate+"T00:00:00"),1)); useTime?setMDate(nd):setDate(nd); }}>次の勤務 ›</button>
       </div>
-      <p className="tiny" style={{textAlign:"center",marginTop:2}}>15:30〜翌9:30の記録をまとめて表示します</p>
+      <p className="tiny" style={{textAlign:"center",marginTop:2}}>15:30〜翌9:30の記録をまとめて表示します{useTime&&"（過去日時の指定中は、指定した日の記録を表示します）"}</p>
       {me.isAdmin&&log.length>0&&<div className="row-end" style={{marginBottom:6}}><button className="mini-del" style={{padding:"6px 12px",borderRadius:"10px"}} onClick={delAllShown}>🗑 この勤務日の記録を一括削除</button></div>}
       {log.length===0&&<p className="empty">まだ記録がありません。</p>}
       <div className="rec-log">{log.map(r=>(<div key={r.id} className="rec-row">
@@ -1646,7 +1674,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.85〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.86〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
