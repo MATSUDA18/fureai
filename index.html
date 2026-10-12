@@ -788,7 +788,7 @@ function Nisshi({me,data,persist}){
   const buildInitial=(obj)=>Object.assign({name:user,period:fmtDate(date)+" 16:00 〜 翌朝",writer:me.name,v1:_V1,v2:_V2,vitals1:_vtext(_V1),vitals2:_vtext(_V2),urine:_findT(/排\s*尿/),stool:_findT(/排\s*便/),medication:"",staff:[nplan.s1,nplan.s2].filter(Boolean).join("・"),program:progText,dinnerMenu:"",dinnerAmount:"",dinnerMainLeft:_lv(_dnR,"mainLeft"),dinnerSideLeft:_lv(_dnR,"sideLeft"),breakfastMenu:"",breakfastAmount:"",breakfastMainLeft:_lv(_brR,"mainLeft"),breakfastSideLeft:_lv(_brR,"sideLeft"),appearance:"",special:"",nextRequest:"",nextVisitDate:""}, obj||{}, {name:user,period:fmtDate(date)+" 16:00 〜 翌朝"});
   const emptyForm=()=>{ setErr(""); setF(buildInitial({program:progText})); };
   const markKw=(ff)=> ff.status==="submitted"?("#SUB:"+(ff.submittedBy||"")+"#"):ff.status==="reviewed"?("#REV:"+(ff.reviewedBy||"")+"#"):"";
-  const persistNs=async(st,extra,msg)=>{ if(!f)return; if(!SB_ON){flash2("共有DBが必要です");return;} try{ const status=st||f.status||"draft"; const ff=Object.assign({},f,{status},extra||{}); const id="ns_"+(ff.name||"user")+"_"+date; const kw=[ff.name,ff.appearance,ff.special,ff.program,ff.staff,ff.dinnerMenu,ff.breakfastMenu,ff.vitals1,markKw(ff)].filter(Boolean).join(" "); await nsSave({id,user_name:ff.name||"",biz_date:date,sex:(resSex[ff.name]||""),keywords:kw,data:ff,created:new Date().toISOString()}); setF(ff); flash2(msg||"保存しました"); }catch(e){ setErr("保存に失敗（nisshi表の設定をご確認ください）"); } };
+  const persistNs=async(st,extra,msg)=>{ if(!f)return; if(!SB_ON){flash2("共有DBが必要です");return;} try{ const status=st||f.status||"draft"; const ff=Object.assign({},f,{status},extra||{}); const id="ns_"+(ff.name||"user")+"_"+date; const kw=[ff.name,ff.appearance,ff.special,ff.program,ff.staff,ff.dinnerMenu,ff.breakfastMenu,ff.vitals1,markKw(ff),(ff.styleRef?"#STYLEREF#":"")].filter(Boolean).join(" "); await nsSave({id,user_name:ff.name||"",biz_date:date,sex:(resSex[ff.name]||""),keywords:kw,data:ff,created:new Date().toISOString()}); setF(ff); flash2(msg||"保存しました"); }catch(e){ setErr("保存に失敗（nisshi表の設定をご確認ください）"); } };
   const saveNisshi=()=>persistNs(f&&f.status||"draft",null,"日誌を保存しました（下書き）");
   const submitNisshi=async()=>{ if(!f)return; if(!(f.appearance||"").trim()){ if(!confirm("「利用のご様子」が空のようです。このまま提出しますか？"))return; } await persistNs("submitted",{submittedBy:me.name,submittedAt:new Date().toISOString()},"提出しました（管理者の確認待ち）"); };
   const markReviewed=async()=>{ await persistNs("reviewed",{reviewedBy:me.name,reviewedAt:new Date().toISOString()},"確認済みにしました"); if(subRows!==null) loadSubmitted(); };
@@ -800,7 +800,7 @@ function Nisshi({me,data,persist}){
     let _plan=(_tp[_nd]&&_tp[_nd][_key])||"";
     if(!_plan){ const ys=Object.keys(_tp).sort((a,b)=>Number(b)-Number(a)); for(const y of ys){ if(_tp[y]&&_tp[y][_key]){ _plan=_tp[y][_key]; break; } } }
     if(_plan) s+="\n\n【個別訓練計画（本人の目標・取り組むこと）】\n"+_plan;
-    try{ if(SB_ON){ const list=await nsList(); const mine=(list||[]).filter(r=>r.user_name===user && String(r.biz_date)<date).sort((a,b)=>String(b.biz_date).localeCompare(String(a.biz_date))); if(mine[0]){ const full=await nsGet(mine[0].id); if(full&&full.data&&full.data.appearance){ s+="\n\n【前回（"+mine[0].biz_date+"）のご様子】\n"+String(full.data.appearance).slice(0,800); } } const paper=(list||[]).filter(r=>r.user_name===user && String(r.keywords||"").includes("【紙】")).sort((a,b)=>String(b.biz_date).localeCompare(String(a.biz_date))); if(paper[0] && (!mine[0]||paper[0].id!==mine[0].id)){ const pf=await nsGet(paper[0].id); if(pf&&pf.data&&pf.data.appearance){ s+="\n\n【過去の記録（"+paper[0].biz_date+"・参考）】\n"+String(pf.data.appearance).slice(0,800); } } } }catch(e){}
+    try{ if(SB_ON){ const list=await nsList(); const mine=(list||[]).filter(r=>r.user_name===user && String(r.biz_date)<date).sort((a,b)=>String(b.biz_date).localeCompare(String(a.biz_date))); if(mine[0]){ const full=await nsGet(mine[0].id); if(full&&full.data&&full.data.appearance){ s+="\n\n【前回（"+mine[0].biz_date+"）のご様子】\n"+String(full.data.appearance).slice(0,800); } } const paper=(list||[]).filter(r=>r.user_name===user && String(r.keywords||"").includes("【紙】")).sort((a,b)=>String(b.biz_date).localeCompare(String(a.biz_date))); if(paper[0] && (!mine[0]||paper[0].id!==mine[0].id)){ const pf=await nsGet(paper[0].id); if(pf&&pf.data&&pf.data.appearance){ s+="\n\n【過去の記録（"+paper[0].biz_date+"・参考）】\n"+String(pf.data.appearance).slice(0,800); } } const styled=(list||[]).filter(r=>String(r.keywords||"").includes("#STYLEREF#")).sort((a,b)=>String(b.biz_date).localeCompare(String(a.biz_date))).slice(0,3); if(styled.length){ let ex=""; for(const r of styled){ const sf=await nsGet(r.id); if(sf&&sf.data&&sf.data.appearance){ ex+="\n・"+String(sf.data.appearance).slice(0,400); } } if(ex) s+="\n\n【表現の参考（管理者が整えた過去のまとめ。文体・言い回し・まとめ方・長さをこれに寄せる。内容はコピーしない）】"+ex; } } }catch(e){}
     return s;
   };
   // トーン調整（ご様子の本文だけ作り直す）
@@ -842,13 +842,15 @@ function Nisshi({me,data,persist}){
     }catch(e){ setErr("接続に失敗しました。通信状況をご確認ください。"); }
     setLoading(false);
   };
+  const dlXlsx=(blob,name)=>{ try{ if(navigator.msSaveBlob){ navigator.msSaveBlob(blob,name); return; } }catch(e){} const url=URL.createObjectURL(blob); const a=document.createElement("a"); a.href=url; a.download=name; a.rel="noopener"; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),4000); };
   const toExcel=async()=>{
     try{
       const _next=[f.nextRequest,...activeNotices(date)].filter(x=>x&&String(x).trim()).join("\n");
       const res=await authFetch(SUPABASE_URL+"/functions/v1/nisshi-excel",{method:"POST",body:JSON.stringify(Object.assign({},f,{date,nextRequest:_next}))});
       if(!res.ok){ let m=""; try{ m=(await res.json()).error||""; }catch(e){} throw new Error("func "+res.status+" "+m); }
-      const blob=await res.blob();
-      const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="利用日誌_"+(f.name||"")+"_"+date+".xlsx"; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+      const buf=await res.arrayBuffer();
+      const blob=new Blob([buf],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
+      dlXlsx(blob,"利用日誌_"+(f.name||"")+"_"+date+".xlsx");
     }catch(e){ setErr("サーバー出力に失敗しました（"+String(e&&e.message||e)+"）。簡易版で出力します。"); toExcelLocal(); }
   };
   const toExcelLocal=()=>{
@@ -888,7 +890,9 @@ function Nisshi({me,data,persist}){
     const rows=[]; for(let i=0;i<48;i++){ let h=29.1; if(i<2)h=36; else if(i===2)h=24; else if(i===45)h=15; else if(i===46)h=24; rows[i]={hpt:h}; }
     ws["!rows"]=rows;
     const wb=XU.book_new(); XU.book_append_sheet(wb,ws,"利用日誌");
-    XLSX.writeFile(wb,"利用日誌_"+(f.name||"")+"_"+date+".xlsx");
+    const out=XLSX.write(wb,{bookType:"xlsx",type:"array"});
+    const blob=new Blob([out],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
+    dlXlsx(blob,"利用日誌_"+(f.name||"")+"_"+date+".xlsx");
   };
   return <Section title="日誌まとめ" note="利用者と日付を選び、その日の記録からAIが「利用のご様子」などを下書きします。作成後は保存でき、あとから検索できます。">
     <div className="tl-modes" style={{marginBottom:12}}>
@@ -1007,7 +1011,9 @@ function Nisshi({me,data,persist}){
           <Btn kind="ghost2" onClick={()=>adjustAppearance("soft")}>🍃 もっと控えめに</Btn>
           <Btn kind="ghost2" onClick={()=>adjustAppearance("normal")}>🔁 標準で作り直す</Btn>
         </div>}
-        {(()=>{ const n=(f.appearance||"").length; const over=n>220; return <div className="tiny" style={{marginTop:4,textAlign:"right",color:over?"#C0392B":"#B0895A"}}>{n}字 ／ 目安：約220字まで（12ptで読みやすく1枚に収まります）{over?"。超える分はまとめ欄が少し広がります。具体的な出来事は活動記録に残し、まとめは簡潔に。":""}</div>; })()}</div>
+        {(()=>{ const n=(f.appearance||"").length; const over=n>220; return <div className="tiny" style={{marginTop:4,textAlign:"right",color:over?"#C0392B":"#B0895A"}}>{n}字 ／ 目安：約220字まで（12ptで読みやすく1枚に収まります）{over?"。超える分はまとめ欄が少し広がります。具体的な出来事は活動記録に残し、まとめは簡潔に。":""}</div>; })()}
+        {me.isAdmin&&<label className="chk" style={{marginTop:6,background:"#FFF6F8",borderRadius:10,padding:"8px 10px",border:"1px solid #F0D3DB"}}><input type="checkbox" checked={!!f.styleRef} onChange={e=>setField("styleRef",e.target.checked)}/> ✍ このまとめ方を今後のAIまとめの<b>手本にする</b>（管理者が整えた見本として参照）</label>}
+        {f.styleRef&&<div className="tiny" style={{color:"#B25E77",fontWeight:700,marginTop:2}}>✍ 管理者修正・AIまとめ参照見本</div>}</div>
       <div className="nf"><label>特記事項</label><textarea rows={3} value={f.special} onChange={e=>setField("special",e.target.value)}/></div>
       <div className="nf"><label>次回利用予定日</label><input type="date" value={f.nextVisitDate||""} onChange={e=>setField("nextVisitDate",e.target.value)}/>{f.nextVisitDate&&<div className="tiny">{(()=>{const d=new Date(f.nextVisitDate+"T00:00:00");return (d.getMonth()+1)+"月"+d.getDate()+"日（"+["日","月","火","水","木","金","土"][d.getDay()]+"曜日）";})()}</div>}</div>
       <div className="nf"><label>次回へのお願い（日程・ご連絡など。※家族向けのAI文は入りません）</label><input value={f.nextRequest} onChange={e=>setField("nextRequest",e.target.value)}/>{activeNotices(date).length>0&&<div className="tiny" style={{marginTop:4,color:"#B25E77"}}>この期間の共通連絡（自動で出力に入ります）：{activeNotices(date).map((t,i)=><div key={i}>・{t}</div>)}</div>}</div>
@@ -1349,9 +1355,9 @@ function Records({me,data,persist,reload}){
   const addNoteAt=async()=>{ if(!note.trim()){ flash("記録内容を入力してください"); return; } if(await pushRecords(note.trim(),null,bizTs())){ flash("記録しました（指定時刻）"); setNote(""); } };
   const delRec=async(id)=>{ try{ await recDelete(id); await reload(); }catch(e){} };
   const delAllShown=async()=>{ if(!logFiltered.length){flash("削除する記録がありません");return;} if(!confirm("本当に削除して良いですか？\n表示中の記録 "+logFiltered.length+" 件をすべて削除します。（元に戻せません）"))return; if(!confirm("最終確認です。よろしいですか？"))return; try{ for(const r of logFiltered){ await recDelete(r.id); } await reload(); flash("削除しました"); }catch(e){ setErr("一括削除に失敗しました"); } };
-  const openEditRec=(r)=>{ const d=new Date(r.ts); setEdRec({id:r.id,user:r.user,abn:r.abn,thumb:r.thumb,photoId:r.photoId,y:d.getFullYear(),mo:d.getMonth()+1,da:d.getDate(),h:d.getHours(),mi:d.getMinutes(),item:r.item||""}); };
+  const openEditRec=(r)=>{ const d=new Date(r.ts); const base={id:r.id,user:r.user,abn:r.abn,thumb:r.thumb,photoId:r.photoId,y:d.getFullYear(),mo:d.getMonth()+1,da:d.getDate(),h:d.getHours(),mi:d.getMinutes(),item:r.item||""}; const isMeal=(r.meal!=null||r.mainLeft!=null||/^(夕食|朝食)[　 ]*主食/.test(r.item||"")); if(isMeal){ const it=r.item||""; const memo=it.includes("：")?it.split("：").slice(1).join("："):""; base.isMeal=true; base.meal=r.meal||(it.indexOf("朝食")===0?"朝":"晩"); base.mainLeft=(r.mainLeft==null?"":String(r.mainLeft)); base.sideLeft=(r.sideLeft==null?"":String(r.sideLeft)); base.memo=memo; } setEdRec(base); };
   const setER=(k,v)=>setEdRec(p=>Object.assign({},p,{[k]:v}));
-  const saveEditRec=async()=>{ const e=edRec; if(!(e.item||"").trim()){flash("内容を入力してください");return;} const ts=new Date(e.y,e.mo-1,e.da,e.h,e.mi,0).toISOString(); const rec={id:e.id,ts,user:e.user,item:e.item.trim()}; if(e.abn)rec.abn=true; if(e.thumb)rec.thumb=e.thumb; if(e.photoId)rec.photoId=e.photoId; try{ await recUpdate(e.id,rec); await reload(); setEdRec(null); flash("修正しました"); }catch(err){ flash("修正に失敗しました"); } };
+  const saveEditRec=async()=>{ const e=edRec; const ts=new Date(e.y,e.mo-1,e.da,e.h,e.mi,0).toISOString(); const rec={id:e.id,ts,user:e.user}; if(e.isMeal){ const lab=(v)=>(v===""||v==null)?"—":(Number(v)===0?"完食":v+"割残し"); rec.item=(e.meal==="朝"?"朝食":"夕食")+"　主食"+lab(e.mainLeft)+"／副食"+lab(e.sideLeft)+((e.memo||"").trim()?("："+e.memo.trim()):""); rec.meal=e.meal; rec.mainLeft=(e.mainLeft===""?null:Number(e.mainLeft)); rec.sideLeft=(e.sideLeft===""?null:Number(e.sideLeft)); } else { if(!(e.item||"").trim()){flash("内容を入力してください");return;} rec.item=e.item.trim(); } if(e.abn)rec.abn=true; if(e.thumb)rec.thumb=e.thumb; if(e.photoId)rec.photoId=e.photoId; try{ await recUpdate(e.id,rec); await reload(); setEdRec(null); flash("修正しました"); }catch(err){ flash("修正に失敗しました"); } };
   const submitVit=async()=>{ const v=vit; const item=buildVitItem(v); if(item==="🩺 "){ flash("数値を入力してください"); return; } const abn=vitAbn(v); if(await pushRecords(item, abn?{abn:true}:null, useTime?bizTs():undefined)){ if(abn){ setVit(null); setValert(v.re?"second":"first"); } else { flash("バイタルを記録しました"); setVit(null); } } };
   const loadPhotos=async()=>{ if(!SB_ON){ setPhotos([]); return; } try{ setPhotos(await sbListPhotos(af,at)); }catch(e){ setPhotos([]); } };
   useEffect(()=>{ if(view==="album"){ setPhotos(null); loadPhotos(); } },[view,af,at]);
@@ -1544,7 +1550,14 @@ function Records({me,data,persist,reload}){
         <label className="field"><span>時</span><select value={edRec.h} onChange={e=>setER("h",+e.target.value)}>{EHH.map(h=><option key={h} value={h}>{h}時</option>)}</select></label>
         <label className="field"><span>分</span><select value={edRec.mi} onChange={e=>setER("mi",+e.target.value)}>{EMI.map(m=><option key={m} value={m}>{String(m).padStart(2,"0")}分</option>)}</select></label>
       </div>
-      <Area label="内容" rows={3} value={edRec.item} onChange={e=>setER("item",e.target.value)}/>
+      {edRec.isMeal?<>
+        <div className="chk-row"><label className="chk"><input type="radio" name="edmeal" checked={edRec.meal!=="朝"} onChange={()=>setER("meal","晩")}/>夕食</label><label className="chk"><input type="radio" name="edmeal" checked={edRec.meal==="朝"} onChange={()=>setER("meal","朝")}/>朝食</label></div>
+        <div className="chk-grid" style={{gridTemplateColumns:"repeat(2,1fr)"}}>
+          <label className="field"><span>主食の残量</span><select value={edRec.mainLeft} onChange={e=>setER("mainLeft",e.target.value)}><option value="">—（未記入）</option>{[0,1,2,3,4,5,6,7,8,9,10].map(n=><option key={n} value={String(n)}>{n===0?"完食":n+"割残し"}</option>)}</select></label>
+          <label className="field"><span>副食の残量</span><select value={edRec.sideLeft} onChange={e=>setER("sideLeft",e.target.value)}><option value="">—（未記入）</option>{[0,1,2,3,4,5,6,7,8,9,10].map(n=><option key={n} value={String(n)}>{n===0?"完食":n+"割残し"}</option>)}</select></label>
+        </div>
+        <Area label="メモ（任意）" rows={2} value={edRec.memo||""} onChange={e=>setER("memo",e.target.value)}/>
+      </>:<Area label="内容" rows={3} value={edRec.item} onChange={e=>setER("item",e.target.value)}/>}
       <div className="row-end"><Btn onClick={saveEditRec}>修正を保存</Btn></div>
     </Modal>}
     {pv&&<Modal title="記録写真" tint="#C9788F" onClose={()=>setPv(null)}>
@@ -1711,7 +1724,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.88〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.89〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
