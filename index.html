@@ -761,6 +761,13 @@ function Nisshi({me,data,persist}){
   useEffect(()=>{ if(mode==="import"&&ipRows===null) loadPaper(); },[mode]);
   const savePaper=async()=>{ if(!SB_ON){ setIpMsg("共有DBが必要です"); return; } const u=ipUser||allResidents[0]; if(!u){ setIpMsg("利用者を選んでください"); return; } if(!ipText.trim()){ setIpMsg("内容を入力してください"); return; } try{ const id="paper_"+u+"_"+ipDate; const dataObj={name:u,biz_date:ipDate,period:fmtDate(ipDate),appearance:ipText.trim(),source:"paper",writer:me.name,created:new Date().toISOString()}; await nsSave({id,user_name:u,biz_date:ipDate,sex:(resSex[u]||""),keywords:"【紙】過去記録 "+ipText.trim().slice(0,200),data:dataObj,created:new Date().toISOString()}); setIpText(""); setIpMsg("過去記録を保存しました（AIまとめの参照データになります）。"); loadPaper(); }catch(e){ setIpMsg("保存に失敗（nisshi表の設定をご確認ください）。"); } };
   const delPaper=async(id)=>{ if(!confirm("この過去記録を削除しますか？"))return; try{ await nsDelete(id); loadPaper(); }catch(e){} };
+  // 提出BOX（職員が提出→管理者が確認・印刷）
+  const [subRows,setSubRows]=useState(null); const [subView,setSubView]=useState("待ち");
+  const loadSubmitted=async()=>{ if(!SB_ON){setSubRows([]);return;} try{ setSubRows(await nsList()); }catch(e){ setSubRows([]); } };
+  useEffect(()=>{ if(mode==="review"&&subRows===null) loadSubmitted(); },[mode]);
+  const submittedList=(subRows||[]).filter(r=>{ const k=String(r.keywords||""); return subView==="待ち"?k.includes("#SUB:"):k.includes("#REV:"); });
+  const kwSubmitter=(k)=>{ const m=String(k||"").match(/#SUB:([^#]*)#/); return m?m[1]:""; };
+  const kwReviewer=(k)=>{ const m=String(k||"").match(/#REV:([^#]*)#/); return m?m[1]:""; };
   const openNs=async(row)=>{ try{ const full=await nsGet(row.id); if(full&&full.data){ setF(full.data); setDate(row.biz_date||date); setUser(row.user_name||user); setMode("edit"); } }catch(e){} };
   const delNs=async(id)=>{ if(!confirm("この日誌を削除しますか？"))return; try{ await nsDelete(id); loadNs(); }catch(e){} };
   const hm=(ts)=>{ const d=new Date(ts); return String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0"); };
@@ -780,7 +787,11 @@ function Nisshi({me,data,persist}){
   const _lv=(r,k)=>(r&&r[k]!=null)?r[k]:"";
   const buildInitial=(obj)=>Object.assign({name:user,period:fmtDate(date)+" 16:00 〜 翌朝",writer:me.name,v1:_V1,v2:_V2,vitals1:_vtext(_V1),vitals2:_vtext(_V2),urine:_findT(/排\s*尿/),stool:_findT(/排\s*便/),medication:"",staff:[nplan.s1,nplan.s2].filter(Boolean).join("・"),program:progText,dinnerMenu:"",dinnerAmount:"",dinnerMainLeft:_lv(_dnR,"mainLeft"),dinnerSideLeft:_lv(_dnR,"sideLeft"),breakfastMenu:"",breakfastAmount:"",breakfastMainLeft:_lv(_brR,"mainLeft"),breakfastSideLeft:_lv(_brR,"sideLeft"),appearance:"",special:"",nextRequest:"",nextVisitDate:""}, obj||{}, {name:user,period:fmtDate(date)+" 16:00 〜 翌朝"});
   const emptyForm=()=>{ setErr(""); setF(buildInitial({program:progText})); };
-  const saveNisshi=async()=>{ if(!f)return; if(!SB_ON){flash2("共有DBが必要です");return;} try{ const id="ns_"+(f.name||"user")+"_"+date; const kw=[f.name,f.appearance,f.special,f.program,f.staff,f.dinnerMenu,f.breakfastMenu,f.vitals1].filter(Boolean).join(" "); await nsSave({id,user_name:f.name||"",biz_date:date,sex:(resSex[f.name]||""),keywords:kw,data:f,created:new Date().toISOString()}); flash2("日誌を保存しました"); }catch(e){ setErr("保存に失敗（nisshi表の設定をご確認ください）"); } };
+  const markKw=(ff)=> ff.status==="submitted"?("#SUB:"+(ff.submittedBy||"")+"#"):ff.status==="reviewed"?("#REV:"+(ff.reviewedBy||"")+"#"):"";
+  const persistNs=async(st,extra,msg)=>{ if(!f)return; if(!SB_ON){flash2("共有DBが必要です");return;} try{ const status=st||f.status||"draft"; const ff=Object.assign({},f,{status},extra||{}); const id="ns_"+(ff.name||"user")+"_"+date; const kw=[ff.name,ff.appearance,ff.special,ff.program,ff.staff,ff.dinnerMenu,ff.breakfastMenu,ff.vitals1,markKw(ff)].filter(Boolean).join(" "); await nsSave({id,user_name:ff.name||"",biz_date:date,sex:(resSex[ff.name]||""),keywords:kw,data:ff,created:new Date().toISOString()}); setF(ff); flash2(msg||"保存しました"); }catch(e){ setErr("保存に失敗（nisshi表の設定をご確認ください）"); } };
+  const saveNisshi=()=>persistNs(f&&f.status||"draft",null,"日誌を保存しました（下書き）");
+  const submitNisshi=async()=>{ if(!f)return; if(!(f.appearance||"").trim()){ if(!confirm("「利用のご様子」が空のようです。このまま提出しますか？"))return; } await persistNs("submitted",{submittedBy:me.name,submittedAt:new Date().toISOString()},"提出しました（管理者の確認待ち）"); };
+  const markReviewed=async()=>{ await persistNs("reviewed",{reviewedBy:me.name,reviewedAt:new Date().toISOString()},"確認済みにしました"); if(subRows!==null) loadSubmitted(); };
   const setField=(k,v)=>setF(p=>Object.assign({},p,{[k]:v}));
   // 計画＋前回記録のコンテキストをまとめる
   const gatherCtx=async()=>{
@@ -884,7 +895,22 @@ function Nisshi({me,data,persist}){
       <button className={"seg "+(mode==="edit"?"on":"")} onClick={()=>setMode("edit")}>作成</button>
       <button className={"seg "+(mode==="search"?"on":"")} onClick={()=>setMode("search")}>過去の日誌を検索</button>
       <button className={"seg "+(mode==="import"?"on":"")} onClick={()=>setMode("import")}>過去記録の取り込み</button>
+      {me.isAdmin&&<button className={"seg "+(mode==="review"?"on":"")} onClick={()=>setMode("review")}>📥 提出BOX</button>}
     </div>
+    {mode==="review"&&me.isAdmin&&<div>
+      <div className="tl-modes" style={{marginBottom:10}}>
+        <button className={"seg "+(subView==="待ち"?"on":"")} onClick={()=>setSubView("待ち")}>確認待ち</button>
+        <button className={"seg "+(subView==="済"?"on":"")} onClick={()=>setSubView("済")}>確認済み</button>
+      </div>
+      <p className="tiny">職員が提出した日誌です。「開いて確認」で内容を確認し、Excel出力・印刷したうえで「✅ 確認済みにする」を押してください。</p>
+      {subRows===null&&<p className="empty">読み込み中…</p>}
+      {subRows!==null&&submittedList.length===0&&<p className="empty">{subView==="待ち"?"確認待ちの日誌はありません。":"確認済みの日誌はありません。"}</p>}
+      <div className="rec-log">{submittedList.sort((a,b)=>String(b.biz_date).localeCompare(String(a.biz_date))).map(r=>(<div key={r.id} className="rec-row">
+        <span className="rec-time">{r.biz_date}</span><span className="chip">{r.user_name}</span>
+        <span className="tiny" style={{color:"#8A6B74"}}>{subView==="待ち"?("提出："+(kwSubmitter(r.keywords)||"—")):("確認："+(kwReviewer(r.keywords)||"—"))}</span>
+        <span className="rec-item"><button className="link-btn" onClick={()=>openNs(r)}>開いて確認 ›</button></span>
+      </div>))}</div>
+    </div>}
     {mode==="import"&&<div>
       <div className="tl-editpanel">
         <p className="tiny" style={{marginTop:0}}>紙に書かれた過去の記録を<b>テキストで</b>取り込みます。ここに入れた内容は、同じ利用者の次のAIまとめを作るときに<b>参考データ</b>として使われます（印刷される日誌そのものには出ません）。</p>
@@ -985,10 +1011,13 @@ function Nisshi({me,data,persist}){
       <div className="nf"><label>特記事項</label><textarea rows={3} value={f.special} onChange={e=>setField("special",e.target.value)}/></div>
       <div className="nf"><label>次回利用予定日</label><input type="date" value={f.nextVisitDate||""} onChange={e=>setField("nextVisitDate",e.target.value)}/>{f.nextVisitDate&&<div className="tiny">{(()=>{const d=new Date(f.nextVisitDate+"T00:00:00");return (d.getMonth()+1)+"月"+d.getDate()+"日（"+["日","月","火","水","木","金","土"][d.getDay()]+"曜日）";})()}</div>}</div>
       <div className="nf"><label>次回へのお願い（日程・ご連絡など。※家族向けのAI文は入りません）</label><input value={f.nextRequest} onChange={e=>setField("nextRequest",e.target.value)}/>{activeNotices(date).length>0&&<div className="tiny" style={{marginTop:4,color:"#B25E77"}}>この期間の共通連絡（自動で出力に入ります）：{activeNotices(date).map((t,i)=><div key={i}>・{t}</div>)}</div>}</div>
+      {f&&f.status&&f.status!=="draft"&&<div className="tiny" style={{marginBottom:6,fontWeight:700,color:f.status==="reviewed"?"#2E8B57":"#B25E77"}}>{f.status==="submitted"?("📤 提出済み"+(f.submittedBy?("（提出者："+f.submittedBy+"）"):"")+"・管理者の確認待ち"):("✅ 確認済み"+(f.reviewedBy?("（"+f.reviewedBy+"）"):""))}</div>}
       <div className="n-actions no-print">
-        <Btn onClick={saveNisshi}>💾 保存</Btn>
+        <Btn onClick={saveNisshi}>💾 下書き保存</Btn>
+        <Btn onClick={submitNisshi}>📤 提出する</Btn>
         <Btn onClick={()=>window.print()}>🖨 印刷</Btn>
         <Btn kind="ghost2" onClick={toExcel}>⬇ Excel出力</Btn>
+        {me.isAdmin&&<Btn onClick={markReviewed}>✅ 確認済みにする</Btn>}
       </div>
     </div>}
     </>}
@@ -1303,8 +1332,11 @@ function Records({me,data,persist,reload}){
   const flash=(m)=>{ setToast(m); setTimeout(()=>setToast(""),1800); };
   const hm=(ts)=>{ const d=new Date(ts); return String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0"); };
   const logDate=useTime?mDate:date;
+  const [showAllUsers,setShowAllUsers]=useState(false); const [showLogCal,setShowLogCal]=useState(false);
+  const setLogDate=(nd)=>{ if(!nd)return; useTime?setMDate(nd):setDate(nd); };
   const _bs=new Date(logDate+"T15:00:00"); const _be=(()=>{const e=addDays(new Date(logDate+"T00:00:00"),1); e.setHours(15,0,0,0); return e;})();
   const log=(data.records||[]).filter(r=>r&&r.ts).filter(r=>{ const t=new Date(r.ts); return t>=_bs && t<_be; }).sort((a,b)=>String(b.ts||"").localeCompare(String(a.ts||"")));
+  const logFiltered=(sel.length>0&&!showAllUsers)?log.filter(r=>sel.includes(r.user)):log;
   const effDate=useTime?mDate:date; const rplan=(data.dayPlans||{})[effDate]||{}; const dayUsers=(rplan.users&&rplan.users.length)?rplan.users:USERS4;
   const pushRecords=async(item,extra,tsOverride)=>{ if(sel.length===0){ flash("利用者を選んでください"); return false; } const ts=tsOverride||new Date().toISOString(); const targets=sel.filter(u=>dayUsers.includes(u)); if(!targets.length){ flash("利用者を選んでください"); return false; } const recs=targets.map(u=>Object.assign({id:uid(),ts,user:u,item},extra||{})); try{ for(const rc of recs) await recAdd(rc); await reload(); return true; }catch(e){ flash("保存に失敗しました"); return false; } };
   const bizTs=()=>{ const bd=new Date(mDate+"T00:00:00"); const cal=(+mH>=15)?bd:addDays(bd,1); cal.setHours(+mH,+mM,0,0); return cal.toISOString(); };
@@ -1316,7 +1348,7 @@ function Records({me,data,persist,reload}){
   const addNote=async()=>{ if(!note.trim())return; if(await pushRecords(note.trim())){ flash("記録しました（現在時刻）"); setNote(""); } };
   const addNoteAt=async()=>{ if(!note.trim()){ flash("記録内容を入力してください"); return; } if(await pushRecords(note.trim(),null,bizTs())){ flash("記録しました（指定時刻）"); setNote(""); } };
   const delRec=async(id)=>{ try{ await recDelete(id); await reload(); }catch(e){} };
-  const delAllShown=async()=>{ if(!log.length){flash("削除する記録がありません");return;} if(!confirm("本当に削除して良いですか？\nこの勤務日に表示中の記録 "+log.length+" 件をすべて削除します。（元に戻せません）"))return; if(!confirm("最終確認です。よろしいですか？"))return; try{ for(const r of log){ await recDelete(r.id); } await reload(); flash("削除しました"); }catch(e){ setErr("一括削除に失敗しました"); } };
+  const delAllShown=async()=>{ if(!logFiltered.length){flash("削除する記録がありません");return;} if(!confirm("本当に削除して良いですか？\n表示中の記録 "+logFiltered.length+" 件をすべて削除します。（元に戻せません）"))return; if(!confirm("最終確認です。よろしいですか？"))return; try{ for(const r of logFiltered){ await recDelete(r.id); } await reload(); flash("削除しました"); }catch(e){ setErr("一括削除に失敗しました"); } };
   const openEditRec=(r)=>{ const d=new Date(r.ts); setEdRec({id:r.id,user:r.user,abn:r.abn,thumb:r.thumb,photoId:r.photoId,y:d.getFullYear(),mo:d.getMonth()+1,da:d.getDate(),h:d.getHours(),mi:d.getMinutes(),item:r.item||""}); };
   const setER=(k,v)=>setEdRec(p=>Object.assign({},p,{[k]:v}));
   const saveEditRec=async()=>{ const e=edRec; if(!(e.item||"").trim()){flash("内容を入力してください");return;} const ts=new Date(e.y,e.mo-1,e.da,e.h,e.mi,0).toISOString(); const rec={id:e.id,ts,user:e.user,item:e.item.trim()}; if(e.abn)rec.abn=true; if(e.thumb)rec.thumb=e.thumb; if(e.photoId)rec.photoId=e.photoId; try{ await recUpdate(e.id,rec); await reload(); setEdRec(null); flash("修正しました"); }catch(err){ flash("修正に失敗しました"); } };
@@ -1440,14 +1472,19 @@ function Records({me,data,persist,reload}){
         {cats.map(cat=>{ const list=rItems.filter(i=>i.cat===cat); if(!list.length) return null; return <div key={cat} style={{marginBottom:"8px"}}><div className="tiny" style={{fontWeight:700,color:"#C9788F"}}>{cat}</div>{list.map(i=>(<div key={i.id} className="cat-row"><button className="cat-name catname-btn" onClick={()=>openItemEdit(i)} onTouchStart={()=>lpStart(i)} onTouchEnd={lpCancel} onTouchMove={lpCancel} onMouseLeave={lpCancel}>✎ {i.name}{i.variants&&i.variants.length?(" ["+i.variants.join("・")+"]"):""}{i.multi?"（複）":""}</button><button className="mini-key" onClick={()=>itemMove(i.id,-1)}>↑</button><button className="mini-key" onClick={()=>itemMove(i.id,1)}>↓</button><button className="mini-key" onClick={()=>itemSetVars(i.id)}>種</button><button className="mini-key" onClick={()=>itemToggleMulti(i.id)}>{i.multi?"複✓":"複"}</button><select className="cat-sel" value={i.cat} onChange={e=>itemSetCat(i.id,e.target.value)}>{cats.map(c=><option key={c} value={c}>{c}</option>)}</select><button className="mini-del" onClick={()=>itemDel(i.id)}>🗑</button></div>))}</div>; })}
       </div>}
       <div className="tl-datenav" style={{marginTop:14}}>
-        <button className="link-btn" onClick={()=>{ const nd=iso(addDays(new Date(logDate+"T00:00:00"),-1)); useTime?setMDate(nd):setDate(nd); }}>‹ 前の勤務</button>
-        <b>{fmtDate(logDate)}（勤務）{useTime&&<span className="tiny" style={{color:"#B25E77"}}>　指定日</span>}</b>
-        <button className="link-btn" onClick={()=>{ const nd=iso(addDays(new Date(logDate+"T00:00:00"),1)); useTime?setMDate(nd):setDate(nd); }}>次の勤務 ›</button>
+        <button className="link-btn" onClick={()=>setLogDate(iso(addDays(new Date(logDate+"T00:00:00"),-1)))}>‹ 前の勤務</button>
+        <button className="link-btn" style={{fontWeight:800,color:"#5A4A50"}} onClick={()=>setShowLogCal(v=>!v)}>{fmtDate(logDate)}（勤務）📅{useTime&&<span className="tiny" style={{color:"#B25E77"}}>　指定日</span>}</button>
+        <button className="link-btn" onClick={()=>setLogDate(iso(addDays(new Date(logDate+"T00:00:00"),1)))}>次の勤務 ›</button>
       </div>
-      <p className="tiny" style={{textAlign:"center",marginTop:2}}>15:30〜翌9:30の記録をまとめて表示します{useTime&&"（過去日時の指定中は、指定した日の記録を表示します）"}</p>
-      {me.isAdmin&&log.length>0&&<div className="row-end" style={{marginBottom:6}}><button className="mini-del" style={{padding:"6px 12px",borderRadius:"10px"}} onClick={delAllShown}>🗑 この勤務日の記録を一括削除</button></div>}
-      {log.length===0&&<p className="empty">まだ記録がありません。</p>}
-      <div className="rec-log">{log.map(r=>(<div key={r.id} className="rec-row">
+      {showLogCal&&<div style={{display:"flex",justifyContent:"center",alignItems:"center",gap:8,margin:"4px 0"}}><input type="date" value={logDate} onChange={e=>{ setLogDate(e.target.value); }}/><button className="link-btn" onClick={()=>{ setLogDate(iso(new Date())); setShowLogCal(false); }}>今日へ</button></div>}
+      <p className="tiny" style={{textAlign:"center",marginTop:2}}>日付（勤務）を押すとカレンダーで過去の日も確認できます。15:30〜翌9:30の記録をまとめて表示します。</p>
+      {sel.length>0&&<div className="tl-modes" style={{marginBottom:6}}>
+        <button className={"seg "+(!showAllUsers?"on":"")} onClick={()=>setShowAllUsers(false)}>選択中（{sel.join("・")}）のみ</button>
+        <button className={"seg "+(showAllUsers?"on":"")} onClick={()=>setShowAllUsers(true)}>全員</button>
+      </div>}
+      {me.isAdmin&&logFiltered.length>0&&<div className="row-end" style={{marginBottom:6}}><button className="mini-del" style={{padding:"6px 12px",borderRadius:"10px"}} onClick={delAllShown}>🗑 表示中の記録を一括削除</button></div>}
+      {logFiltered.length===0&&<p className="empty">{sel.length>0&&!showAllUsers?"この日の「"+sel.join("・")+"」の記録はありません。":"まだ記録がありません。"}</p>}
+      <div className="rec-log">{logFiltered.map(r=>(<div key={r.id} className="rec-row">
         <span className="rec-time">{hm(r.ts)}</span><span className="chip">{r.user}</span>
         {r.thumb&&<img className="rec-thumb noSave" draggable={false} onContextMenu={e=>e.preventDefault()} src={r.thumb} alt="写真" onClick={()=>openFull(r.photoId)}/>}
         <span className={"rec-item"+(r.abn?" abn":"")}>{r.item}</span>
@@ -1674,7 +1711,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.86〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.88〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
