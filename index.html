@@ -761,6 +761,14 @@ function Nisshi({me,data,persist}){
   useEffect(()=>{ if(mode==="import"&&ipRows===null) loadPaper(); },[mode]);
   const savePaper=async()=>{ if(!SB_ON){ setIpMsg("共有DBが必要です"); return; } const u=ipUser||allResidents[0]; if(!u){ setIpMsg("利用者を選んでください"); return; } if(!ipText.trim()){ setIpMsg("内容を入力してください"); return; } try{ const id="paper_"+u+"_"+ipDate; const dataObj={name:u,biz_date:ipDate,period:fmtDate(ipDate),appearance:ipText.trim(),source:"paper",writer:me.name,created:new Date().toISOString()}; await nsSave({id,user_name:u,biz_date:ipDate,sex:(resSex[u]||""),keywords:"【紙】過去記録 "+ipText.trim().slice(0,200),data:dataObj,created:new Date().toISOString()}); setIpText(""); setIpMsg("過去記録を保存しました（AIまとめの参照データになります）。"); loadPaper(); }catch(e){ setIpMsg("保存に失敗（nisshi表の設定をご確認ください）。"); } };
   const delPaper=async(id)=>{ if(!confirm("この過去記録を削除しますか？"))return; try{ await nsDelete(id); loadPaper(); }catch(e){} };
+  // 修正したExcelを取り込み、まとめ本文の「修正前→修正後」を学習素材にする（管理者）
+  const xlRef=useRef(null);
+  const [xlUser,setXlUser]=useState(""); const [xlDate,setXlDate]=useState(()=>iso(new Date()));
+  const [xlDiff,setXlDiff]=useState(null); const [xlMsg,setXlMsg]=useState("");
+  const extractMatome=(ws)=>{ let best=""; for(let r=30;r<=55;r++){ const c=ws["B"+r]; if(c&&c.v!=null){ const v=String(c.v).trim(); if(v && v.indexOf("【")!==0 && v.length>best.length) best=v; } } return best; };
+  const extractActivity=(ws)=>{ const lines=[]; for(let r=17;r<=34;r++){ const c=ws["D"+r]||ws["C"+r]; if(c&&c.v!=null){ const v=String(c.v).trim(); if(v) lines.push(v); } } return lines.join("\n"); };
+  const onXlFile=async(e)=>{ const file=e.target.files&&e.target.files[0]; e.target.value=""; if(!file)return; if(!window.XLSX){ setXlMsg("Excel機能の読み込み中です。少し待って再度お試しください。"); return; } let u=xlUser, d=xlDate; const mm=(file.name||"").match(/利用日誌_(.+)_(\d{4}-\d{2}-\d{2})/); if(mm){ if(!u) u=mm[1].trim(); d=mm[2]; setXlUser(u); setXlDate(d); } try{ const buf=await file.arrayBuffer(); const wb=XLSX.read(buf,{type:"array"}); const ws=wb.Sheets[wb.SheetNames[0]]; const after=extractMatome(ws); const afterAct=extractActivity(ws); if(!after&&!afterAct){ setXlMsg("Excel内の本文が見つかりませんでした。日誌テンプレートのExcelをお選びください。"); return; } if(!u){ setXlMsg("利用者が不明です。上で利用者を選んでからアップロードしてください。"); return; } let before="",beforeAct=""; try{ const g=await nsGet("ns_"+u+"_"+d); if(g&&g.data){ before=g.data.appearance||""; beforeAct=g.data.program||""; } }catch(e){} setXlDiff({user:u,date:d,before,after,beforeAct,afterAct}); setXlMsg(""); }catch(err){ setXlMsg("Excelの読み込みに失敗しました。"); } };
+  const saveXlLearn=async()=>{ if(!xlDiff)return; const {user:u,date:d,before,after,beforeAct,afterAct}=xlDiff; try{ const id="ns_"+u+"_"+d; let base={}; try{ const g=await nsGet(id); if(g&&g.data) base=g.data; }catch(e){} const ff=Object.assign({},base,{name:u,biz_date:d,appearance:(after||base.appearance||""),appearanceBefore:before,activityFinal:(afterAct||""),activityBefore:(beforeAct||""),styleRef:true,excelCorrected:true,styleBy:me.name}); const kw=[u,after,base.special,afterAct,base.staff,"#STYLEREF#","#XLSX修正#"].filter(Boolean).join(" "); await nsSave({id,user_name:u,biz_date:d,sex:(resSex[u]||""),keywords:kw,data:ff,created:new Date().toISOString()}); setXlMsg("保存しました。今後のAIまとめの手本（まとめ・活動記録の修正前→修正後）として参照されます。"); setXlDiff(null); }catch(e){ setXlMsg("保存に失敗しました。"); } };
   // 提出BOX（職員が提出→管理者が確認・印刷）
   const [subRows,setSubRows]=useState(null); const [subView,setSubView]=useState("待ち");
   const loadSubmitted=async()=>{ if(!SB_ON){setSubRows([]);return;} try{ setSubRows(await nsList()); }catch(e){ setSubRows([]); } };
@@ -800,7 +808,7 @@ function Nisshi({me,data,persist}){
     let _plan=(_tp[_nd]&&_tp[_nd][_key])||"";
     if(!_plan){ const ys=Object.keys(_tp).sort((a,b)=>Number(b)-Number(a)); for(const y of ys){ if(_tp[y]&&_tp[y][_key]){ _plan=_tp[y][_key]; break; } } }
     if(_plan) s+="\n\n【個別訓練計画（本人の目標・取り組むこと）】\n"+_plan;
-    try{ if(SB_ON){ const list=await nsList(); const mine=(list||[]).filter(r=>r.user_name===user && String(r.biz_date)<date).sort((a,b)=>String(b.biz_date).localeCompare(String(a.biz_date))); if(mine[0]){ const full=await nsGet(mine[0].id); if(full&&full.data&&full.data.appearance){ s+="\n\n【前回（"+mine[0].biz_date+"）のご様子】\n"+String(full.data.appearance).slice(0,800); } } const paper=(list||[]).filter(r=>r.user_name===user && String(r.keywords||"").includes("【紙】")).sort((a,b)=>String(b.biz_date).localeCompare(String(a.biz_date))); if(paper[0] && (!mine[0]||paper[0].id!==mine[0].id)){ const pf=await nsGet(paper[0].id); if(pf&&pf.data&&pf.data.appearance){ s+="\n\n【過去の記録（"+paper[0].biz_date+"・参考）】\n"+String(pf.data.appearance).slice(0,800); } } const styled=(list||[]).filter(r=>String(r.keywords||"").includes("#STYLEREF#")).sort((a,b)=>String(b.biz_date).localeCompare(String(a.biz_date))).slice(0,3); if(styled.length){ let ex=""; for(const r of styled){ const sf=await nsGet(r.id); if(sf&&sf.data&&sf.data.appearance){ ex+="\n・"+String(sf.data.appearance).slice(0,400); } } if(ex) s+="\n\n【表現の参考（管理者が整えた過去のまとめ。文体・言い回し・まとめ方・長さをこれに寄せる。内容はコピーしない）】"+ex; } } }catch(e){}
+    try{ if(SB_ON){ const list=await nsList(); const mine=(list||[]).filter(r=>r.user_name===user && String(r.biz_date)<date).sort((a,b)=>String(b.biz_date).localeCompare(String(a.biz_date))); if(mine[0]){ const full=await nsGet(mine[0].id); if(full&&full.data&&full.data.appearance){ s+="\n\n【前回（"+mine[0].biz_date+"）のご様子】\n"+String(full.data.appearance).slice(0,800); } } const paper=(list||[]).filter(r=>r.user_name===user && String(r.keywords||"").includes("【紙】")).sort((a,b)=>String(b.biz_date).localeCompare(String(a.biz_date))); if(paper[0] && (!mine[0]||paper[0].id!==mine[0].id)){ const pf=await nsGet(paper[0].id); if(pf&&pf.data&&pf.data.appearance){ s+="\n\n【過去の記録（"+paper[0].biz_date+"・参考）】\n"+String(pf.data.appearance).slice(0,800); } } const styled=(list||[]).filter(r=>String(r.keywords||"").includes("#STYLEREF#")).sort((a,b)=>String(b.biz_date).localeCompare(String(a.biz_date))).slice(0,3); if(styled.length){ let ex=""; for(const r of styled){ const sf=await nsGet(r.id); if(sf&&sf.data&&sf.data.appearance){ const bef=sf.data.appearanceBefore; if(bef&&String(bef).trim()&&String(bef)!==String(sf.data.appearance)){ ex+="\n【まとめ例】修正前："+String(bef).slice(0,300)+"\n→修正後："+String(sf.data.appearance).slice(0,400); } else { ex+="\n・"+String(sf.data.appearance).slice(0,400); } const ab=sf.data.activityBefore, af=sf.data.activityFinal; if(af&&String(af).trim()&&String(ab||"")!==String(af)){ ex+="\n【活動記録の書き方】修正前："+String(ab||"").slice(0,250)+"\n→修正後："+String(af).slice(0,350); } } } if(ex) s+="\n\n【表現の参考（管理者が整えた過去のまとめ・活動記録。文体・言い回し・まとめ方・長さをこれに寄せる。「修正前→修正後」の例は“どう直すか”の手本。内容はコピーしない）】"+ex; } } }catch(e){}
     return s;
   };
   // トーン調整（ご様子の本文だけ作り直す）
@@ -932,6 +940,25 @@ function Nisshi({me,data,persist}){
         <span className="rec-time">{r.biz_date}</span><span className="chip">{r.user_name}</span>
         <span className="rec-item" style={{fontSize:12,color:"#8A6A74"}}>{String(r.keywords||"").replace("【紙】過去記録 ","").slice(0,40)}…</span>
         <button className="mini-del" onClick={()=>delPaper(r.id)}>🗑</button></div>))}</div>
+      {me.isAdmin&&<div className="tl-editpanel" style={{marginTop:14,background:"#FFF8EF",borderColor:"#F3DEC2"}}>
+        <div className="rec-gtitle" style={{color:"#C08A3E"}}>📘 修正したExcelを取り込む（AIの手本にする・管理者）</div>
+        <p className="tiny">Excelで出力して<b>さらに文章を直した</b>日誌ファイル（.xlsx）を選ぶと、「利用のご様子」の本文を読み取り、アプリ側の元の文と<b>修正前→修正後</b>で比較します。保存すると、今後のAIまとめがこの直し方を手本にします。<br/>※ 行の高さ・セル結合などのレイアウト変更は学習しません（テキストのみ）。</p>
+        <div className="nf2"><div className="nf"><label>利用者</label><select value={xlUser} onChange={e=>setXlUser(e.target.value)}><option value="">（ファイル名から自動／選択）</option>{allResidents.map(u=><option key={u} value={u}>{u}</option>)}</select></div>
+          <div className="nf"><label>日付</label><input type="date" value={xlDate} onChange={e=>e.target.value&&setXlDate(e.target.value)}/></div></div>
+        <div className="row-end"><button className="btn ghost2" onClick={()=>xlRef.current&&xlRef.current.click()}>⬆ 修正したExcelを選ぶ</button></div>
+        <input ref={xlRef} type="file" accept=".xlsx,.xls" onChange={onXlFile} style={{display:"none"}}/>
+        {xlDiff&&<div style={{marginTop:8}}>
+          <p className="tiny" style={{fontWeight:700}}>{xlDiff.user}さん／{xlDiff.date} の比較</p>
+          <div className="rec-sub" style={{marginTop:4}}>① 利用のご様子（まとめ）</div>
+          <div className="nf"><label>修正前（アプリの文）</label><div className="tiny" style={{whiteSpace:"pre-wrap",background:"#fff",border:"1px solid #F0E2C9",borderRadius:8,padding:8,color:"#8A6A74"}}>{xlDiff.before||"（アプリ側に保存された文がありません）"}</div></div>
+          <div className="nf"><label>修正後（Excelの文）</label><div className="tiny" style={{whiteSpace:"pre-wrap",background:"#fff",border:"1px solid #E7B98A",borderRadius:8,padding:8,color:"#5A4A50",fontWeight:600}}>{xlDiff.after||"（Excelに本文がありません）"}</div></div>
+          <div className="rec-sub" style={{marginTop:8}}>② 活動記録（時刻ごとの内容）</div>
+          <div className="nf"><label>修正前（アプリの記録）</label><div className="tiny" style={{whiteSpace:"pre-wrap",background:"#fff",border:"1px solid #F0E2C9",borderRadius:8,padding:8,color:"#8A6A74"}}>{xlDiff.beforeAct||"（なし）"}</div></div>
+          <div className="nf"><label>修正後（Excelの活動記録）</label><div className="tiny" style={{whiteSpace:"pre-wrap",background:"#fff",border:"1px solid #E7B98A",borderRadius:8,padding:8,color:"#5A4A50",fontWeight:600}}>{xlDiff.afterAct||"（Excelに活動記録がありません）"}</div></div>
+          <div className="row-end" style={{gap:8}}><button className="btn ghost2" onClick={()=>setXlDiff(null)}>取り消し</button><Btn onClick={saveXlLearn}>この修正を手本として保存</Btn></div>
+        </div>}
+        {xlMsg&&<p className="ok">{xlMsg}</p>}
+      </div>}
     </div>}
     {mode==="search"&&<div>
       <div className="tl-editpanel">
@@ -1724,7 +1751,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.89〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.91〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
@@ -1972,12 +1999,25 @@ const TABS=[
 ];
 function Inside({me,data,tab,setTab,onLogout,persist,reload}){
   const tabs=me.isAdmin?[...TABS,{id:"admin",label:"管理者パネル"}]:TABS;
+  const [pwOpen,setPwOpen]=useState(false); const [cpw,setCpw]=useState(""); const [np1,setNp1]=useState(""); const [np2,setNp2]=useState(""); const [pwMsg,setPwMsg]=useState("");
+  const changeMyPw=async()=>{ setPwMsg(""); const acc=(data.accounts||[]).find(a=>a.id===me.id)||me; const curHash=await sha256(cpw); if(curHash!==acc.hash){ setPwMsg("現在のパスワードが違います。"); return; } if(np1.length<4){ setPwMsg("新しいパスワードは4文字以上にしてください。"); return; } if(np1!==np2){ setPwMsg("新しいパスワード（確認）が一致しません。"); return; } const hash=await sha256(np1); persist({...data,accounts:(data.accounts||[]).map(a=>a.id===me.id?{...a,hash}:a)}); setCpw("");setNp1("");setNp2(""); setPwMsg("変更しました。次回のログインから新しいパスワードになります。"); setTimeout(()=>{ setPwOpen(false); setPwMsg(""); },1600); };
   return <div className="inside">
     <header className="ins-head">
       <button className="ghost" onClick={onLogout}>‹ トップ</button>
       <div className="ins-title">ふれあいホームみずほ</div>
-      <button className="ghost" onClick={onLogout}>{me.name} ⏻</button>
+      <div style={{display:"flex",gap:6,alignItems:"center"}}>
+        <button className="ghost" onClick={()=>{setPwOpen(true);setPwMsg("");setCpw("");setNp1("");setNp2("");}} title="パスワード変更">🔑</button>
+        <button className="ghost" onClick={onLogout}>{me.name} ⏻</button>
+      </div>
     </header>
+    {pwOpen&&<Modal title="パスワードの変更" tint="#C9788F" onClose={()=>setPwOpen(false)}>
+      <p className="hint">ご自身（{me.name}）のパスワードを変更します。</p>
+      <Field label="現在のパスワード" type="password" value={cpw} onChange={e=>setCpw(e.target.value)}/>
+      <Field label="新しいパスワード（4文字以上）" type="password" value={np1} onChange={e=>setNp1(e.target.value)}/>
+      <Field label="新しいパスワード（確認）" type="password" value={np2} onChange={e=>setNp2(e.target.value)}/>
+      {pwMsg&&<p className="ok">{pwMsg}</p>}
+      <div className="row-end"><Btn onClick={changeMyPw}>変更する</Btn></div>
+    </Modal>}
     <nav className="tabs">{tabs.map(t=>(
       <button key={t.id} className={"tab tab-"+t.id+" "+(tab===t.id?"on":"")} onClick={()=>setTab(t.id)}>{t.label}</button>))}</nav>
     <main className="ins-body">
