@@ -230,6 +230,10 @@
   .vopen{width:100%;justify-content:center;}
   .rec-users{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px;}
   .ruser{padding:12px 4px;border-radius:12px;border:1px solid #F0D3DB;background:#fff;color:#94808A;font-weight:700;font-size:13px;cursor:pointer;}
+  .rec-users-sm{gap:6px;margin-bottom:8px;}
+  .rec-users-sm .ruser{padding:7px 4px;font-size:12px;border-radius:10px;}
+  .datewrap{position:relative;display:inline-block;}
+  .datewrap input[type=date]{position:absolute;left:0;top:0;width:100%;height:100%;opacity:0;cursor:pointer;border:0;padding:0;margin:0;}
   .ruser.on{background:#E79AB0;color:#fff;border-color:#E79AB0;}
   .rec-items{display:flex;flex-wrap:wrap;gap:8px;}
   .recbtn{padding:8px 12px;border-radius:10px;border:1px solid #F0D3DB;background:#FBEAEE;color:#C9788F;font-weight:700;font-size:13px;cursor:pointer;}
@@ -1365,7 +1369,7 @@ function Records({me,data,persist,reload}){
   const flash=(m)=>{ setToast(m); setTimeout(()=>setToast(""),1800); };
   const hm=(ts)=>{ const d=new Date(ts); return String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0"); };
   const logDate=useTime?mDate:date;
-  const [showAllUsers,setShowAllUsers]=useState(false); const [showLogCal,setShowLogCal]=useState(false);
+  const [showAllUsers,setShowAllUsers]=useState(false);
   const setLogDate=(nd)=>{ if(!nd)return; useTime?setMDate(nd):setDate(nd); };
   const _bs=new Date(logDate+"T15:00:00"); const _be=(()=>{const e=addDays(new Date(logDate+"T00:00:00"),1); e.setHours(15,0,0,0); return e;})();
   const log=(data.records||[]).filter(r=>r&&r.ts).filter(r=>{ const t=new Date(r.ts); return t>=_bs && t<_be; }).sort((a,b)=>String(b.ts||"").localeCompare(String(a.ts||"")));
@@ -1506,11 +1510,11 @@ function Records({me,data,persist,reload}){
       </div>}
       <div className="tl-datenav" style={{marginTop:14}}>
         <button className="link-btn" onClick={()=>setLogDate(iso(addDays(new Date(logDate+"T00:00:00"),-1)))}>‹ 前の勤務</button>
-        <button className="link-btn" style={{fontWeight:800,color:"#5A4A50"}} onClick={()=>setShowLogCal(v=>!v)}>{fmtDate(logDate)}（勤務）📅{useTime&&<span className="tiny" style={{color:"#B25E77"}}>　指定日</span>}</button>
+        <span className="datewrap"><b style={{fontWeight:800,color:"#5A4A50"}}>{fmtDate(logDate)}（勤務）📅{useTime&&<span className="tiny" style={{color:"#B25E77"}}>　指定日</span>}</b><input type="date" value={logDate} aria-label="日付を選ぶ" onClick={e=>{try{e.currentTarget.showPicker&&e.currentTarget.showPicker();}catch(x){}}} onChange={e=>e.target.value&&setLogDate(e.target.value)}/></span>
         <button className="link-btn" onClick={()=>setLogDate(iso(addDays(new Date(logDate+"T00:00:00"),1)))}>次の勤務 ›</button>
       </div>
-      {showLogCal&&<div style={{display:"flex",justifyContent:"center",alignItems:"center",gap:8,margin:"4px 0"}}><input type="date" value={logDate} onChange={e=>{ setLogDate(e.target.value); }}/><button className="link-btn" onClick={()=>{ setLogDate(iso(new Date())); setShowLogCal(false); }}>今日へ</button></div>}
-      <p className="tiny" style={{textAlign:"center",marginTop:2}}>日付（勤務）を押すとカレンダーで過去の日も確認できます。15:30〜翌9:30の記録をまとめて表示します。</p>
+      <p className="tiny" style={{textAlign:"center",marginTop:2}}>日付（勤務）をタップするとカレンダーが開きます。15:30〜翌9:30の記録をまとめて表示します。{logDate!==iso(new Date())&&<> ／ <button className="link-btn" onClick={()=>setLogDate(iso(new Date()))}>今日へ戻る</button></>}</p>
+      <div className="rec-users rec-users-sm">{dayUsers.map(u=>(<button key={u} className={"ruser "+(sel.includes(u)?"on":"")} onClick={()=>toggleUser(u)}>{u}</button>))}</div>
       {sel.length>0&&<div className="tl-modes" style={{marginBottom:6}}>
         <button className={"seg "+(!showAllUsers?"on":"")} onClick={()=>setShowAllUsers(false)}>選択中（{sel.join("・")}）のみ</button>
         <button className={"seg "+(showAllUsers?"on":"")} onClick={()=>setShowAllUsers(true)}>全員</button>
@@ -1751,7 +1755,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.91〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.92〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
