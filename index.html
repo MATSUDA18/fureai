@@ -401,7 +401,17 @@
     .chat{max-height:56vh;min-height:340px;}
     .bubble{max-width:78%;font-size:15px;}
   }
-  @media (min-width:1024px){.inside{max-width:1040px;}}
+  @media (min-width:1024px){.inside{max-width:1200px;}}
+  @media (min-width:1280px){.inside{max-width:1320px;}}
+  .mealcal{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-top:6px;}
+  .mc-h{text-align:center;font-weight:700;color:#C9788F;font-size:12px;padding:3px 0;}
+  .mc-cell{min-height:70px;border:1px solid #F0D3DB;border-radius:8px;background:#fff;padding:3px;display:flex;flex-direction:column;gap:2px;cursor:pointer;overflow:hidden;text-align:left;}
+  .mc-cell.empty{border-color:#eee;background:#fafafa;cursor:default;}
+  .mc-cell.filled{background:#FFF8EF;border-color:#F3DEC2;}
+  .mc-d{font-weight:700;color:#B25E77;font-size:11px;}
+  .mc-cell img{width:100%;height:28px;object-fit:cover;border-radius:4px;}
+  .mc-mn{font-size:9px;line-height:1.2;color:#5A4A50;max-height:26px;overflow:hidden;}
+  .mc-ck{font-size:8px;color:#8A6B74;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;}
   .care-band{background:#FFF8EF;border:1px solid #F3DEC2;border-radius:14px;padding:10px 12px;margin:4px 0 12px;}
   .care-head{font-weight:800;color:#C08A3E;font-size:14px;margin-bottom:6px;}
   .care-note{background:#fff;border:1px solid #F0E2C9;border-radius:12px;padding:8px 10px;margin-bottom:6px;}
@@ -1352,6 +1362,20 @@ function Records({me,data,persist,reload}){
   const [af,setAf]=useState(iso(addDays(new Date(),-7))); const [at,setAt]=useState(iso(new Date()));
   const [dpOpen,setDpOpen]=useState(false);
   const fileRef=useRef(null);
+  const PHOTO_CATS=["余暇活動","調理","食事メニュー","おやつ作り","清掃","イベント","その他"];
+  const [photoPick,setPhotoPick]=useState(false); const photoCatRef=useRef("");
+  // 食事記録カレンダー
+  const mealLog=data.mealLog||{};
+  const [mealMonth,setMealMonth]=useState(()=>iso(new Date()).slice(0,7));
+  const [mealEdit,setMealEdit]=useState(null); const mealRef=useRef(null);
+  const mealCells=(()=>{ const p=mealMonth.split("-"); const y=+p[0],m=+p[1]; const startW=new Date(y,m-1,1).getDay(); const dim=new Date(y,m,0).getDate(); const a=[]; for(let i=0;i<startW;i++)a.push(null); for(let d=1;d<=dim;d++)a.push(y+"-"+String(m).padStart(2,"0")+"-"+String(d).padStart(2,"0")); while(a.length%7)a.push(null); return a; })();
+  const mealShift=(delta)=>{ const p=mealMonth.split("-"); const d=new Date(+p[0],+p[1]-1+delta,1); setMealMonth(d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")); };
+  const openMealDay=(ds)=>{ const cur=mealLog[ds]||{}; let menu=cur.menu||""; if(!menu){ const bs=new Date(ds+"T15:00:00"); const be=(()=>{const e=addDays(new Date(ds+"T00:00:00"),1);e.setHours(15,0,0,0);return e;})(); const ms=(data.records||[]).filter(r=>{const t=new Date(r.ts);return t>=bs&&t<be;}).filter(r=>/^メニュー/.test(r.item||"")).map(r=>(r.item||"").replace(/^メニュー[^：]*：/,"")); menu=ms.join(" / "); } setMealEdit({date:ds,menu,cook1:cur.cook1||"",cook2:cur.cook2||"",img:cur.img||""}); };
+  const onMealPhoto=async(ev)=>{ const f=ev.target.files&&ev.target.files[0]; ev.target.value=""; if(!f)return; try{ const img=await compressImage(f,360,0.6); setMealEdit(p=>Object.assign({},p,{img})); }catch(e){} };
+  const saveMeal=()=>{ const e=mealEdit; const next=Object.assign({},mealLog); const v={menu:(e.menu||"").trim(),cook1:e.cook1||"",cook2:e.cook2||"",img:e.img||""}; if(!v.menu&&!v.cook1&&!v.cook2&&!v.img){ delete next[e.date]; } else { next[e.date]=v; } persist(Object.assign({},data,{mealLog:next})); setMealEdit(null); flash("食事記録を保存しました"); };
+  const mealToExcel=()=>{ if(!window.XLSX){flash("Excel機能の読み込み中です");return;} const p=mealMonth.split("-"); const y=+p[0],m=+p[1]; const dim=new Date(y,m,0).getDate(); const wd=["日","月","火","水","木","金","土"]; const A=[["日付","曜日","メニュー","調理担当1","調理担当2"]]; for(let d=1;d<=dim;d++){ const ds=y+"-"+String(m).padStart(2,"0")+"-"+String(d).padStart(2,"0"); const v=mealLog[ds]||{}; const dd=new Date(ds+"T00:00:00"); A.push([m+"/"+d, wd[dd.getDay()], v.menu||"", v.cook1||"", v.cook2||""]); } const ws=XLSX.utils.aoa_to_sheet(A); ws["!cols"]=[{wch:8},{wch:5},{wch:42},{wch:12},{wch:12}]; const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,y+"年"+m+"月食事"); const out=XLSX.write(wb,{bookType:"xlsx",type:"array"}); const blob=new Blob([out],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}); const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="食事記録_"+y+"年"+m+"月.xlsx"; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),4000); };
+  const printMealA3=()=>{ const p=mealMonth.split("-"); const y=+p[0],m=+p[1]; const wd=["日","月","火","水","木","金","土"]; let rows=""; for(let i=0;i<mealCells.length;i++){ if(i%7===0) rows+="<tr>"; const ds=mealCells[i]; if(!ds){ rows+="<td class='empty'></td>"; } else { const d=+ds.slice(8); const v=mealLog[ds]||{}; const dd=new Date(ds+"T00:00:00"); const esc=s=>String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;"); rows+="<td><div class='dn'>"+d+"（"+wd[dd.getDay()]+"）</div>"+(v.img?("<img src='"+v.img+"'/>"):"")+"<div class='mn'>"+esc(v.menu)+"</div>"+((v.cook1||v.cook2)?("<div class='ck'>調理："+esc([v.cook1,v.cook2].filter(Boolean).join("・"))+"</div>"):"")+"</td>"; } if(i%7===6) rows+="</tr>"; } const title=y+"年"+m+"月 食事記録"; const doc="<!doctype html><html lang='ja'><head><meta charset='utf-8'><title>"+title+"</title><style>@page{size:A3 landscape;margin:10mm;}body{font-family:sans-serif;color:#333;margin:0;}h1{font-size:16pt;text-align:center;margin:0 0 6px;color:#B25E77;}table{width:100%;border-collapse:collapse;table-layout:fixed;}th{background:#F6D4DD;color:#B25E77;border:1px solid #ddd;padding:5px;font-size:10pt;}td{border:1px solid #ccc;height:3.4cm;vertical-align:top;padding:4px;font-size:8.5pt;overflow:hidden;}td.empty{background:#fafafa;}.dn{font-weight:700;color:#B25E77;font-size:9pt;}img{width:100%;height:1.8cm;object-fit:cover;border-radius:3px;margin:2px 0;}.mn{font-size:8pt;line-height:1.25;}.ck{color:#555;font-size:7.8pt;margin-top:2px;}</style></head><body><h1>"+title+"（メニュー・調理担当・写真）</h1><table><thead><tr>"+wd.map(w=>"<th>"+w+"</th>").join("")+"</tr></thead><tbody>"+rows+"</tbody></table><scr"+"ipt>window.onload=function(){setTimeout(function(){window.print();},400);}</scr"+"ipt></body></html>"; const w=window.open("","_blank"); if(!w){ flash("ポップアップがブロックされました。設定で許可してください"); return; } w.document.open(); w.document.write(doc); w.document.close(); };
+  const startPhoto=(cat)=>{ photoCatRef.current=cat||""; setPhotoPick(false); if(sel.filter(u=>dayUsers.includes(u)).length===0){ flash("先に利用者を選んでください"); return; } setTimeout(()=>{ if(fileRef.current) fileRef.current.click(); },0); };
   // 配慮メモ（本人の取扱説明）
   const careNotes=data.careNotes||[];
   const visibleNotes=careNotes.filter(n=>sel.includes(n.user)&&n.level!=="管理者へ");
@@ -1393,7 +1417,7 @@ function Records({me,data,persist,reload}){
   const loadPhotos=async()=>{ if(!SB_ON){ setPhotos([]); return; } try{ setPhotos(await sbListPhotos(af,at)); }catch(e){ setPhotos([]); } };
   useEffect(()=>{ if(view==="album"){ setPhotos(null); loadPhotos(); } },[view,af,at]);
   useEffect(()=>{ setSel([]); },[date, dayUsers.join("|")]);
-  const onFile=async(e)=>{ const f=e.target.files&&e.target.files[0]; e.target.value=""; if(!f)return; if(sel.length===0){ flash("先に利用者を選んでください"); return; } if(!SB_ON){ flash("写真の保存には共有DBの設定が必要です"); return; } setBusy(true); try{ const full=await compressImage(f,900,0.6); const thumb=await compressImage(f,160,0.5); const id=uid()+"_"+Date.now(); const ts=new Date().toISOString(); await sbInsertPhoto({id, meta:{users:sel, ts, thumb}, image:full, created:ts}); await pushRecords("📷 写真",{photoId:id, thumb}); flash("写真を記録しました"); }catch(err){ flash("写真の保存に失敗（写真表の設定をご確認ください）"); } finally{ setBusy(false); } };
+  const onFile=async(e)=>{ const f=e.target.files&&e.target.files[0]; e.target.value=""; if(!f)return; if(sel.length===0){ flash("先に利用者を選んでください"); return; } if(!SB_ON){ flash("写真の保存には共有DBの設定が必要です"); return; } const cat=photoCatRef.current||""; setBusy(true); try{ const full=await compressImage(f,900,0.6); const thumb=await compressImage(f,160,0.5); const id=uid()+"_"+Date.now(); const ts=new Date().toISOString(); await sbInsertPhoto({id, meta:{users:sel, ts, thumb, cat}, image:full, created:ts}); await pushRecords("📷 写真"+(cat?("（"+cat+"）"):""),{photoId:id, thumb, cat}); flash("写真を記録しました"+(cat?("："+cat):"")); }catch(err){ flash("写真の保存に失敗（写真表の設定をご確認ください）"); } finally{ setBusy(false); photoCatRef.current=""; } };
   const openFull=async(id)=>{ if(!id||!SB_ON)return; try{ const p=await sbPhotoFull(id); if(p) setPv(p); else flash("写真が見つかりません"); }catch(e){ flash("写真を開けませんでした"); } };
   const delPhoto=async(id)=>{ if(!confirm("この写真を削除しますか？"))return; try{ await sbDeletePhoto(id); setPhotos(p=>(p||[]).filter(x=>x.id!==id)); setPv(null); }catch(e){} };
   const catMove=(i,dir)=>{ const c=cats.slice(); const j=i+dir; if(j<0||j>=c.length)return; const t=c[i];c[i]=c[j];c[j]=t; persist({...data,recCats:c,recItems:rItems}); };
@@ -1454,13 +1478,32 @@ function Records({me,data,persist,reload}){
     </div>}
     <div className="tl-modes" style={{marginBottom:12}}>
       <button className={"seg "+(view==="log"?"on":"")} onClick={()=>setView("log")}>記録</button>
-      <button className={"seg "+(view==="album"?"on":"")} onClick={()=>setView("album")}>アルバム</button>
+      <button className={"seg "+(view==="album"?"on":"")} onClick={()=>setView("album")}>📷 写真記録</button>
+      <button className={"seg "+(view==="meal"?"on":"")} onClick={()=>setView("meal")}>🍚 食事記録</button>
     </div>
+    {view==="meal"&&<div>
+      <div className="tl-datenav">
+        <button className="link-btn" onClick={()=>mealShift(-1)}>‹ 前の月</button>
+        <b>{(()=>{const p=mealMonth.split("-");return p[0]+"年"+Number(p[1])+"月";})()}</b>
+        <button className="link-btn" onClick={()=>mealShift(1)}>次の月 ›</button>
+      </div>
+      <p className="tiny" style={{textAlign:"center",marginBottom:4}}>日をタップして、メニュー・調理担当2名・写真を入力します。提出用に出力できます。</p>
+      <div className="mealcal">
+        {["日","月","火","水","木","金","土"].map(w=><div key={w} className="mc-h">{w}</div>)}
+        {mealCells.map((ds,i)=>{ if(!ds) return <div key={"e"+i} className="mc-cell empty"></div>; const d=+ds.slice(8); const v=mealLog[ds]||{}; const has=v.menu||v.cook1||v.cook2||v.img; return <button key={ds} className={"mc-cell"+(has?" filled":"")} onClick={()=>openMealDay(ds)}><span className="mc-d">{d}</span>{v.img&&<img src={v.img} alt=""/>}{v.menu&&<span className="mc-mn">{v.menu}</span>}{(v.cook1||v.cook2)&&<span className="mc-ck">🍳{[v.cook1,v.cook2].filter(Boolean).join("・")}</span>}</button>; })}
+      </div>
+      <div className="n-actions no-print" style={{marginTop:12}}>
+        <Btn onClick={printMealA3}>🖨 A3カレンダーで印刷</Btn>
+        <Btn kind="ghost2" onClick={mealToExcel}>⬇ Excel出力（Googleスプレッドシートでも開けます）</Btn>
+      </div>
+      <p className="tiny" style={{marginTop:6,color:"#B0895A"}}>※ A3印刷は新しいタブで開きます（パソコン推奨。印刷ダイアログで「A3・横」を選んでください）。Excelは写真なしの表（日付・メニュー・調理担当）です。</p>
+    </div>}
     {view==="log"&&<>
       <div className="rec-quick">
         <button className="recbtn vit" onClick={()=>setVit({sys:"",dia:"",hr:"",temp:""})}>🩺 バイタル測定（血圧・体温）</button>
-        <button className="recbtn cam" onClick={()=>fileRef.current&&fileRef.current.click()} disabled={busy}>📷 写真</button>
+        <button className="recbtn cam" onClick={()=>setPhotoPick(true)} disabled={busy}>📷 写真をとる（用途を選ぶ）</button>
       </div>
+      <p className="tiny" style={{textAlign:"center",margin:"2px 0 6px",color:"#B0895A"}}>🩺はバイタル専用／📷は活動・調理・食事・イベント等の写真用です</p>
       {useTime&&<div className="pastmode-banner">⏱ 過去日時モードで記録中：{fmtDate(mDate)}　{mH}:{String(mM).padStart(2,"0")}<br/><span className="tiny" style={{fontWeight:400}}>下の利用者と項目を押すと、この日時で保存されます（閉じるまで続きます）。</span></div>}
       <div className="row-between" style={{margin:"4px 0 8px"}}><button className="link-btn" onClick={openAllCats}>すべて開く</button><button className="link-btn" onClick={closeAllCats}>すべて閉じる</button></div>
       <div className={useTime?"items-past":""}>
@@ -1468,6 +1511,11 @@ function Records({me,data,persist,reload}){
       {(function(){ const orphans=rItems.filter(i=>!cats.includes(i.cat)); if(!orphans.length) return null; return <div className="rec-group"><div className="rec-gtitle">その他</div><div className="rec-items">{orphans.map(i=>(<button key={i.id} className="recbtn" onClick={()=>tapItem(i)}>{i.name}{i.variants&&i.variants.length?" ▾":""}</button>))}</div></div>; })()}
       </div>
       <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={onFile} style={{display:"none"}}/>
+      {photoPick&&<Modal title="📷 どの写真ですか？" tint="#C9788F" onClose={()=>setPhotoPick(false)}>
+        <p className="hint">用途を選ぶと、その場でカメラが開きます。記録に「写真（用途）」として残ります。</p>
+        <div className="chk-grid" style={{gridTemplateColumns:"repeat(2,1fr)",gap:8}}>{PHOTO_CATS.map(c=><Btn key={c} kind="ghost2" onClick={()=>startPhoto(c)}>{c}</Btn>)}</div>
+        <div className="row-end" style={{marginTop:8}}><button className="link-btn" onClick={()=>startPhoto("")}>用途なしで撮る</button></div>
+      </Modal>}
       <div className="rec-sub">自由に記録（様子・エピソード）</div>
       <div className="composer">
         <textarea rows={1} value={note} placeholder="様子を具体的に（例：夕食後、笑顔で職員と将棋。勝って嬉しそう）" onChange={e=>setNote(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();addNote();}}}/>
@@ -1595,6 +1643,13 @@ function Records({me,data,persist,reload}){
       <img className="noSave" draggable={false} onContextMenu={e=>e.preventDefault()} src={pv.image} style={{width:"100%",borderRadius:12}} alt="記録写真"/>
       <p className="hint" style={{marginTop:10}}>{pv.meta&&pv.meta.users?pv.meta.users.join("・"):""}　{pv.created?new Date(pv.created).toLocaleString():""}</p>
       <div className="row-end"><Btn kind="ghost2" onClick={()=>delPhoto(pv.id)}>削除</Btn></div>
+    </Modal>}
+    {mealEdit&&<Modal title={(()=>{const d=new Date(mealEdit.date+"T00:00:00");return (d.getMonth()+1)+"月"+d.getDate()+"日（"+["日","月","火","水","木","金","土"][d.getDay()]+"）の食事記録";})()} tint="#C9788F" onClose={()=>setMealEdit(null)}>
+      <div className="nf"><label>メニュー内容</label><textarea rows={3} value={mealEdit.menu} onChange={e=>setMealEdit(p=>Object.assign({},p,{menu:e.target.value}))} placeholder="例：ごはん、味噌汁、鶏の照り焼き、サラダ、果物"/></div>
+      <div className="nf2"><div className="nf"><label>調理担当1</label><select value={mealEdit.cook1} onChange={e=>setMealEdit(p=>Object.assign({},p,{cook1:e.target.value}))}><option value="">（選択）</option>{(data.accounts||[]).map(a=><option key={a.id} value={a.name}>{a.name}</option>)}{mealEdit.cook1&&!(data.accounts||[]).some(a=>a.name===mealEdit.cook1)&&<option value={mealEdit.cook1}>{mealEdit.cook1}</option>}</select></div>
+        <div className="nf"><label>調理担当2</label><select value={mealEdit.cook2} onChange={e=>setMealEdit(p=>Object.assign({},p,{cook2:e.target.value}))}><option value="">（選択）</option>{(data.accounts||[]).map(a=><option key={a.id} value={a.name}>{a.name}</option>)}{mealEdit.cook2&&!(data.accounts||[]).some(a=>a.name===mealEdit.cook2)&&<option value={mealEdit.cook2}>{mealEdit.cook2}</option>}</select></div></div>
+      <div className="nf"><label>写真</label><div className="row-between"><div className="face-prev">{mealEdit.img?<img src={mealEdit.img} alt="食事"/>:<span>なし</span>}</div><div style={{display:"flex",gap:6,flexWrap:"wrap"}}><button className="recbtn cam" onClick={()=>mealRef.current&&mealRef.current.click()}>📷 写真</button>{mealEdit.img&&<button className="recbtn" onClick={()=>setMealEdit(p=>Object.assign({},p,{img:""}))}>削除</button>}</div></div><input ref={mealRef} type="file" accept="image/*" onChange={onMealPhoto} style={{display:"none"}}/></div>
+      <div className="row-end"><Btn onClick={saveMeal}>保存</Btn></div>
     </Modal>}
   </Section>;
 }
@@ -1755,7 +1810,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.94〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.96〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
@@ -1952,7 +2007,7 @@ function Album({me,data}){
   useEffect(()=>{ if(!slide)return; let cancel=false; (async()=>{ try{ const p=await sbPhotoFull(slide.list[slide.idx].id); if(!cancel) setSlide(s=>s?Object.assign({},s,{img:p?p.image:null}):s); }catch(e){} })(); return ()=>{cancel=true;}; },[slide&&slide.idx]);
   useEffect(()=>{ if(!slide||!slide.playing||!slide.img)return; const t=setTimeout(()=>{ setSlide(s=>s?Object.assign({},s,{idx:(s.idx+1)%s.list.length,img:null}):s); },3500); return ()=>clearTimeout(t); },[slide&&slide.idx, slide&&slide.playing, slide&&slide.img]);
   const slideNav=(d)=>setSlide(s=>s?Object.assign({},s,{idx:(s.idx+d+s.list.length)%s.list.length,img:null}):s);
-  return <Section title="写真・アルバム" note="このアプリに保存した写真を表示・検索できます。写真の取り込みや、期間を指定したスライドショーもできます。">
+  return <Section title="写真記録" note="このアプリに保存した写真を表示・検索できます。写真の取り込みや、期間を指定したスライドショーもできます。">
     <div className="tl-editpanel">
       <div className="nf"><label>名前で検索</label><input value={q} onChange={e=>setQ(e.target.value)} placeholder="利用者名・イベント名など" list="albnames"/></div>
       <datalist id="albnames">{resNames.map(n=><option key={n} value={n}/>)}</datalist>
@@ -1991,7 +2046,7 @@ const TABS=[
   {id:"shifts",label:"職員シフト"},
   {id:"timecard",label:"出勤簿（勤怠）"},
   {id:"plans",label:"利用予定カレンダー"},
-  {id:"album",label:"写真・アルバム"},
+  {id:"album",label:"写真記録"},
   {id:"users",label:"利用者情報"},
   {id:"consult",label:"AI相談"},
   {id:"nisshi",label:"日誌まとめ"},
@@ -2596,6 +2651,7 @@ function Consult({data}){
 
 /* ============================ 管理者パネル ============================ */
 function AdminPanel({data,persist}){
+  const [manOpen,setManOpen]=useState(false);
   const [name,setName]=useState(""); const [p1,setP1]=useState(""); const [p2,setP2]=useState("");
   const [isAdmin,setIsAdmin]=useState(false); const [msg,setMsg]=useState(""); const [affil,setAffil]=useState("専属");
   const [hotaru,setHotaru]=useState(data.hotaruUrl||""); const [phil,setPhil]=useState(data.philosophy||"");
@@ -2659,6 +2715,37 @@ function AdminPanel({data,persist}){
     const master=await sha256(m1); persist({...data,master}); setM1("");setM2("");setMsg("管理者登録用パスワードを変更しました。");
   };
   return <Section title="管理者パネル" note="アカウントの登録・削除、理念や連携アプリの設定ができます。">
+    <div className="notice-box" style={{marginBottom:12}}><b>🔑 AI機能（日誌まとめ・AI相談）を使う準備</b>
+      <p className="tiny" style={{margin:"4px 0"}}>職員の端末ごとに一度、APIキーの入力が必要です。入れ方の手順をまとめました。</p>
+      <div className="row-end"><Btn kind="ghost2" onClick={()=>setManOpen(true)}>📄 APIキー設定マニュアルを見る</Btn></div></div>
+    {manOpen&&<Modal title="📄 APIキー設定マニュアル" tint="#B25E77" onClose={()=>setManOpen(false)}>
+      <div style={{lineHeight:1.8,color:"#5A4A50",fontSize:14}}>
+        <p><b>これは何？</b><br/>「日誌まとめ」「AI相談」のAI機能を使うには、AnthropicのAPIキーが必要です。キーは<b>その端末にだけ</b>保存され、使った分だけ課金されます。</p>
+        <p style={{marginTop:10}}><b>① 管理者がAPIキーを取得（最初の一度だけ）</b></p>
+        <ol style={{margin:"4px 0",paddingLeft:20}}>
+          <li>パソコンで <b>console.anthropic.com</b> を開いてログイン（アカウントがなければ作成）。</li>
+          <li>左メニューの <b>API keys</b> を開く。</li>
+          <li><b>Create Key</b> を押し、名前（例：ふれあいみずほ）を付けて作成。</li>
+          <li>表示された <b>sk-ant- で始まる長い文字列</b> をコピー（※この画面でしか全体は見られません。安全な所に控える）。</li>
+        </ol>
+        <p style={{marginTop:10}}><b>② 各端末のアプリに入力（職員の端末ごとに一度）</b></p>
+        <ol style={{margin:"4px 0",paddingLeft:20}}>
+          <li>アプリ下の <b>「AI相談」</b> タブを開く。</li>
+          <li>右上あたりの <b>「AIの設定」</b> を押す。</li>
+          <li>APIキー（sk-ant-…）を貼り付けて <b>保存</b>。</li>
+          <li>「日誌まとめ」やAI相談でAIが使えるようになります。</li>
+        </ol>
+        <p style={{marginTop:10}}><b>⚠ 注意</b></p>
+        <ul style={{margin:"4px 0",paddingLeft:20}}>
+          <li>キーは<b>その端末にだけ</b>保存されます。端末ごとに入力が必要です。</li>
+          <li><b>共用端末には入れない</b>でください。第三者に見られると悪用の恐れがあります。</li>
+          <li>キーは他人に教えない・SNS等に貼らない。使った分だけ料金がかかります。</li>
+          <li>流出が疑われる時は console.anthropic.com でそのキーを削除（Revoke）し、作り直してください。</li>
+        </ul>
+        <p className="tiny" style={{marginTop:8}}>※ A4のPDF版も配布できます（印刷して職員に渡す用）。</p>
+      </div>
+      <div className="row-end" style={{marginTop:8}}><Btn onClick={()=>setManOpen(false)}>閉じる</Btn></div>
+    </Modal>}
     <div className="grid2">
       <div><h3 className="blk">登録済みのアカウント</h3>
         <div className="acc-list">{data.accounts.map(a=>(
