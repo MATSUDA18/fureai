@@ -1755,7 +1755,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.92〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.94〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
@@ -2005,7 +2005,25 @@ function Inside({me,data,tab,setTab,onLogout,persist,reload}){
   const tabs=me.isAdmin?[...TABS,{id:"admin",label:"管理者パネル"}]:TABS;
   const [pwOpen,setPwOpen]=useState(false); const [cpw,setCpw]=useState(""); const [np1,setNp1]=useState(""); const [np2,setNp2]=useState(""); const [pwMsg,setPwMsg]=useState("");
   const changeMyPw=async()=>{ setPwMsg(""); const acc=(data.accounts||[]).find(a=>a.id===me.id)||me; const curHash=await sha256(cpw); if(curHash!==acc.hash){ setPwMsg("現在のパスワードが違います。"); return; } if(np1.length<4){ setPwMsg("新しいパスワードは4文字以上にしてください。"); return; } if(np1!==np2){ setPwMsg("新しいパスワード（確認）が一致しません。"); return; } const hash=await sha256(np1); persist({...data,accounts:(data.accounts||[]).map(a=>a.id===me.id?{...a,hash}:a)}); setCpw("");setNp1("");setNp2(""); setPwMsg("変更しました。次回のログインから新しいパスワードになります。"); setTimeout(()=>{ setPwOpen(false); setPwMsg(""); },1600); };
+  // アプリを開いた最初の「確認のお願い」（未確認の申し送り／未対応の補充品／確認待ち日誌）
+  const chkKey="mizuho_openchk_"+me.id+"_"+iso(new Date());
+  const [openChk,setOpenChk]=useState(()=>{ try{ return localStorage.getItem(chkKey)!=="1"; }catch(e){ return true; } });
+  const dismissToday=()=>{ try{ localStorage.setItem(chkKey,"1"); }catch(e){} setOpenChk(false); };
+  const _hoTargeted=(h)=>{ if(h.from!=="hq")return false; if(h.scope==="all")return true; if(h.scope==="day"){ const p=(data.dayPlans||{})[h.day]||{}; return me.name===p.s1||me.name===p.s2||me.name===p.s3; } return false; };
+  const myHo=(data.handovers||[]).filter(h=>_hoTargeted(h)&&!(h.confirmedBy&&h.confirmedBy[me.id]));
+  const pendSupply=me.isAdmin?(data.supplyItems||[]).filter(it=>it.want&&!it.done):[];
+  const [pendNisshi,setPendNisshi]=useState(0);
+  useEffect(()=>{ let on=true; if(!me||!me.isAdmin||!SB_ON){ setPendNisshi(0); return; } (async()=>{ try{ const all=await nsList(); if(on) setPendNisshi((all||[]).filter(r=>String(r.keywords||"").includes("#SUB:")).length); }catch(e){} })(); return ()=>{on=false;}; },[me]);
+  const chkHas=myHo.length>0||pendSupply.length>0||pendNisshi>0;
+  const confirmOne=(h)=>{ const cb=Object.assign({},h.confirmedBy||{},{[me.id]:new Date().toISOString()}); persist(Object.assign({},data,{handovers:(data.handovers||[]).map(x=>x.id===h.id?Object.assign({},x,{confirmedBy:cb}):x)})); };
+  const _hd=(ts)=>{ const d=new Date(ts); return (d.getMonth()+1)+"/"+d.getDate(); };
   return <div className="inside">
+    {openChk&&chkHas&&<Modal title="📋 確認のお願い" tint="#E4577A" onClose={()=>setOpenChk(false)}>
+      {myHo.length>0&&<div className="notice-box"><b>📌 未確認の申し送り（{myHo.length}）</b>{myHo.map(h=>(<div key={h.id} className="notice-item"><span>{_hd(h.ts)}・本部{h.scope==="day"?"（本日担当）":"（全員）"}</span><p>{h.text}</p><div className="row-end"><Btn onClick={()=>confirmOne(h)}>確認済みにする</Btn></div></div>))}</div>}
+      {pendNisshi>0&&<div className="notice-box"><b>📝 確認待ちの日誌（{pendNisshi}）</b><p className="tiny" style={{margin:"4px 0"}}>職員から提出された日誌が確認待ちです。</p><div className="row-end"><Btn kind="ghost2" onClick={()=>{setTab("nisshi");setOpenChk(false);}}>日誌まとめ（提出BOX）を開く →</Btn></div></div>}
+      {pendSupply.length>0&&<div className="notice-box"><b>🛒 未対応の補充品リクエスト（{pendSupply.length}）</b>{pendSupply.map(it=>(<div key={it.id} className="notice-item"><p>・{it.name}{it.wantVariant?("（"+it.wantVariant+"）"):""}{it.wantBy?("／依頼："+it.wantBy):""}</p></div>))}<div className="row-end"><Btn kind="ghost2" onClick={()=>{setTab("handover");setOpenChk(false);}}>補充品を確認する →</Btn></div></div>}
+      <div className="row-between" style={{marginTop:8,flexWrap:"wrap",gap:8}}><button className="link-btn" onClick={()=>setOpenChk(false)}>あとで閉じる</button><button className="link-btn" onClick={dismissToday}>今日はもう表示しない</button></div>
+    </Modal>}
     <header className="ins-head">
       <button className="ghost" onClick={onLogout}>‹ トップ</button>
       <div className="ins-title">ふれあいホームみずほ</div>
