@@ -13,7 +13,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;500;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet" />
 <style>
   *{box-sizing:border-box;}
-  html,body{margin:0;}
+  html,body{margin:0;overflow-x:clip;}
+  img{max-width:100%;}
   body{background:#FCF4F5;color:#5A4A50;font-family:"Noto Sans JP",system-ui,sans-serif;-webkit-font-smoothing:antialiased;}
   h1,h2,h3{font-family:"Zen Maru Gothic","Noto Sans JP",sans-serif;}
   textarea,input,button{font-family:inherit;}
@@ -1819,7 +1820,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.98〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.99〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
@@ -2296,16 +2297,21 @@ function Work({me,data,persist}){
   const delW=(id)=>{ if(!confirm("この項目を業務の詳細から削除しますか？"))return; persist(Object.assign({},data,{workItems:wItems.filter(x=>x.id!==id)})); };
   const toggleNeed=(w)=>{ persist(Object.assign({},data,{workItems:wItems.map(x=>x.id===w.id?Object.assign({},x,{needConfirm:!x.needConfirm}):x)})); };
   const toggleImp=(w)=>{ persist(Object.assign({},data,{workItems:wItems.map(x=>x.id===w.id?Object.assign({},x,{important:!x.important}):x)})); };
+  const [edit,setEdit]=useState(null);
+  const openNew=()=>setEdit({id:null,text:"",important:false,needConfirm:false});
+  const saveEdit=()=>{ const e=edit; if(!(e.text||"").trim()){ return; } if(e.id){ persist(Object.assign({},data,{workItems:wItems.map(x=>x.id===e.id?Object.assign({},x,{text:e.text.trim(),important:!!e.important,needConfirm:!!e.needConfirm}):x)})); } else { const w={id:uid(),text:e.text.trim(),fromLabel:"",date:iso(new Date()),needConfirm:!!e.needConfirm,important:!!e.important,confirmedBy:{},source:"manual"}; persist(Object.assign({},data,{workItems:[w,...wItems]})); } setEdit(null); };
   const sorted=wItems.slice().sort((a,b)=>(b.important?1:0)-(a.important?1:0));
   return <Section title="各業務の詳細" note="日々の支援業務の内容です。申し送りから「業務の詳細へ」で追加した項目はここに残ります。">
+    {me.isAdmin&&<div className="row-end" style={{marginBottom:8}}><Btn kind="ghost2" onClick={openNew}>＋ 業務を追加</Btn></div>}
     {wItems.length>0&&<div style={{marginBottom:14}}>
-      <h3 className="blk">📋 申し送りから追加された業務</h3>
+      <h3 className="blk">📋 追加された業務</h3>
       {sorted.map(w=>(<div key={w.id} className={"work-card"+(w.important?" imp":"")} style={w.important?{}:{borderLeft:"5px solid "+(w.needConfirm&&!(w.confirmedBy&&w.confirmedBy[me.id])?"#E4577A":"#E7D3B8")}}>
         {w.important&&<div className="imp-badge">⚠ 重要</div>}
         <p style={{whiteSpace:"pre-wrap",margin:0}}>{w.text}</p>
         <div className="tiny" style={{marginTop:6,display:"flex",flexWrap:"wrap",gap:8,alignItems:"center"}}>
           <span style={{color:"#8A6B74"}}>{w.date}{w.fromLabel?("／"+w.fromLabel):""}</span>
           {w.needConfirm&&((w.confirmedBy&&w.confirmedBy[me.id])?<span style={{color:"#2E8B57",fontWeight:700}}>✓ 確認済み</span>:<button className="btn ghost2" style={{padding:"4px 10px"}} onClick={()=>confirmW(w)}>確認済みにする</button>)}
+          {me.isAdmin&&<button className="link-btn" onClick={()=>setEdit({id:w.id,text:w.text,important:w.important,needConfirm:w.needConfirm})}>✎ 編集</button>}
           {me.isAdmin&&<button className="link-btn" style={w.important?{color:"#E4433C",fontWeight:700}:{}} onClick={()=>toggleImp(w)}>{w.important?"重要を外す":"⚠ 重要にする"}</button>}
           {me.isAdmin&&<button className="link-btn" onClick={()=>toggleNeed(w)}>{w.needConfirm?"確認不要にする":"要確認にする"}</button>}
           {me.isAdmin&&<button className="mini-del" onClick={()=>delW(w.id)}>🗑</button>}
@@ -2314,7 +2320,13 @@ function Work({me,data,persist}){
       </div>))}
     </div>}
     <h3 className="blk">基本の業務</h3>
-    <div className="grid2">{items.map(it=>(<div key={it.h} className="work-card"><h3>{it.h}</h3><p>{it.b}</p></div>))}</div></Section>;
+    <div className="grid2">{items.map(it=>(<div key={it.h} className="work-card"><h3>{it.h}</h3><p>{it.b}</p></div>))}</div>
+    {edit&&<Modal title={edit.id?"業務の編集":"業務を追加"} tint="#C9788F" onClose={()=>setEdit(null)}>
+      <div className="nf"><label>内容</label><textarea rows={5} value={edit.text} onChange={e=>setEdit(p=>Object.assign({},p,{text:e.target.value}))} placeholder="業務の内容を入力"/></div>
+      <label className="chk"><input type="checkbox" checked={!!edit.important} onChange={e=>setEdit(p=>Object.assign({},p,{important:e.target.checked}))}/> ⚠ 重要マークを付ける</label>
+      <label className="chk"><input type="checkbox" checked={!!edit.needConfirm} onChange={e=>setEdit(p=>Object.assign({},p,{needConfirm:e.target.checked}))}/> 確認が必要（トップの通知に出す）</label>
+      <div className="row-end" style={{marginTop:8}}><Btn onClick={saveEdit}>保存</Btn></div>
+    </Modal>}</Section>;
 }
 function Traits(){
   return <Section title="障害特性と支援のポイント" note="当ホームは身体・精神・知的・発達・その他、すべての障害を対象としています。特性は一人ひとり異なります。ここは基本の視点です。">
