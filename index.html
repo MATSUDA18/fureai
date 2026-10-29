@@ -192,6 +192,10 @@
   .zbtn{width:34px;height:34px;border-radius:10px;border:1px solid #F0D3DB;background:#fff;color:#C9788F;font-size:18px;font-weight:700;cursor:pointer;line-height:1;}
   .tl-datenav b{color:#C9788F;font-size:14px;}
   .tl-scroll{overflow:auto;border:1px solid #F0D3DB;border-radius:14px;background:#fff;-webkit-overflow-scrolling:touch;touch-action:pan-y;}
+  .tl-hint{display:flex;align-items:center;gap:6px;justify-content:center;background:#FFF6E8;border:1px solid #F3DEC2;color:#B07A2E;font-size:12px;font-weight:700;border-radius:999px;padding:6px 12px;margin:0 0 8px;text-align:center;}
+  .tl-tip{position:fixed;left:50%;top:120px;transform:translateX(-50%);z-index:60;background:#5A4A50;color:#fff;padding:12px 16px;border-radius:14px;box-shadow:0 12px 32px rgba(0,0,0,.32);font-size:14px;font-weight:700;display:flex;align-items:center;gap:10px;max-width:90vw;animation:tlpop .25s ease;}
+  .tl-tip button{background:rgba(255,255,255,.22);border:0;color:#fff;border-radius:8px;padding:5px 9px;cursor:pointer;font-weight:700;}
+  @keyframes tlpop{from{opacity:0;transform:translateX(-50%) translateY(-10px);}to{opacity:1;transform:translateX(-50%) translateY(0);}}
   .tl-inner{position:relative;}
   .tl-head{display:flex;position:sticky;top:0;z-index:3;background:#FBEAEE;border-bottom:1px solid #F0D3DB;}
   .tl-corner{flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:11px;color:#C9788F;font-weight:700;border-right:1px solid #F0D3DB;}
@@ -1822,7 +1826,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.100〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.101〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
@@ -2212,7 +2216,9 @@ function Schedule({me,data,persist}){
   const scrollRef=useRef(null); const [zoom,setZoom]=useState(1); const pinchRef=useRef({d0:0,z0:1,active:false});
   const ppm=(mode==="overview"?1.0:8)*zoom;
   const dist=(t)=>Math.hypot(t[0].clientX-t[1].clientX, t[0].clientY-t[1].clientY);
-  const onTS=(e)=>{ if(e.touches.length===2){ pinchRef.current={d0:dist(e.touches), z0:zoom, active:true}; } };
+  const [tip,setTip]=useState(false); const tipRef=useRef(false);
+  const maybeTip=()=>{ if(tipRef.current)return; tipRef.current=true; let seen=false; try{seen=localStorage.getItem("mizuho_tl_tip")==="1";}catch(e){} if(seen)return; try{localStorage.setItem("mizuho_tl_tip","1");}catch(e){} setTip(true); setTimeout(()=>setTip(false),6000); };
+  const onTS=(e)=>{ maybeTip(); if(e.touches.length===2){ pinchRef.current={d0:dist(e.touches), z0:zoom, active:true}; } };
   const onTM=(e)=>{ if(e.touches.length===2&&pinchRef.current.active){ let z=pinchRef.current.z0*(dist(e.touches)/pinchRef.current.d0); z=Math.max(0.5,Math.min(6,z)); setZoom(z); if(e.cancelable) e.preventDefault(); } };
   const onTE=(e)=>{ if(e.touches.length<2) pinchRef.current.active=false; };
   useEffect(()=>{const t=setInterval(()=>setNow(new Date()),30000);return()=>clearInterval(t);},[]);
@@ -2252,6 +2258,8 @@ function Schedule({me,data,persist}){
     </div>
     <button className="time-toggle" style={{marginTop:0,marginBottom:10}} onClick={()=>setDpOpen(true)}>👥 この日の支援員・利用者を設定</button>
     {edit&&me.isAdmin&&<TimelineEdit data={data} persist={persist}/>}
+    <div className="tl-hint">🤏 2本指でつまむと時間を細かく拡大できます（＋－ボタンでもOK）</div>
+    {tip&&<div className="tl-tip">🤏 2本指でつまむと、時間を細かく広げられます！<button onClick={()=>setTip(false)}>OK</button></div>}
     <div className="tl-scroll" ref={scrollRef} onTouchStart={onTS} onTouchMove={onTM} onTouchEnd={onTE} style={{height:"64vh"}}>
       <div className="tl-inner" style={{width:W}}>
         <div className="tl-head" style={{height:HEAD,width:W}}>
