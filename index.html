@@ -364,6 +364,14 @@
   .ho-status{background:#FBEAEE;border-radius:10px;padding:8px;margin-top:6px;}
   .ho-st-row{display:flex;justify-content:space-between;font-size:12px;padding:3px 0;}
   .sup-row{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #F0D3DB;border-radius:10px;padding:8px 10px;margin-bottom:6px;}
+  .shop-box{background:#FFFDF6;border:2px solid #E7D8A8;border-radius:14px;padding:10px 12px;margin-bottom:14px;box-shadow:0 4px 14px rgba(190,160,70,.12);}
+  .shop-head{display:flex;justify-content:space-between;align-items:center;font-weight:800;color:#9A7B1E;font-size:15px;cursor:pointer;}
+  .shop-sec{margin-top:8px;}
+  .shop-sec-h{font-weight:700;color:#B07A2E;font-size:12px;background:#F6ECCF;border-radius:6px;padding:3px 8px;display:inline-block;margin-bottom:4px;}
+  .shop-item{display:flex;align-items:center;gap:8px;padding:5px 2px;border-bottom:1px dashed #EADFBF;}
+  .shop-check{width:26px;height:26px;border-radius:50%;border:2px solid #C9A94A;background:#fff;color:#C9A94A;font-weight:800;cursor:pointer;flex:none;line-height:1;}
+  .shop-name{flex:1;font-size:14px;color:#5A4A50;font-weight:600;}
+  .shop-meta{font-size:10.5px;color:#A89262;white-space:nowrap;}
   .sup-done{color:#5B8A45;font-size:12px;font-weight:700;}
   .sup-want{color:#C9788F;font-size:12px;}
   .att-latest{margin-top:8px;}
@@ -1141,7 +1149,12 @@ function Handover({me,data,persist}){
   const [toast,setToast]=useState(""); const flash=(m)=>{setToast(m);setTimeout(()=>setToast(""),1600);};
   const [showStatus,setShowStatus]=useState(null);
   const [newItem,setNewItem]=useState(""); const [note,setNote]=useState(data.supplyNote||"");
-  const [openSupCats,setOpenSupCats]=useState({}); const [editSup,setEditSup]=useState(false);
+  const [openSupCats,setOpenSupCats]=useState({}); const [editSup,setEditSup]=useState(false); const [shopOpen,setShopOpen]=useState(true);
+  const SHOP_SECTIONS=["野菜・果物","肉・魚","冷蔵（乳製品・豆腐）","冷凍","パン","米・乾物・缶詰","調味料","お菓子・飲料","日用品・衛生","洗剤・掃除用品","ホームセンター（資材・工具）","その他"];
+  const secFromCat=(cat)=>{ const c=cat||""; if(c.indexOf("調味料")>=0)return "調味料"; if(c.indexOf("食品")>=0)return "米・乾物・缶詰"; if(c.indexOf("衛生")>=0)return "日用品・衛生"; if(c.indexOf("清掃")>=0||c.indexOf("掃除")>=0)return "洗剤・掃除用品"; return "その他"; };
+  const secOf=(it)=> it.section || secFromCat(it.cat);
+  const mdOnly=(ts)=>{ if(!ts)return ""; const d=new Date(ts); return (d.getMonth()+1)+"/"+d.getDate(); };
+  const setSection=(id,section)=>persist(Object.assign({},data,{supplyItems:items.map(x=>x.id===id?Object.assign({},x,{section}):x)}));
   const [nCat,setNCat]=useState(""); const [nItemCat,setNItemCat]=useState(""); const [nVars,setNVars]=useState("");
   const [pendingAtt,setPendingAtt]=useState([]); const [av,setAv]=useState(null); const [supPhotoFor,setSupPhotoFor]=useState(null);
   const hoFileRef=useRef(null); const supFileRef=useRef(null); const noteFileRef=useRef(null);
@@ -1209,6 +1222,20 @@ function Handover({me,data,persist}){
       </div>))}
     </>}
     {sub==="sup"&&<>
+      {(()=>{ const wantList=items.filter(i=>i.want&&!i.done); if(wantList.length===0) return null; const bySec={}; wantList.forEach(it=>{ const s=secOf(it); (bySec[s]=bySec[s]||[]).push(it); }); const order=SHOP_SECTIONS.filter(s=>bySec[s]); Object.keys(bySec).forEach(s=>{ if(!order.includes(s)) order.push(s); }); return <div className="shop-box">
+        <div className="shop-head" onClick={()=>setShopOpen(!shopOpen)}><span>🛒 買い物リスト（{wantList.length}）</span><span className="tiny">{shopOpen?"▼ 閉じる":"▶ 開く"}</span></div>
+        {shopOpen&&<div>
+          <p className="tiny" style={{margin:"2px 0 8px",color:"#8A6B74"}}>売り場ごとにまとめています。買えたら「○」を押すと消えます（＝済）。</p>
+          {order.map(sec=>(<div key={sec} className="shop-sec">
+            <div className="shop-sec-h">{sec}</div>
+            {bySec[sec].map(it=>(<div key={it.id} className="shop-item">
+              <button className="shop-check" onClick={()=>markDone(it)} title="買えた（済にする）">○</button>
+              <span className="shop-name">{it.name}{it.wantVariant?("（"+it.wantVariant+"）"):""}</span>
+              <span className="shop-meta">希望{mdOnly(it.wantAt)}{it.wantBy?("・"+it.wantBy):""}</span>
+            </div>))}
+          </div>))}
+        </div>}
+      </div>; })()}
       <div className="rec-sub" style={{marginTop:0}}>補充品リスト（希望する物にチェック）</div>
       {me.isAdmin&&<div className="row-end" style={{marginBottom:4}}><button className="link-btn" onClick={()=>setEditSup(!editSup)}>{editSup?"編集を閉じる":"カテゴリー・品目を編集"}</button></div>}
       <div className="row-between" style={{margin:"2px 0 8px"}}><button className="link-btn" onClick={openAllSup}>すべて開く</button><button className="link-btn" onClick={closeAllSup}>すべて閉じる</button></div>
@@ -1220,10 +1247,10 @@ function Handover({me,data,persist}){
           {it.variants&&it.variants.length>0&&<select className="cat-sel" value={it.wantVariant||""} onChange={e=>setVariant(it,e.target.value)}><option value="">種類</option>{it.variants.map(v=><option key={v} value={v}>{v}</option>)}</select>}
           {it.photo&&<img className="sup-thumb" src={it.photo} alt="" onClick={()=>setAv({data:it.photo,meta:{type:"image"}})}/>}
           <button className="mini-key" onClick={()=>{setSupPhotoFor(it.id);supFileRef.current&&supFileRef.current.click();}} title="写真">📷</button>
-          {it.done?<span className="sup-done">済 {dt(it.doneAt)}</span>:(it.want?<span className="sup-want">希望 {it.wantBy}{it.wantVariant?"（"+it.wantVariant+"）":""}</span>:null)}
+          {it.done?<span className="sup-done">済 {dt(it.doneAt)}</span>:(it.want?<span className="sup-want">希望 {mdOnly(it.wantAt)} {it.wantBy}{it.wantVariant?"（"+it.wantVariant+"）":""}</span>:null)}
           {me.isAdmin&&it.want&&!it.done&&<button className="btn ghost2" onClick={()=>markDone(it)}>済</button>}
           {me.isAdmin&&it.done&&<button className="link-btn" onClick={()=>clearDone(it)}>戻す</button>}
-          {me.isAdmin&&editSup&&<><button className="mini-key" onClick={()=>siMove(it.id,-1)}>↑</button><button className="mini-key" onClick={()=>siMove(it.id,1)}>↓</button><select className="cat-sel" value={it.cat||"その他"} onChange={e=>siSetCat(it.id,e.target.value)}>{supCats.map(c=><option key={c} value={c}>{c}</option>)}</select></>}
+          {me.isAdmin&&editSup&&<><button className="mini-key" onClick={()=>siMove(it.id,-1)}>↑</button><button className="mini-key" onClick={()=>siMove(it.id,1)}>↓</button><select className="cat-sel" value={it.cat||"その他"} onChange={e=>siSetCat(it.id,e.target.value)}>{supCats.map(c=><option key={c} value={c}>{c}</option>)}</select><select className="cat-sel" title="売り場" value={secOf(it)} onChange={e=>setSection(it.id,e.target.value)}>{SHOP_SECTIONS.map(s=><option key={s} value={s}>{s}</option>)}</select></>}
           {me.isAdmin&&<button className="mini-del" onClick={()=>delItem(it.id)}>🗑</button>}
         </div>))}</div>}
       </div>; })}
@@ -1826,7 +1853,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.101〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.102〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
