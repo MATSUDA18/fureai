@@ -1151,6 +1151,8 @@ function Handover({me,data,persist}){
   const [toast,setToast]=useState(""); const flash=(m)=>{setToast(m);setTimeout(()=>setToast(""),1600);};
   const [showStatus,setShowStatus]=useState(null);
   const [newItem,setNewItem]=useState(""); const [note,setNote]=useState(data.supplyNote||""); const [noteOpen,setNoteOpen]=useState(false);
+  const [noteItem,setNoteItem]=useState(null);
+  const saveItemNote=()=>{ const e=noteItem; persist(Object.assign({},data,{supplyItems:items.map(i=>i.id===e.id?Object.assign({},i,{note:(e.text||"").trim()}):i)})); setNoteItem(null); };
   const [openSupCats,setOpenSupCats]=useState({}); const [editSup,setEditSup]=useState(false); const [shopOpen,setShopOpen]=useState(true);
   const SHOP_SECTIONS=["野菜・果物","肉・魚","冷蔵（乳製品・豆腐）","冷凍","パン","米・乾物・缶詰","調味料","お菓子・飲料","日用品・衛生","洗剤・掃除用品","ホームセンター（資材・工具）","その他"];
   const secFromCat=(cat)=>{ const c=cat||""; if(c.indexOf("調味料")>=0)return "調味料"; if(c.indexOf("食品")>=0)return "米・乾物・缶詰"; if(c.indexOf("衛生")>=0)return "日用品・衛生"; if(c.indexOf("清掃")>=0||c.indexOf("掃除")>=0)return "洗剤・掃除用品"; return "その他"; };
@@ -1252,11 +1254,13 @@ function Handover({me,data,persist}){
           {isVar(it)?<div style={{flex:1,minWidth:"60%"}}><div style={{fontWeight:600,color:"#5A4A50",fontSize:14,marginBottom:4}}>{it.name}</div><div style={{display:"flex",flexWrap:"wrap",gap:6}}>{it.variants.map(v=>{const on=wvOf(it).indexOf(v)>=0;return <button key={v} className={"var-chip"+(on?" on":"")} onClick={()=>toggleVariant(it,v)}>{on?"✓ ":""}{v}</button>;})}</div></div>:<label className="chk" style={{flex:1}}><input type="checkbox" checked={!!it.want} onChange={()=>toggleWant(it)}/>{it.name}</label>}
           {it.photo&&<img className="sup-thumb" src={it.photo} alt="" onClick={()=>setAv({data:it.photo,meta:{type:"image"}})}/>}
           <button className="mini-key" onClick={()=>{setSupPhotoFor(it.id);supFileRef.current&&supFileRef.current.click();}} title="写真">📷</button>
+          <button className="mini-key" onClick={()=>setNoteItem({id:it.id,text:it.note||""})} title="この品のメモ">📝{(it.note||"").trim()?"✓":""}</button>
           {it.done?<span className="sup-done">済 {dt(it.doneAt)}</span>:(isWant(it)?<span className="sup-want">希望 {mdOnly(it.wantAt)} {it.wantBy}{isVar(it)&&wvOf(it).length?"（"+wvOf(it).join("・")+"）":""}</span>:null)}
           {me.isAdmin&&isWant(it)&&!it.done&&<button className="btn ghost2" onClick={()=>markDone(it)}>済</button>}
           {me.isAdmin&&it.done&&<button className="link-btn" onClick={()=>clearDone(it)}>戻す</button>}
           {me.isAdmin&&editSup&&<><button className="mini-key" onClick={()=>siMove(it.id,-1)}>↑</button><button className="mini-key" onClick={()=>siMove(it.id,1)}>↓</button><select className="cat-sel" value={it.cat||"その他"} onChange={e=>siSetCat(it.id,e.target.value)}>{supCats.map(c=><option key={c} value={c}>{c}</option>)}</select><select className="cat-sel" title="売り場" value={secOf(it)} onChange={e=>setSection(it.id,e.target.value)}>{SHOP_SECTIONS.map(s=><option key={s} value={s}>{s}</option>)}</select></>}
           {me.isAdmin&&<button className="mini-del" onClick={()=>delItem(it.id)}>🗑</button>}
+          {(it.note||"").trim()&&<div style={{flexBasis:"100%",fontSize:11.5,color:"#8A6B74",marginTop:2,whiteSpace:"pre-wrap"}}>📝 {it.note}</div>}
         </div>))}</div>}
       </div>; })}
       {editSup&&me.isAdmin&&<div className="tl-editpanel">
@@ -1269,7 +1273,8 @@ function Handover({me,data,persist}){
       <select value={nItemCat} onChange={e=>setNItemCat(e.target.value)} style={{width:"100%",padding:"10px",border:"1px solid #F0D3DB",borderRadius:"10px",marginTop:"6px",background:"#FCF4F5"}}><option value="">カテゴリー：{supCats[0]}</option>{supCats.map(c=><option key={c} value={c}>{c}</option>)}</select>
       <input value={nVars} onChange={e=>setNVars(e.target.value)} placeholder="種類（任意・例：いちご、ブルーベリー、マーマレード）" style={{width:"100%",padding:"10px",border:"1px solid #F0D3DB",borderRadius:"10px",marginTop:"6px"}}/>
       <p className="tiny">「種類」を入れると、その品目に選択肢が付きます（例：ジャム→いちご/ブルーベリー…）。読点「、」かカンマ「,」で区切ってください。</p>
-      <button className="cat-head" style={{marginTop:10}} onClick={()=>setNoteOpen(!noteOpen)}><span>{noteOpen?"▼":"▶"} 📝 備考（自由メモ）{(!noteOpen&&((data.supplyNote||"").trim()||(data.supplyNotePhotos||[]).length>0))?"　●":""}</span></button>
+      <p className="tiny" style={{margin:"8px 0 2px",color:"#8A6B74"}}>各品目のメモは、品目の右の「📝」から入力できます（その品だけに残ります）。</p>
+      <button className="cat-head" onClick={()=>setNoteOpen(!noteOpen)}><span>{noteOpen?"▼":"▶"} 📋 全体の自由メモ（任意・補充品全般）{(!noteOpen&&((data.supplyNote||"").trim()||(data.supplyNotePhotos||[]).length>0))?"　●":""}</span></button>
       {noteOpen&&<div>
         <Area label="" rows={3} value={note} onChange={e=>setNote(e.target.value)} placeholder="補充に関する自由メモ"/>
         <div className="row-between" style={{marginTop:2}}><button className="link-btn" onClick={()=>noteFileRef.current&&noteFileRef.current.click()}>📷 備考に写真を添付</button><Btn kind="ghost2" onClick={saveNote}>備考を保存</Btn></div>
@@ -1279,6 +1284,11 @@ function Handover({me,data,persist}){
     </>}
     <input ref={supFileRef} type="file" accept="image/*" onChange={onSupPhoto} style={{display:"none"}}/>
     {av&&<Modal title="添付" tint="#C9788F" onClose={()=>setAv(null)}>{av.meta&&av.meta.type==="pdf"?<embed src={av.data} type="application/pdf" style={{width:"100%",height:"60vh"}}/>:<img src={av.data} style={{width:"100%",borderRadius:8}} alt="添付"/>}</Modal>}
+    {noteItem&&<Modal title={"📝 メモ："+((items.find(i=>i.id===noteItem.id)||{}).name||"")} tint="#C9788F" onClose={()=>setNoteItem(null)}>
+      <p className="hint">この品目だけのメモです（例：「●●スーパーの方が安い」「青いパッケージの方」など）。</p>
+      <Area label="" rows={3} value={noteItem.text} onChange={e=>setNoteItem(p=>Object.assign({},p,{text:e.target.value}))} placeholder="この品目のメモ"/>
+      <div className="row-end"><Btn onClick={saveItemNote}>保存</Btn></div>
+    </Modal>}
     {toast&&<div className="toast">{toast}</div>}
   </Section>;
 }
@@ -1476,7 +1486,7 @@ function Records({me,data,persist,reload}){
   const loadPhotos=async()=>{ if(!SB_ON){ setPhotos([]); return; } try{ setPhotos(await sbListPhotos(af,at)); }catch(e){ setPhotos([]); } };
   useEffect(()=>{ if(view==="album"){ setPhotos(null); loadPhotos(); } },[view,af,at]);
   useEffect(()=>{ setSel([]); },[date, dayUsers.join("|")]);
-  const onFile=async(e)=>{ const f=e.target.files&&e.target.files[0]; e.target.value=""; if(!f)return; if(sel.length===0){ flash("先に利用者を選んでください"); return; } if(!SB_ON){ flash("写真の保存には共有DBの設定が必要です"); return; } const cat=photoCatRef.current||""; setBusy(true); try{ const full=await compressImage(f,900,0.6); const thumb=await compressImage(f,160,0.5); const id=uid()+"_"+Date.now(); const ts=new Date().toISOString(); await sbInsertPhoto({id, meta:{users:sel, ts, thumb, cat}, image:full, created:ts}); await pushRecords("📷 写真"+(cat?("（"+cat+"）"):""),{photoId:id, thumb, cat}); flash("写真を記録しました"+(cat?("："+cat):"")); }catch(err){ flash("写真の保存に失敗（写真表の設定をご確認ください）"); } finally{ setBusy(false); photoCatRef.current=""; } };
+  const onFile=async(e)=>{ const f=e.target.files&&e.target.files[0]; e.target.value=""; if(!f)return; if(sel.length===0){ flash("先に利用者を選んでください"); return; } if(!SB_ON){ flash("写真の保存には共有DBの設定が必要です"); return; } const cat=photoCatRef.current||""; setBusy(true); try{ const full=await compressImage(f,900,0.6); const thumb=await compressImage(f,160,0.5); const id=uid()+"_"+Date.now(); const ts=new Date().toISOString(); await sbInsertPhoto({id, meta:{users:sel, ts, thumb, cat}, image:full, created:ts}); await pushRecords("📷 写真"+(cat?("（"+cat+"）"):""),{photoId:id, thumb, cat}); flash("写真を記録しました"+(cat?("："+cat):"")); if(view==="album"){ try{ await loadPhotos(); }catch(e){} } }catch(err){ flash("写真の保存に失敗（写真表の設定をご確認ください）"); } finally{ setBusy(false); photoCatRef.current=""; } };
   const openFull=async(id)=>{ if(!id||!SB_ON)return; try{ const p=await sbPhotoFull(id); if(p) setPv(p); else flash("写真が見つかりません"); }catch(e){ flash("写真を開けませんでした"); } };
   const delPhoto=async(id)=>{ if(!confirm("この写真を削除しますか？"))return; try{ await sbDeletePhoto(id); setPhotos(p=>(p||[]).filter(x=>x.id!==id)); setPv(null); }catch(e){} };
   const catMove=(i,dir)=>{ const c=cats.slice(); const j=i+dir; if(j<0||j>=c.length)return; const t=c[i];c[i]=c[j];c[j]=t; persist({...data,recCats:c,recItems:rItems}); };
@@ -1573,12 +1583,6 @@ function Records({me,data,persist,reload}){
       {cats.map(cat=>{ const list=rItems.filter(i=>catsOf(i).includes(cat)); if(!list.length) return null; const op=!!openCats[cat]; return <div key={cat} className="rec-group"><button className={"cat-head"+(op?" open":"")} onClick={()=>toggleCat(cat)}><span>{op?"▼":"▶"} {cat}</span><span className="tiny">{list.length}</span></button>{op&&<div className="rec-items rec-open">{list.map(i=>(<button key={i.id} className="recbtn" onClick={()=>tapItem(i)}>{i.name}{i.variants&&i.variants.length?" ▾":""}</button>))}</div>}</div>; })}
       {(function(){ const orphans=rItems.filter(i=>!catsOf(i).some(c=>cats.includes(c))); if(!orphans.length) return null; return <div className="rec-group"><div className="rec-gtitle">その他</div><div className="rec-items">{orphans.map(i=>(<button key={i.id} className="recbtn" onClick={()=>tapItem(i)}>{i.name}{i.variants&&i.variants.length?" ▾":""}</button>))}</div></div>; })()}
       </div></>}
-      <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={onFile} style={{display:"none"}}/>
-      {photoPick&&<Modal title="📷 どの写真ですか？" tint="#C9788F" onClose={()=>setPhotoPick(false)}>
-        <p className="hint">用途を選ぶと、その場でカメラが開きます。記録に「写真（用途）」として残ります。</p>
-        <div className="chk-grid" style={{gridTemplateColumns:"repeat(2,1fr)",gap:8}}>{PHOTO_CATS.map(c=><Btn key={c} kind="ghost2" onClick={()=>startPhoto(c)}>{c}</Btn>)}</div>
-        <div className="row-end" style={{marginTop:8}}><button className="link-btn" onClick={()=>startPhoto("")}>用途なしで撮る</button></div>
-      </Modal>}
       {menuOpen&&<Modal title="🍱 配食メニューの貼り付け" tint="#C9788F" onClose={()=>setMenuOpen(false)}>
         <p className="hint">LINEで届いた<b>晩・朝のメニュー</b>をコピーして、下の枠に貼り付けてください。自動で晩・朝に分けます（違っていれば下で直せます）。</p>
         <div className="nf"><label>貼り付け（晩・朝まとめて）</label><textarea rows={6} value={menuRaw} onChange={e=>onMenuRaw(e.target.value)} placeholder={"LINEのメニューをそのまま貼り付け。例：\n11/4夜\n・豚肉ときのこのカレー…\n11/5 朝\n・目玉焼き…"}/></div>
@@ -1646,7 +1650,15 @@ function Records({me,data,persist,reload}){
         <span className={"rec-item"+(r.abn?" abn":"")}>{r.item}</span>
         <button className="mini-key" onClick={()=>openEditRec(r)}>✏️</button><button className="mini-del" onClick={()=>delRec(r.id)}>🗑</button></div>;})}</div>
     </>}
+    <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={onFile} style={{display:"none"}}/>
+    {photoPick&&<Modal title="📷 どの写真ですか？" tint="#C9788F" onClose={()=>setPhotoPick(false)}>
+      <p className="hint">用途を選ぶと、その場でカメラが開きます。記録に「写真（用途）」として残ります。</p>
+      <div className="chk-grid" style={{gridTemplateColumns:"repeat(2,1fr)",gap:8}}>{PHOTO_CATS.map(c=><Btn key={c} kind="ghost2" onClick={()=>startPhoto(c)}>{c}</Btn>)}</div>
+      <div className="row-end" style={{marginTop:8}}><button className="link-btn" onClick={()=>startPhoto("")}>用途なしで撮る</button></div>
+    </Modal>}
     {view==="album"&&<div>
+      <button className="recbtn cam" style={{width:"100%",marginBottom:8,padding:"10px"}} onClick={()=>setPhotoPick(true)} disabled={busy}>📷 写真をとる（用途を選ぶ）</button>
+      <p className="tiny" style={{textAlign:"center",marginBottom:6,color:"#B0895A"}}>上で利用者を選んでから撮影してください。撮った写真はこの一覧に入ります。</p>
       <div className="album-filter">
         <label>開始<input type="date" value={af} onChange={e=>setAf(e.target.value)}/></label>
         <label>終了<input type="date" value={at} onChange={e=>setAt(e.target.value)}/></label>
@@ -1883,7 +1895,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.107〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.108〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
