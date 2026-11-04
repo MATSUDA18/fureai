@@ -372,6 +372,8 @@
   .shop-check{width:26px;height:26px;border-radius:50%;border:2px solid #C9A94A;background:#fff;color:#C9A94A;font-weight:800;cursor:pointer;flex:none;line-height:1;}
   .shop-name{flex:1;font-size:14px;color:#5A4A50;font-weight:600;}
   .shop-meta{font-size:10.5px;color:#A89262;white-space:nowrap;}
+  .var-chip{padding:5px 10px;border-radius:999px;border:1px solid #F0D3DB;background:#fff;color:#94808A;font-size:12px;font-weight:600;cursor:pointer;}
+  .var-chip.on{background:#F6D4DD;border-color:#E79AB0;color:#B85C7A;}
   .sup-done{color:#5B8A45;font-size:12px;font-weight:700;}
   .sup-want{color:#C9788F;font-size:12px;}
   .att-latest{margin-top:8px;}
@@ -1185,10 +1187,14 @@ function Handover({me,data,persist}){
   const addItem=()=>{ if(!newItem.trim())return; const cat=nItemCat||supCats[0]||"その他"; const vars=nVars.split(/[、,]/).map(s=>s.trim()).filter(Boolean); persist(Object.assign({},data,{supplyCats:supCats,supplyItems:[...items,{id:uid(),name:newItem.trim(),cat,variants:vars}]})); setNewItem(""); setNVars(""); };
   const siMove=(id,dir)=>{ const arr=items.slice(); const idx=arr.findIndex(x=>x.id===id); if(idx<0)return; const cat=(arr[idx].cat||"その他"); let j=idx+dir; while(j>=0&&j<arr.length&&(arr[j].cat||"その他")!==cat) j+=dir; if(j<0||j>=arr.length)return; const t=arr[idx];arr[idx]=arr[j];arr[j]=t; persist(Object.assign({},data,{supplyItems:arr,supplyCats:supCats})); };
   const siSetCat=(id,cat)=>persist(Object.assign({},data,{supplyItems:items.map(x=>x.id===id?Object.assign({},x,{cat}):x),supplyCats:supCats}));
-  const setVariant=(it,v)=>persist(Object.assign({},data,{supplyItems:items.map(i=>i.id===it.id?Object.assign({},i,{wantVariant:v}):i)}));
+  const isVar=(it)=> it.variants && it.variants.length>0;
+  const wvOf=(it)=> it.wantVariants ? it.wantVariants : (it.wantVariant?[it.wantVariant]:[]);
+  const isWant=(it)=> isVar(it) ? wvOf(it).length>0 : !!it.want;
+  const toggleVariant=(it,v)=>{ const cur=wvOf(it); const has=cur.indexOf(v)>=0; const next=has?cur.filter(x=>x!==v):cur.concat([v]); const upd={wantVariants:next,wantVariant:undefined}; if(next.length>0&&cur.length===0){ upd.want=true; upd.wantBy=me.name; upd.wantAt=new Date().toISOString(); upd.done=false; upd.doneAt=null; } if(next.length===0){ upd.want=false; } persist(Object.assign({},data,{supplyItems:items.map(i=>i.id===it.id?Object.assign({},i,upd):i)})); };
+  const removeVariant=(it,v)=>{ const cur=wvOf(it); const next=cur.filter(x=>x!==v); const upd={wantVariants:next}; if(next.length===0){ upd.want=false; upd.done=true; upd.doneAt=new Date().toISOString(); } persist(Object.assign({},data,{supplyItems:items.map(i=>i.id===it.id?Object.assign({},i,upd):i)})); };
   const delItem=(id)=>{ if(!confirm("この品目を削除しますか？"))return; persist(Object.assign({},data,{supplyItems:items.filter(i=>i.id!==id)})); };
-  const toggleWant=(it)=>{ if(!it.want && it.variants && it.variants.length>0 && !it.wantVariant){ flash("種類を選んでください"); return; } const now=new Date().toISOString(); const upd=it.want?{want:false}:{want:true,wantBy:me.name,wantAt:now,done:false,doneAt:null}; persist(Object.assign({},data,{supplyItems:items.map(i=>i.id===it.id?Object.assign({},i,upd):i)})); };
-  const markDone=(it)=>{ persist(Object.assign({},data,{supplyItems:items.map(i=>i.id===it.id?Object.assign({},i,{done:true,doneAt:new Date().toISOString(),want:false}):i)})); };
+  const toggleWant=(it)=>{ const now=new Date().toISOString(); const upd=it.want?{want:false}:{want:true,wantBy:me.name,wantAt:now,done:false,doneAt:null}; persist(Object.assign({},data,{supplyItems:items.map(i=>i.id===it.id?Object.assign({},i,upd):i)})); };
+  const markDone=(it)=>{ persist(Object.assign({},data,{supplyItems:items.map(i=>i.id===it.id?Object.assign({},i,{done:true,doneAt:new Date().toISOString(),want:false,wantVariants:[]}):i)})); };
   const clearDone=(it)=>{ persist(Object.assign({},data,{supplyItems:items.map(i=>i.id===it.id?Object.assign({},i,{done:false,doneAt:null}):i)})); };
   const saveNote=()=>{ persist(Object.assign({},data,{supplyNote:note})); flash("備考を保存しました"); };
   return <Section title="申し送り・補充品" note="">
@@ -1222,16 +1228,16 @@ function Handover({me,data,persist}){
       </div>))}
     </>}
     {sub==="sup"&&<>
-      {(()=>{ const wantList=items.filter(i=>i.want&&!i.done); if(wantList.length===0) return null; const bySec={}; wantList.forEach(it=>{ const s=secOf(it); (bySec[s]=bySec[s]||[]).push(it); }); const order=SHOP_SECTIONS.filter(s=>bySec[s]); Object.keys(bySec).forEach(s=>{ if(!order.includes(s)) order.push(s); }); return <div className="shop-box">
-        <div className="shop-head" onClick={()=>setShopOpen(!shopOpen)}><span>🛒 買い物リスト（{wantList.length}）</span><span className="tiny">{shopOpen?"▼ 閉じる":"▶ 開く"}</span></div>
+      {(()=>{ const entries=[]; items.forEach(it=>{ if(it.done)return; if(isVar(it)){ wvOf(it).forEach(v=>entries.push({it,v})); } else if(it.want){ entries.push({it,v:""}); } }); if(entries.length===0) return null; const bySec={}; entries.forEach(en=>{ const s=secOf(en.it); (bySec[s]=bySec[s]||[]).push(en); }); const order=SHOP_SECTIONS.filter(s=>bySec[s]); Object.keys(bySec).forEach(s=>{ if(!order.includes(s)) order.push(s); }); return <div className="shop-box">
+        <div className="shop-head" onClick={()=>setShopOpen(!shopOpen)}><span>🛒 買い物リスト（{entries.length}）</span><span className="tiny">{shopOpen?"▼ 閉じる":"▶ 開く"}</span></div>
         {shopOpen&&<div>
           <p className="tiny" style={{margin:"2px 0 8px",color:"#8A6B74"}}>売り場ごとにまとめています。買えたら「○」を押すと消えます（＝済）。</p>
           {order.map(sec=>(<div key={sec} className="shop-sec">
             <div className="shop-sec-h">{sec}</div>
-            {bySec[sec].map(it=>(<div key={it.id} className="shop-item">
-              <button className="shop-check" onClick={()=>markDone(it)} title="買えた（済にする）">○</button>
-              <span className="shop-name">{it.name}{it.wantVariant?("（"+it.wantVariant+"）"):""}</span>
-              <span className="shop-meta">希望{mdOnly(it.wantAt)}{it.wantBy?("・"+it.wantBy):""}</span>
+            {bySec[sec].map((en,i)=>(<div key={en.it.id+"_"+en.v+"_"+i} className="shop-item">
+              <button className="shop-check" onClick={()=>en.v?removeVariant(en.it,en.v):markDone(en.it)} title="買えた（済にする）">○</button>
+              <span className="shop-name">{en.it.name}{en.v?("（"+en.v+"）"):""}</span>
+              <span className="shop-meta">希望{mdOnly(en.it.wantAt)}{en.it.wantBy?("・"+en.it.wantBy):""}</span>
             </div>))}
           </div>))}
         </div>}
@@ -1242,13 +1248,12 @@ function Handover({me,data,persist}){
       {items.length===0&&<p className="empty">品目がありません。下で登録できます。</p>}
       {supCats.map(cat=>{ const list=items.filter(i=>(i.cat||"その他")===cat); if(!list.length) return null; const op=!!openSupCats[cat]; return <div key={cat} className="rec-group">
         <button className="cat-head" onClick={()=>toggleSupCat(cat)}><span>{op?"▼":"▶"} {cat}</span><span className="tiny">{list.filter(x=>x.want&&!x.done).length>0?"希望"+list.filter(x=>x.want&&!x.done).length+"／":""}{list.length}</span></button>
-        {op&&<div>{list.map(it=>(<div key={it.id} className="sup-row">
-          <label className="chk" style={{flex:1}}><input type="checkbox" checked={!!it.want} onChange={()=>toggleWant(it)}/>{it.name}</label>
-          {it.variants&&it.variants.length>0&&<select className="cat-sel" value={it.wantVariant||""} onChange={e=>setVariant(it,e.target.value)}><option value="">種類</option>{it.variants.map(v=><option key={v} value={v}>{v}</option>)}</select>}
+        {op&&<div>{list.map(it=>(<div key={it.id} className="sup-row" style={{flexWrap:"wrap"}}>
+          {isVar(it)?<div style={{flex:1,minWidth:"60%"}}><div style={{fontWeight:600,color:"#5A4A50",fontSize:14,marginBottom:4}}>{it.name}</div><div style={{display:"flex",flexWrap:"wrap",gap:6}}>{it.variants.map(v=>{const on=wvOf(it).indexOf(v)>=0;return <button key={v} className={"var-chip"+(on?" on":"")} onClick={()=>toggleVariant(it,v)}>{on?"✓ ":""}{v}</button>;})}</div></div>:<label className="chk" style={{flex:1}}><input type="checkbox" checked={!!it.want} onChange={()=>toggleWant(it)}/>{it.name}</label>}
           {it.photo&&<img className="sup-thumb" src={it.photo} alt="" onClick={()=>setAv({data:it.photo,meta:{type:"image"}})}/>}
           <button className="mini-key" onClick={()=>{setSupPhotoFor(it.id);supFileRef.current&&supFileRef.current.click();}} title="写真">📷</button>
-          {it.done?<span className="sup-done">済 {dt(it.doneAt)}</span>:(it.want?<span className="sup-want">希望 {mdOnly(it.wantAt)} {it.wantBy}{it.wantVariant?"（"+it.wantVariant+"）":""}</span>:null)}
-          {me.isAdmin&&it.want&&!it.done&&<button className="btn ghost2" onClick={()=>markDone(it)}>済</button>}
+          {it.done?<span className="sup-done">済 {dt(it.doneAt)}</span>:(isWant(it)?<span className="sup-want">希望 {mdOnly(it.wantAt)} {it.wantBy}{isVar(it)&&wvOf(it).length?"（"+wvOf(it).join("・")+"）":""}</span>:null)}
+          {me.isAdmin&&isWant(it)&&!it.done&&<button className="btn ghost2" onClick={()=>markDone(it)}>済</button>}
           {me.isAdmin&&it.done&&<button className="link-btn" onClick={()=>clearDone(it)}>戻す</button>}
           {me.isAdmin&&editSup&&<><button className="mini-key" onClick={()=>siMove(it.id,-1)}>↑</button><button className="mini-key" onClick={()=>siMove(it.id,1)}>↓</button><select className="cat-sel" value={it.cat||"その他"} onChange={e=>siSetCat(it.id,e.target.value)}>{supCats.map(c=><option key={c} value={c}>{c}</option>)}</select><select className="cat-sel" title="売り場" value={secOf(it)} onChange={e=>setSection(it.id,e.target.value)}>{SHOP_SECTIONS.map(s=><option key={s} value={s}>{s}</option>)}</select></>}
           {me.isAdmin&&<button className="mini-del" onClick={()=>delItem(it.id)}>🗑</button>}
@@ -1438,7 +1443,13 @@ function Records({me,data,persist,reload}){
   const setLogDate=(nd)=>{ if(!nd)return; useTime?setMDate(nd):setDate(nd); };
   const _bs=new Date(logDate+"T15:00:00"); const _be=(()=>{const e=addDays(new Date(logDate+"T00:00:00"),1); e.setHours(15,0,0,0); return e;})();
   const log=(data.records||[]).filter(r=>r&&r.ts).filter(r=>{ const t=new Date(r.ts); return t>=_bs && t<_be; }).sort((a,b)=>String(b.ts||"").localeCompare(String(a.ts||"")));
-  const logFiltered=(sel.length>0&&!showAllUsers)?log.filter(r=>sel.includes(r.user)):log;
+  const logFiltered=(sel.length>0&&!showAllUsers)?log.filter(r=>sel.includes(r.user)||r.user==="全体"):log;
+  // 配食メニューの貼り付け（晩・朝を一括で分割記録）
+  const [menuOpen,setMenuOpen]=useState(false); const [menuRaw,setMenuRaw]=useState(""); const [menuD,setMenuD]=useState(""); const [menuB,setMenuB]=useState("");
+  const splitMenu=(raw)=>{ const lines=String(raw||"").replace(/\r/g,"").split("\n"); const bare=(L)=>String(L||"").replace(/[\s　]/g,""); const isDH=(L)=> /(夜|夕食|夕飯|晩)/.test(L)&&!/朝/.test(L)&&(/\d/.test(L)||bare(L).length<=4); const isBH=(L)=> /朝/.test(L)&&(/\d/.test(L)||bare(L).length<=4); let di=-1,bi=-1; for(let i=0;i<lines.length;i++){ if(isDH(lines[i])){ di=i; break; } } for(let i=(di>=0?di+1:0);i<lines.length;i++){ if(isBH(lines[i])){ bi=i; break; } } const grab=(a,b)=> lines.slice(a,b).join("\n").trim(); let dinner="",breakfast=""; if(di>=0){ dinner=grab(di+1, bi>di?bi:lines.length); } if(bi>=0){ breakfast=grab(bi+1, lines.length); } if(!dinner&&!breakfast){ const t=String(raw||""); const d2=t.search(/(夜|夕食|晩)/), b2=t.search(/朝/); if(d2>=0&&b2>d2){ dinner=t.slice(d2,b2); breakfast=t.slice(b2); } else { dinner=t.trim(); } } return {dinner:dinner.trim(),breakfast:breakfast.trim()}; };
+  const cleanMenu=(s)=> String(s||"").replace(/\r/g,"").replace(/\n[\s　]*→/g,"→").split(/\n/).map(x=>x.replace(/^[・\s　]+/,"").trim()).filter(Boolean).join("、");
+  const onMenuRaw=(v)=>{ setMenuRaw(v); const r=splitMenu(v); setMenuD(r.dinner); setMenuB(r.breakfast); };
+  const pasteMenu=async()=>{ const d=cleanMenu(menuD), b=cleanMenu(menuB); if(!d&&!b){ flash("メニューを入力してください"); return; } const recs=[]; if(d){ recs.push({id:uid(),ts:new Date(date+"T18:00:00").toISOString(),user:"全体",item:"メニュー（晩）："+d}); } if(b){ const bd=addDays(new Date(date+"T00:00:00"),1); bd.setHours(7,30,0,0); recs.push({id:uid(),ts:bd.toISOString(),user:"全体",item:"メニュー（朝）："+b}); } try{ for(const rc of recs) await recAdd(rc); await reload(); setMenuOpen(false); setMenuRaw(""); setMenuD(""); setMenuB(""); flash("メニューを記録しました（晩・朝）"); }catch(e){ flash("保存に失敗しました"); } };
   const effDate=useTime?mDate:date; const rplan=(data.dayPlans||{})[effDate]||{}; const dayUsers=(rplan.users&&rplan.users.length)?rplan.users:USERS4;
   const USER_COLORS=[{bg:"#F7D9E1",fg:"#B85C7A"},{bg:"#D4ECE2",fg:"#2E8B76"},{bg:"#D9E7F3",fg:"#3D73A6"},{bg:"#F3E6C6",fg:"#A6812F"},{bg:"#E6DBF0",fg:"#7C5EA6"},{bg:"#F8E2D2",fg:"#C06A42"},{bg:"#DEECCF",fg:"#5F8C3C"},{bg:"#F0D9EC",fg:"#A85F94"}];
   const userColor=(u)=>{ let i=dayUsers.indexOf(u); if(i<0){ let h=0; const s=String(u); for(let k=0;k<s.length;k++) h=(h*31+s.charCodeAt(k))>>>0; i=h; } return USER_COLORS[((i%USER_COLORS.length)+USER_COLORS.length)%USER_COLORS.length]; };
@@ -1542,6 +1553,7 @@ function Records({me,data,persist,reload}){
       <p className="tiny" style={{marginTop:6,color:"#B0895A"}}>※ A3印刷は新しいタブで開きます（パソコン推奨。印刷ダイアログで「A3・横」を選んでください）。Excelは写真なしの表（日付・メニュー・調理担当）です。</p>
     </div>}
     {view==="log"&&<>
+      <button className="recbtn" style={{width:"100%",background:"#FFF3E6",borderColor:"#F0C98A",color:"#B07A2E",marginBottom:8,padding:"10px"}} onClick={()=>setMenuOpen(true)}>🍱 配食メニューを貼り付け（晩・朝をまとめて記録）</button>
       <div className="rec-quick">
         <button className="recbtn vit" onClick={()=>setVit({sys:"",dia:"",hr:"",temp:""})}>🩺 バイタル測定（血圧・体温）</button>
         <button className="recbtn cam" onClick={()=>setPhotoPick(true)} disabled={busy}>📷 写真をとる（用途を選ぶ）</button>
@@ -1558,6 +1570,14 @@ function Records({me,data,persist,reload}){
         <p className="hint">用途を選ぶと、その場でカメラが開きます。記録に「写真（用途）」として残ります。</p>
         <div className="chk-grid" style={{gridTemplateColumns:"repeat(2,1fr)",gap:8}}>{PHOTO_CATS.map(c=><Btn key={c} kind="ghost2" onClick={()=>startPhoto(c)}>{c}</Btn>)}</div>
         <div className="row-end" style={{marginTop:8}}><button className="link-btn" onClick={()=>startPhoto("")}>用途なしで撮る</button></div>
+      </Modal>}
+      {menuOpen&&<Modal title="🍱 配食メニューの貼り付け" tint="#C9788F" onClose={()=>setMenuOpen(false)}>
+        <p className="hint">LINEで届いた<b>晩・朝のメニュー</b>をコピーして、下の枠に貼り付けてください。自動で晩・朝に分けます（違っていれば下で直せます）。</p>
+        <div className="nf"><label>貼り付け（晩・朝まとめて）</label><textarea rows={6} value={menuRaw} onChange={e=>onMenuRaw(e.target.value)} placeholder={"LINEのメニューをそのまま貼り付け。例：\n11/4夜\n・豚肉ときのこのカレー…\n11/5 朝\n・目玉焼き…"}/></div>
+        <div className="nf"><label>🌙 晩のメニュー</label><textarea rows={2} value={menuD} onChange={e=>setMenuD(e.target.value)} placeholder="（自動で入ります）"/></div>
+        <div className="nf"><label>☀ 朝のメニュー</label><textarea rows={2} value={menuB} onChange={e=>setMenuB(e.target.value)} placeholder="（自動で入ります）"/></div>
+        <p className="tiny">記録先：{fmtDate(date)}（この勤務日）。記録すると、下の記録一覧に「全体」として晩・朝が別々に出ます。</p>
+        <div className="row-end"><Btn onClick={pasteMenu}>晩・朝を記録する</Btn></div>
       </Modal>}
       <div className="rec-sub">自由に記録（様子・エピソード）</div>
       <div className="composer">
@@ -1853,7 +1873,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.102〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.104〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
@@ -2122,7 +2142,7 @@ function Inside({me,data,tab,setTab,onLogout,persist,reload}){
       {myHo.length>0&&<div className="notice-box"><b>📌 未確認の申し送り（{myHo.length}）</b>{myHo.map(h=>(<div key={h.id} className="notice-item"><span>{_hd(h.ts)}・本部{h.scope==="day"?"（本日担当）":"（全員）"}</span><p>{h.text}</p><div className="row-end"><Btn onClick={()=>confirmOne(h)}>確認済みにする</Btn></div></div>))}</div>}
       {myWork.length>0&&<div className="notice-box"><b>📋 業務の詳細・要確認（{myWork.length}）</b>{myWork.map(w=>(<div key={w.id} className="notice-item">{w.important&&<span className="imp-badge" style={{marginBottom:4}}>⚠ 重要</span>}<span style={{display:"block"}}>{w.date}{w.fromLabel?("／"+w.fromLabel):""}</span><p>{w.text}</p><div className="row-end" style={{gap:6}}><button className="link-btn" onClick={()=>{setTab("work");setOpenChk(false);}}>業務の詳細を開く</button><Btn onClick={()=>confirmWorkOne(w)}>確認済みにする</Btn></div></div>))}</div>}
       {pendNisshi>0&&<div className="notice-box"><b>📝 確認待ちの日誌（{pendNisshi}）</b><p className="tiny" style={{margin:"4px 0"}}>職員から提出された日誌が確認待ちです。</p><div className="row-end"><Btn kind="ghost2" onClick={()=>{setTab("nisshi");setOpenChk(false);}}>日誌まとめ（提出BOX）を開く →</Btn></div></div>}
-      {pendSupply.length>0&&<div className="notice-box"><b>🛒 未対応の補充品リクエスト（{pendSupply.length}）</b>{pendSupply.map(it=>(<div key={it.id} className="notice-item"><p>・{it.name}{it.wantVariant?("（"+it.wantVariant+"）"):""}{it.wantBy?("／依頼："+it.wantBy):""}</p></div>))}<div className="row-end"><Btn kind="ghost2" onClick={()=>{setTab("handover");setOpenChk(false);}}>補充品を確認する →</Btn></div></div>}
+      {pendSupply.length>0&&<div className="notice-box"><b>🛒 未対応の補充品リクエスト（{pendSupply.length}）</b>{pendSupply.map(it=>{const vv=it.wantVariants?it.wantVariants:(it.wantVariant?[it.wantVariant]:[]);return <div key={it.id} className="notice-item"><p>・{it.name}{vv.length?("（"+vv.join("・")+"）"):""}{it.wantBy?("／依頼："+it.wantBy):""}</p></div>;})}<div className="row-end"><Btn kind="ghost2" onClick={()=>{setTab("handover");setOpenChk(false);}}>補充品を確認する →</Btn></div></div>}
       <div className="row-between" style={{marginTop:8,flexWrap:"wrap",gap:8}}><button className="link-btn" onClick={()=>setOpenChk(false)}>あとで閉じる</button><button className="link-btn" onClick={dismissToday}>今日はもう表示しない</button></div>
     </Modal>}
     <header className="ins-head">
