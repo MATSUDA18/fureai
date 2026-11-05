@@ -395,6 +395,8 @@
   .ho-att-thumb{width:60px;height:60px;object-fit:cover;border-radius:8px;cursor:pointer;}
   .ho-att-file{background:#FBEAEE;border:1px solid #F0D3DB;color:#C9788F;border-radius:10px;padding:6px 10px;font-size:12px;cursor:pointer;}
   .sup-thumb{width:36px;height:36px;object-fit:cover;border-radius:6px;cursor:pointer;}
+  .var-cell{display:inline-flex;align-items:center;gap:3px;background:#FCF4F5;border-radius:10px;padding:2px 4px;}
+  .sup-thumb-sm{width:30px;height:30px;object-fit:cover;border-radius:5px;cursor:pointer;border:1px solid #EAD6DD;}
   .thumb-x{position:absolute;top:-6px;right:-6px;width:18px;height:18px;border-radius:50%;background:#C0392B;color:#fff;border:none;font-size:12px;line-height:1;cursor:pointer;}
   .nisshi{background:#fff;border:1px solid #F0D3DB;border-radius:12px;padding:16px;margin-top:8px;}
   .nisshi-head{text-align:center;font-weight:700;color:#B25E77;font-size:18px;margin-bottom:14px;}
@@ -1179,13 +1181,14 @@ function Handover({me,data,persist}){
   const mdOnly=(ts)=>{ if(!ts)return ""; const d=new Date(ts); return (d.getMonth()+1)+"/"+d.getDate(); };
   const setSection=(id,section)=>persist(Object.assign({},data,{supplyItems:items.map(x=>x.id===id?Object.assign({},x,{section}):x)}));
   const [nCat,setNCat]=useState(""); const [nItemCat,setNItemCat]=useState(""); const [nVars,setNVars]=useState("");
-  const [pendingAtt,setPendingAtt]=useState([]); const [av,setAv]=useState(null); const [supPhotoFor,setSupPhotoFor]=useState(null);
+  const [pendingAtt,setPendingAtt]=useState([]); const [av,setAv]=useState(null); const [supPhotoFor,setSupPhotoFor]=useState(null); const [supCatFor,setSupCatFor]=useState(null);
   const hoFileRef=useRef(null); const supFileRef=useRef(null); const noteFileRef=useRef(null);
   const readDU=(f)=>new Promise((rs,rj)=>{const fr=new FileReader();fr.onload=()=>rs(fr.result);fr.onerror=rj;fr.readAsDataURL(f);});
   const onHoFile=async(e)=>{ const f=e.target.files&&e.target.files[0]; e.target.value=""; if(!f)return; if(!SB_ON){flash("共有DBが必要です");return;} try{ const id=uid()+"_"+Date.now(); const isImg=/^image\//.test(f.type); let full,thumb=null,type; if(isImg){ full=await compressImage(f,1200,0.7); thumb=await compressImage(f,200,0.5); type="image"; } else { full=await readDU(f); type="file"; } await sbInsertAttach({id,meta:{kind:"handover",name:f.name,type,thumb},data:full,created:new Date().toISOString()}); setPendingAtt(p=>[...p,{id,name:f.name,type,thumb}]); flash("添付しました"); }catch(err){ flash("添付に失敗（attachments表の設定をご確認ください）"); } };
   const openHoImg=async(a)=>{ try{ const full=await sbAttachFull(a.id); if(full) setAv(full); }catch(e){} };
   const dlAtt=async(a)=>{ try{ const full=await sbAttachFull(a.id); if(!full)return; const link=document.createElement("a"); link.href=full.data; link.download=a.name||"file"; document.body.appendChild(link); link.click(); link.remove(); }catch(e){ flash("開けませんでした"); } };
-  const onSupPhoto=async(e)=>{ const f=e.target.files&&e.target.files[0]; e.target.value=""; if(!f||!supPhotoFor)return; try{ const p=await compressImage(f,500,0.55); const idv=supPhotoFor; persist(Object.assign({},data,{supplyItems:(data.supplyItems||[]).map(i=>i.id===idv?Object.assign({},i,{photo:p}):i)})); setSupPhotoFor(null); }catch(err){} };
+  const onSupPhoto=async(e)=>{ const f=e.target.files&&e.target.files[0]; e.target.value=""; if(!f||!supPhotoFor)return; try{ const p=await compressImage(f,800,0.6); const id=supPhotoFor.id, v=supPhotoFor.v; persist(Object.assign({},data,{supplyItems:(data.supplyItems||[]).map(i=>{ if(i.id!==id) return i; if(v){ const photos=Object.assign({},i.photos||{},{[v]:p}); return Object.assign({},i,{photos}); } return Object.assign({},i,{photo:p}); })})); setSupPhotoFor(null); }catch(err){} };
+  const delSupPhoto=(id,v)=>{ persist(Object.assign({},data,{supplyItems:(data.supplyItems||[]).map(i=>{ if(i.id!==id) return i; if(v){ const photos=Object.assign({},i.photos||{}); delete photos[v]; return Object.assign({},i,{photos}); } return Object.assign({},i,{photo:""}); })})); };
   const onNotePhoto=async(e)=>{ const f=e.target.files&&e.target.files[0]; e.target.value=""; if(!f)return; if(!SB_ON){flash("共有DBが必要です");return;} try{ const id=uid()+"_"+Date.now(); const full=await compressImage(f,1200,0.7); const thumb=await compressImage(f,200,0.5); await sbInsertAttach({id,meta:{kind:"supply",name:f.name,type:"image",thumb},data:full,created:new Date().toISOString()}); persist(Object.assign({},data,{supplyNotePhotos:[...(data.supplyNotePhotos||[]),{id,name:f.name,thumb}]})); flash("写真を添付しました"); }catch(err){ flash("添付に失敗しました"); } };
   const delNotePhoto=async(a)=>{ if(!confirm("この写真を外しますか？"))return; try{ await sbDeleteAttach(a.id); }catch(e){} persist(Object.assign({},data,{supplyNotePhotos:(data.supplyNotePhotos||[]).filter(x=>x.id!==a.id)})); };
   const hoDate=(ts)=>fmtDate(iso(new Date(ts)));
@@ -1202,12 +1205,14 @@ function Handover({me,data,persist}){
   const openAllSup=()=>{ const o={}; supCats.forEach(c=>o[c]=true); setOpenSupCats(o); };
   const closeAllSup=()=>setOpenSupCats({});
   const scMove=(i,dir)=>{ const c=supCats.slice(); const j=i+dir; if(j<0||j>=c.length)return; const t=c[i];c[i]=c[j];c[j]=t; persist(Object.assign({},data,{supplyCats:c,supplyItems:items})); };
-  const scRename=(cat)=>{ const nn=prompt("カテゴリー名",cat); if(!nn||!nn.trim()||nn.trim()===cat)return; const nm=nn.trim(); persist(Object.assign({},data,{supplyCats:supCats.map(x=>x===cat?nm:x),supplyItems:items.map(x=>((x.cat||"その他")===cat)?Object.assign({},x,{cat:nm}):x)})); };
-  const scDel=(cat)=>{ if(!confirm("カテゴリー「"+cat+"」を削除しますか？（中の品目は他へ移動します）"))return; let nc=supCats.filter(x=>x!==cat); let to=nc[0]||"その他"; if(!nc.includes(to))nc.push(to); persist(Object.assign({},data,{supplyCats:nc,supplyItems:items.map(x=>((x.cat||"その他")===cat)?Object.assign({},x,{cat:to}):x)})); };
+  const scRename=(cat)=>{ const nn=prompt("カテゴリー名",cat); if(!nn||!nn.trim()||nn.trim()===cat)return; const nm=nn.trim(); persist(Object.assign({},data,{supplyCats:supCats.map(x=>x===cat?nm:x),supplyItems:items.map(x=>{ const cs=scatsOf(x).map(c=>c===cat?nm:c); const uniq=cs.filter((c,i)=>cs.indexOf(c)===i); return Object.assign({},x,{cats:uniq,cat:uniq[0]}); })})); };
+  const scDel=(cat)=>{ if(!confirm("カテゴリー「"+cat+"」を削除しますか？（中の品目は他へ移動します）"))return; let nc=supCats.filter(x=>x!==cat); let to=nc[0]||"その他"; if(!nc.includes(to))nc.push(to); persist(Object.assign({},data,{supplyCats:nc,supplyItems:items.map(x=>{ let cs=scatsOf(x).filter(c=>c!==cat); if(!cs.length) cs=[to]; return Object.assign({},x,{cats:cs,cat:cs[0]}); })})); };
   const scAdd=()=>{ const nm=nCat.trim(); if(!nm||supCats.includes(nm))return; persist(Object.assign({},data,{supplyCats:[...supCats,nm],supplyItems:items})); setNCat(""); };
-  const addItem=()=>{ if(!newItem.trim())return; const cat=nItemCat||supCats[0]||"その他"; const vars=nVars.split(/[、,]/).map(s=>s.trim()).filter(Boolean); persist(Object.assign({},data,{supplyCats:supCats,supplyItems:[...items,{id:uid(),name:newItem.trim(),cat,variants:vars}]})); setNewItem(""); setNVars(""); };
+  const addItem=()=>{ if(!newItem.trim())return; const cat=nItemCat||supCats[0]||"その他"; const vars=nVars.split(/[、,]/).map(s=>s.trim()).filter(Boolean); persist(Object.assign({},data,{supplyCats:supCats,supplyItems:[...items,{id:uid(),name:newItem.trim(),cat,cats:[cat],variants:vars}]})); setNewItem(""); setNVars(""); };
   const siMove=(id,dir)=>{ const arr=items.slice(); const idx=arr.findIndex(x=>x.id===id); if(idx<0)return; const cat=(arr[idx].cat||"その他"); let j=idx+dir; while(j>=0&&j<arr.length&&(arr[j].cat||"その他")!==cat) j+=dir; if(j<0||j>=arr.length)return; const t=arr[idx];arr[idx]=arr[j];arr[j]=t; persist(Object.assign({},data,{supplyItems:arr,supplyCats:supCats})); };
   const siSetCat=(id,cat)=>persist(Object.assign({},data,{supplyItems:items.map(x=>x.id===id?Object.assign({},x,{cat}):x),supplyCats:supCats}));
+  const scatsOf=(it)=> (it.cats&&it.cats.length)?it.cats:(it.cat?[it.cat]:["その他"]);
+  const toggleItemCat=(id,cat)=>persist(Object.assign({},data,{supplyCats:supCats,supplyItems:items.map(x=>{ if(x.id!==id) return x; const cur=scatsOf(x); const next=cur.indexOf(cat)>=0?cur.filter(c=>c!==cat):cur.concat([cat]); const fin=next.length?next:[supCats[0]||"その他"]; return Object.assign({},x,{cats:fin,cat:fin[0]}); })}));
   const isVar=(it)=> it.variants && it.variants.length>0;
   const wvOf=(it)=> it.wantVariants ? it.wantVariants : (it.wantVariant?[it.wantVariant]:[]);
   const isWant=(it)=> isVar(it) ? wvOf(it).length>0 : !!it.want;
@@ -1267,17 +1272,17 @@ function Handover({me,data,persist}){
       {me.isAdmin&&<div className="row-end" style={{marginBottom:4}}><button className="link-btn" onClick={()=>setEditSup(!editSup)}>{editSup?"編集を閉じる":"カテゴリー・品目を編集"}</button></div>}
       <div className="row-between" style={{margin:"2px 0 8px"}}><button className="link-btn" onClick={openAllSup}>すべて開く</button><button className="link-btn" onClick={closeAllSup}>すべて閉じる</button></div>
       {items.length===0&&<p className="empty">品目がありません。下で登録できます。</p>}
-      {supCats.map(cat=>{ const list=items.filter(i=>(i.cat||"その他")===cat); if(!list.length) return null; const op=!!openSupCats[cat]; return <div key={cat} className="rec-group">
+      {supCats.map(cat=>{ const list=items.filter(i=>scatsOf(i).includes(cat)); if(!list.length) return null; const op=!!openSupCats[cat]; return <div key={cat} className="rec-group">
         <button className="cat-head" onClick={()=>toggleSupCat(cat)}><span>{op?"▼":"▶"} {cat}</span><span className="tiny">{list.filter(x=>x.want&&!x.done).length>0?"希望"+list.filter(x=>x.want&&!x.done).length+"／":""}{list.length}</span></button>
         {op&&<div>{list.map(it=>(<div key={it.id} className="sup-row" style={{flexWrap:"wrap"}}>
-          {isVar(it)?<div style={{flex:1,minWidth:"60%"}}><div style={{fontWeight:600,color:"#5A4A50",fontSize:14,marginBottom:4}}>{it.name}</div><div style={{display:"flex",flexWrap:"wrap",gap:6}}>{it.variants.map(v=>{const on=wvOf(it).indexOf(v)>=0;return <button key={v} className={"var-chip"+(on?" on":"")} onClick={()=>toggleVariant(it,v)}>{on?"✓ ":""}{v}</button>;})}</div></div>:<label className="chk" style={{flex:1}}><input type="checkbox" checked={!!it.want} onChange={()=>toggleWant(it)}/>{it.name}</label>}
-          {it.photo&&<img className="sup-thumb" src={it.photo} alt="" onClick={()=>setAv({data:it.photo,meta:{type:"image"}})}/>}
-          <button className="mini-key" onClick={()=>{setSupPhotoFor(it.id);supFileRef.current&&supFileRef.current.click();}} title="写真">📷</button>
+          {isVar(it)?<div style={{flex:1,minWidth:"60%"}}><div style={{fontWeight:600,color:"#5A4A50",fontSize:14,marginBottom:4}}>{it.name}</div><div style={{display:"flex",flexWrap:"wrap",gap:8}}>{it.variants.map(v=>{const on=wvOf(it).indexOf(v)>=0; const ph=(it.photos||{})[v]; return <div key={v} className="var-cell"><button className={"var-chip"+(on?" on":"")} onClick={()=>toggleVariant(it,v)}>{on?"✓ ":""}{v}</button>{ph&&<img className="sup-thumb-sm" src={ph} alt="" onClick={()=>setAv({data:ph,meta:{type:"image"}})}/>}<button className="mini-key" onClick={()=>{setSupPhotoFor({id:it.id,v:v});supFileRef.current&&supFileRef.current.click();}} title={v+"の写真"}>📷</button>{ph&&<button className="mini-key" onClick={()=>delSupPhoto(it.id,v)} title="写真を外す">✕</button>}</div>;})}</div></div>:<label className="chk" style={{flex:1}}><input type="checkbox" checked={!!it.want} onChange={()=>toggleWant(it)}/>{it.name}</label>}
+          {!isVar(it)&&it.photo&&<img className="sup-thumb" src={it.photo} alt="" onClick={()=>setAv({data:it.photo,meta:{type:"image"}})}/>}
+          {!isVar(it)&&<button className="mini-key" onClick={()=>{setSupPhotoFor({id:it.id,v:null});supFileRef.current&&supFileRef.current.click();}} title="写真">📷</button>}
           <button className="mini-key" onClick={()=>setNoteItem({id:it.id,text:it.note||""})} title="この品のメモ">📝{(it.note||"").trim()?"✓":""}</button>
           {it.done?<span className="sup-done">済 {dt(it.doneAt)}</span>:(isWant(it)?<span className="sup-want">希望 {mdOnly(it.wantAt)} {it.wantBy}{isVar(it)&&wvOf(it).length?"（"+wvOf(it).join("・")+"）":""}</span>:null)}
           {me.isAdmin&&isWant(it)&&!it.done&&<button className="btn ghost2" onClick={()=>markDone(it)}>済</button>}
           {me.isAdmin&&it.done&&<button className="link-btn" onClick={()=>clearDone(it)}>戻す</button>}
-          {me.isAdmin&&editSup&&<><button className="mini-key" onClick={()=>siMove(it.id,-1)}>↑</button><button className="mini-key" onClick={()=>siMove(it.id,1)}>↓</button><select className="cat-sel" value={it.cat||"その他"} onChange={e=>siSetCat(it.id,e.target.value)}>{supCats.map(c=><option key={c} value={c}>{c}</option>)}</select><select className="cat-sel" title="売り場" value={secOf(it)} onChange={e=>setSection(it.id,e.target.value)}>{SHOP_SECTIONS.map(s=><option key={s} value={s}>{s}</option>)}</select></>}
+          {me.isAdmin&&editSup&&<><button className="mini-key" onClick={()=>siMove(it.id,-1)}>↑</button><button className="mini-key" onClick={()=>siMove(it.id,1)}>↓</button><button className="mini-key" onClick={()=>setSupCatFor(it)} title="カテゴリー（複数可）">分類{scatsOf(it).length>1?("("+scatsOf(it).length+")"):""}</button><select className="cat-sel" title="売り場" value={secOf(it)} onChange={e=>setSection(it.id,e.target.value)}>{SHOP_SECTIONS.map(s=><option key={s} value={s}>{s}</option>)}</select></>}
           {me.isAdmin&&<button className="mini-del" onClick={()=>delItem(it.id)}>🗑</button>}
           {(it.note||"").trim()&&<div style={{flexBasis:"100%",fontSize:11.5,color:"#8A6B74",marginTop:2,whiteSpace:"pre-wrap"}}>📝 {it.note}</div>}
         </div>))}</div>}
@@ -1303,6 +1308,11 @@ function Handover({me,data,persist}){
     </>}
     <input ref={supFileRef} type="file" accept="image/*" onChange={onSupPhoto} style={{display:"none"}}/>
     {av&&<Modal title="添付" tint="#C9788F" onClose={()=>setAv(null)}>{av.meta&&av.meta.type==="pdf"?<embed src={av.data} type="application/pdf" style={{width:"100%",height:"60vh"}}/>:<img src={av.data} style={{width:"100%",borderRadius:8}} alt="添付"/>}</Modal>}
+    {supCatFor&&(()=>{ const cur=items.find(i=>i.id===supCatFor.id)||supCatFor; const sel=scatsOf(cur); return <Modal title={"カテゴリー："+(cur.name||"")} tint="#C9788F" onClose={()=>setSupCatFor(null)}>
+      <p className="hint">この品目を表示するカテゴリーを選びます（複数選べます）。選んだ全てのカテゴリーに表示されます。</p>
+      <div className="chk-grid" style={{gridTemplateColumns:"repeat(2,1fr)",gap:8}}>{supCats.map(c=><label className="chk" key={c}><input type="checkbox" checked={sel.indexOf(c)>=0} onChange={()=>toggleItemCat(cur.id,c)}/>{c}</label>)}</div>
+      <div className="row-end"><Btn onClick={()=>setSupCatFor(null)}>閉じる</Btn></div>
+    </Modal>;})()}
     {noteItem&&<Modal title={"📝 メモ："+((items.find(i=>i.id===noteItem.id)||{}).name||"")} tint="#C9788F" onClose={()=>setNoteItem(null)}>
       <p className="hint">この品目だけのメモです（例：「●●スーパーの方が安い」「青いパッケージの方」など）。</p>
       <Area label="" rows={3} value={noteItem.text} onChange={e=>setNoteItem(p=>Object.assign({},p,{text:e.target.value}))} placeholder="この品目のメモ"/>
@@ -1946,7 +1956,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.113〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.114〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
