@@ -359,6 +359,9 @@
   .rec-item.abn{color:#C0392B;font-weight:700;}
   .vit-abn{color:#C0392B;font-weight:700;}
   .crop-wrap{max-height:52vh;overflow:hidden;background:#000;border-radius:8px;}
+  .crop-tools{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;}
+  .crop-tool{flex:1;min-width:72px;padding:9px 6px;border:1px solid #E79AB0;background:#FFF6F8;color:#B85C7A;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;}
+  .crop-tool:active{filter:brightness(0.97);}
   .ho-card{background:#fff;border:1px solid #F0D3DB;border-radius:12px;padding:12px;margin-bottom:10px;border-left:5px solid #E79AB0;}
   .ho-card.hq{border-left-color:#E4577A;background:#FFF6F8;}
   .ho-top{display:flex;align-items:center;gap:8px;}
@@ -1113,12 +1116,16 @@ function Nisshi({me,data,persist}){
 function CropModal({src,onCancel,onDone}){
   const imgRef=useRef(null); const cRef=useRef(null);
   useEffect(()=>{ let c; const t=setTimeout(()=>{ try{ if(imgRef.current&&window.Cropper){ c=new window.Cropper(imgRef.current,{viewMode:1,autoCropArea:1,background:false,responsive:true}); cRef.current=c; } }catch(e){} },60); return ()=>{ clearTimeout(t); if(cRef.current){ try{cRef.current.destroy();}catch(e){} } }; },[]);
+  const rot=(deg)=>{ try{ cRef.current&&cRef.current.rotate(deg); }catch(e){} };
+  const flip=(axis)=>{ try{ const c=cRef.current; if(!c)return; if(axis==="x"){ c.scaleX((c.getData().scaleX||1)*-1); } else { c.scaleY((c.getData().scaleY||1)*-1); } }catch(e){} };
+  const reset=()=>{ try{ cRef.current&&cRef.current.reset(); }catch(e){} };
   const done=()=>{ const c=cRef.current; if(!c){ onDone(src); return; } try{ const cv=c.getCroppedCanvas({maxWidth:1400,maxHeight:1400}); onDone(cv.toDataURL("image/jpeg",0.75)); }catch(e){ onDone(src); } };
   return <div className="ov" style={{zIndex:130}}><div className="modal" style={{maxWidth:"520px"}}>
-    <div className="modal-head" style={{background:"#C9788F"}}><span>写真の切り取り</span><button className="icon-btn" onClick={onCancel}>×</button></div>
+    <div className="modal-head" style={{background:"#C9788F"}}><span>写真の切り取り・回転</span><button className="icon-btn" onClick={onCancel}>×</button></div>
     <div className="modal-body"><div className="crop-wrap"><img ref={imgRef} src={src} style={{maxWidth:"100%",display:"block"}} alt="crop"/></div>
-    <p className="tiny">指で範囲を動かす・つまんで拡大縮小できます。</p>
-    <div className="row-end"><Btn kind="ghost2" onClick={onCancel}>キャンセル</Btn><Btn onClick={done}>この範囲で決定</Btn></div></div></div></div>;
+    <div className="crop-tools"><button className="crop-tool" onClick={()=>rot(-90)} title="左に90°回転">↺ 左回転</button><button className="crop-tool" onClick={()=>rot(90)} title="右に90°回転">↻ 右回転</button><button className="crop-tool" onClick={()=>flip("x")} title="左右反転">⇋ 左右反転</button><button className="crop-tool" onClick={reset} title="元に戻す">⟲ リセット</button></div>
+    <p className="tiny">指で範囲を動かす・つまんで拡大縮小。回転・反転ボタンで向きを直せます。</p>
+    <div className="row-end"><Btn kind="ghost2" onClick={onCancel}>キャンセル</Btn><Btn onClick={done}>この向き・範囲で決定</Btn></div></div></div></div>;
 }
 function parseVit(item){ const s=(item||"").match(/(\d+)mmHg\/(\d+)mmHg/)||[]; const p=(item||"").match(/(\d+)回\/分/)||[]; const t=(item||"").match(/体温([\d.]+)℃/)||[]; return {sys:s[1]||"",dia:s[2]||"",hr:p[1]||"",temp:t[1]||""}; }
 function buildVitItem(v){ const parts=[]; if(v.sys&&v.dia) parts.push(v.sys+"mmHg/"+v.dia+"mmHg"); if(v.hr) parts.push(v.hr+"回/分"); if(v.temp) parts.push("体温"+v.temp+"℃"); return "🩺 "+parts.join(" "); }
@@ -1967,7 +1974,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.117〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.118〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
