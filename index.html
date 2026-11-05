@@ -192,6 +192,8 @@
   .seg.on{background:#E79AB0;color:#fff;}
   .seg+.seg{border-left:1px solid #F0D3DB;}
   .tl-datenav{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+  .topdate{background:#FCF4F5;border:1px solid #F0D3DB;border-radius:14px;padding:8px 10px;margin-bottom:10px;}
+  .topdate .time-toggle{margin-top:4px;}
   .tl-zoom{display:inline-flex;gap:6px;}
   .zbtn{width:34px;height:34px;border-radius:10px;border:1px solid #F0D3DB;background:#fff;color:#C9788F;font-size:18px;font-weight:700;cursor:pointer;line-height:1;}
   .tl-datenav b{color:#C9788F;font-size:14px;}
@@ -1586,6 +1588,33 @@ function Records({me,data,persist,reload}){
       <p className="tiny" style={{marginTop:6,color:"#B0895A"}}>※ A3印刷は新しいタブで開きます（パソコン推奨。印刷ダイアログで「A3・横」を選んでください）。Excelは写真なしの表（日付・メニュー・調理担当）です。</p>
     </div>}
     {view==="log"&&<>
+      <div className="topdate">
+        <div className="tl-datenav" style={{marginTop:0,marginBottom:4}}>
+          <button className="link-btn" onClick={()=>setLogDate(iso(addDays(new Date(logDate+"T00:00:00"),-1)))}>‹ 前の勤務</button>
+          <span className="datewrap"><b style={{fontWeight:800,color:"#5A4A50"}}>{fmtDate(logDate)}（勤務）📅{useTime&&<span className="tiny" style={{color:"#B25E77"}}>　指定日</span>}</b><input type="date" value={logDate} aria-label="日付を選ぶ" onClick={e=>{try{e.currentTarget.showPicker&&e.currentTarget.showPicker();}catch(x){}}} onChange={e=>e.target.value&&setLogDate(e.target.value)}/></span>
+          <button className="link-btn" onClick={()=>setLogDate(iso(addDays(new Date(logDate+"T00:00:00"),1)))}>次の勤務 ›</button>
+        </div>
+        <button className={"time-toggle"+(useTime?" active":"")} style={{marginTop:2}} onClick={()=>{ if(!useTime){ setMDate(date); const n=new Date(); const nh=n.getHours(); setMH(String((nh>=15||nh<=9)?nh:16)); setMM(String(Math.floor(n.getMinutes()/5)*5)); } setUseTime(!useTime); }}>{useTime?"× 日時の指定を閉じる":"🕒 過去の日時を指定して記録"}</button>
+        {useTime&&<div className="timepick">
+          <div className="rec-sub" style={{marginTop:0}}>日時を選んで記録</div>
+          <div className="field"><span>勤務開始日（この日の勤務として記録）</span>
+            {(()=>{ const p=(mDate||iso(new Date())).split("-"); const yy=+p[0],mm=+p[1],dd=+p[2]; const setYMD=(y,m,d)=>{ const dim=new Date(y,m,0).getDate(); if(d>dim)d=dim; setMDate(y+"-"+String(m).padStart(2,"0")+"-"+String(d).padStart(2,"0")); }; return <div className="wheel">
+              <select value={yy} onChange={e=>setYMD(+e.target.value,mm,dd)}>{EY.map(y=><option key={y} value={y}>{y}年</option>)}</select>
+              <select value={mm} onChange={e=>setYMD(yy,+e.target.value,dd)}>{EMO.map(m=><option key={m} value={m}>{m}月</option>)}</select>
+              <select value={dd} onChange={e=>setYMD(yy,mm,+e.target.value)}>{EDA.map(d=><option key={d} value={d}>{d}日</option>)}</select>
+            </div>; })()}
+            <input type="date" value={mDate} onChange={e=>e.target.value&&setMDate(e.target.value)} style={{marginTop:6}}/>
+          </div>
+          <div className="wheel">
+            <select value={mH} onChange={e=>setMH(e.target.value)}>{REC_HOURS.map(h=><option key={h} value={h}>{h}時</option>)}</select>
+            <select value={mM} onChange={e=>setMM(e.target.value)}>{REC_MINS.map(m=><option key={m} value={m}>{String(m).padStart(2,"0")}分</option>)}</select>
+          </div>
+          <p className="tiny">日付は「年・月・日」で何年前でも選べます（下のカレンダーからも選べます）。時刻は15時〜翌9時台（0〜9時台は自動で翌日扱い）。</p>
+          <p className="tiny" style={{color:"#B25E77",fontWeight:700}}>⏱ この状態のまま下の「利用者」を選んで各項目（巡回・服薬・介助・バイタル等）を押すと、上で指定した日時で記録されます。文章は下のボタンで記録できます。</p>
+          <div className="row-end"><Btn onClick={addNoteAt}>この日時で文章を記録</Btn></div>
+        </div>}
+        <p className="tiny" style={{textAlign:"center",margin:"2px 0 0"}}>日付（勤務）をタップするとカレンダーが開きます。15:30〜翌9:30の記録をまとめて表示します。{logDate!==iso(new Date())&&<> ／ <button className="link-btn" onClick={()=>setLogDate(iso(new Date()))}>今日へ戻る</button></>}</p>
+      </div>
       <button className="recbtn" style={{width:"100%",background:"#FFF3E6",borderColor:"#F0C98A",color:"#B07A2E",marginBottom:8,padding:"10px"}} onClick={()=>setMenuOpen(true)}>🍱 配食メニューを貼り付け（晩・朝をまとめて記録）</button>
       <div className="rec-quick">
         <button className="recbtn vit" onClick={()=>setVit({sys:"",dia:"",hr:"",temp:""})}>🩺 バイタル測定（血圧・体温）</button>
@@ -1614,26 +1643,7 @@ function Records({me,data,persist,reload}){
         <textarea rows={1} value={note} placeholder="様子を具体的に（例：夕食後、笑顔で職員と将棋。勝って嬉しそう）" onChange={e=>setNote(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();addNote();}}}/>
         <button className="send" onClick={addNote} title="現在時刻で記録">＋</button>
       </div>
-      <p className="tiny" style={{marginTop:4}}>「＋」を押すと<b>現在の時刻</b>のまま記録します。💡 具体的な様子はここに残すと、日誌の「ご様子まとめ」を簡潔にできます（活動記録はそのまま印刷されます）。</p>
-      <button className={"time-toggle"+(useTime?" active":"")} onClick={()=>{ if(!useTime){ setMDate(date); const n=new Date(); const nh=n.getHours(); setMH(String((nh>=15||nh<=9)?nh:16)); setMM(String(Math.floor(n.getMinutes()/5)*5)); } setUseTime(!useTime); }}>{useTime?"× 日時の指定を閉じる":"🕒 過去の日時を指定して記録"}</button>
-      {useTime&&<div className="timepick">
-        <div className="rec-sub" style={{marginTop:0}}>日時を選んで記録</div>
-        <div className="field"><span>勤務開始日（この日の勤務として記録）</span>
-          {(()=>{ const p=(mDate||iso(new Date())).split("-"); const yy=+p[0],mm=+p[1],dd=+p[2]; const setYMD=(y,m,d)=>{ const dim=new Date(y,m,0).getDate(); if(d>dim)d=dim; setMDate(y+"-"+String(m).padStart(2,"0")+"-"+String(d).padStart(2,"0")); }; return <div className="wheel">
-            <select value={yy} onChange={e=>setYMD(+e.target.value,mm,dd)}>{EY.map(y=><option key={y} value={y}>{y}年</option>)}</select>
-            <select value={mm} onChange={e=>setYMD(yy,+e.target.value,dd)}>{EMO.map(m=><option key={m} value={m}>{m}月</option>)}</select>
-            <select value={dd} onChange={e=>setYMD(yy,mm,+e.target.value)}>{EDA.map(d=><option key={d} value={d}>{d}日</option>)}</select>
-          </div>; })()}
-          <input type="date" value={mDate} onChange={e=>e.target.value&&setMDate(e.target.value)} style={{marginTop:6}}/>
-        </div>
-        <div className="wheel">
-          <select value={mH} onChange={e=>setMH(e.target.value)}>{REC_HOURS.map(h=><option key={h} value={h}>{h}時</option>)}</select>
-          <select value={mM} onChange={e=>setMM(e.target.value)}>{REC_MINS.map(m=><option key={m} value={m}>{String(m).padStart(2,"0")}分</option>)}</select>
-        </div>
-        <p className="tiny">日付は「年・月・日」で何年前でも選べます（下のカレンダーからも選べます）。時刻は15時〜翌9時台（0〜9時台は自動で翌日扱い）。</p>
-        <p className="tiny" style={{color:"#B25E77",fontWeight:700}}>⏱ この状態のまま下の「利用者」を選んで各項目（巡回・服薬・介助・バイタル等）を押すと、上で指定した日時で記録されます。文章は下のボタンで記録できます。</p>
-        <div className="row-end"><Btn onClick={addNoteAt}>この日時で文章を記録</Btn></div>
-      </div>}
+      <p className="tiny" style={{marginTop:4}}>「＋」を押すと<b>現在の時刻</b>のまま記録します。💡 具体的な様子はここに残すと、日誌の「ご様子まとめ」を簡潔にできます（活動記録はそのまま印刷されます）。<br/>※ 過去の日時を指定して記録したいときは、<b>ページ上部の「🕒 過去の日時を指定して記録」</b>をお使いください。</p>
       {me.isAdmin&&<div style={{marginTop:8}}><button className="link-btn" onClick={()=>setEditItems(!editItems)}>{editItems?"項目の編集を閉じる":"項目を編集（管理者）"}</button></div>}
       {editItems&&me.isAdmin&&<div className="tl-editpanel">
         <div className="rec-gtitle">カテゴリー（↑↓で並び替え・✎で名前変更）</div>
@@ -1919,7 +1929,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.111〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.112〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
@@ -2153,7 +2163,6 @@ const TABS=[
   {id:"handover",label:"申し送り・補充品"},
   {id:"records",label:"記録"},
   {id:"shifts",label:"職員シフト"},
-  {id:"timecard",label:"出勤簿（勤怠）"},
   {id:"plans",label:"利用予定カレンダー"},
   {id:"album",label:"写真記録"},
   {id:"users",label:"利用者情報"},
@@ -2164,6 +2173,7 @@ const TABS=[
   {id:"traits",label:"障害特性と支援"},
   {id:"materials",label:"研修資料"},
   {id:"history",label:"あゆみ"},
+  {id:"timecard",label:"出勤簿（勤怠）"},
 ];
 function Inside({me,data,tab,setTab,onLogout,persist,reload}){
   const tabs=me.isAdmin?[...TABS,{id:"admin",label:"管理者パネル"}]:TABS;
