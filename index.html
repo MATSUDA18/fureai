@@ -182,6 +182,14 @@
   .shift-time{font-weight:700;color:#C9788F;white-space:nowrap;}
   .shift-note{color:#94808A;font-size:12px;}
   .noshift{color:#94808A;font-size:12px;}
+  .plan-users{display:flex;align-items:center;flex-wrap:wrap;gap:5px;padding:7px 9px;background:#FFF6EE;border:1px solid #F0D7B8;border-radius:10px;margin-bottom:8px;cursor:pointer;}
+  .pu-label{font-size:11.5px;font-weight:800;color:#B07A2E;flex:none;}
+  .pu-chip{font-size:12.5px;font-weight:700;color:#8A5A2E;background:#fff;border:1px solid #F0D7B8;border-radius:999px;padding:2px 9px;}
+  .pu-none{font-size:12px;color:#B0895A;}
+  .pu-edit{margin-left:auto;color:#C9A94A;font-size:13px;flex:none;}
+  .ev-badge{font-size:11.5px;font-weight:800;border-radius:999px;padding:3px 10px;flex:none;}
+  .ev-meta{font-size:13px;color:#6A5A60;margin-bottom:4px;}
+  .ev-body{font-size:13px;color:#5A4A50;white-space:pre-wrap;background:#FBEAEE;border-radius:10px;padding:8px 10px;}
   .mini-del{margin-left:auto;background:transparent;border:none;color:#C0392B;cursor:pointer;}
   .acc-actions{margin-left:auto;display:flex;gap:10px;align-items:center;}
   .acc-actions .del{margin-left:0;background:transparent;border:none;color:#C0392B;cursor:pointer;font-size:15px;}
@@ -1986,7 +1994,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.123〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.124〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
@@ -2221,7 +2229,7 @@ const TABS=[
   {id:"schedule",label:"タイムスケジュール"},
   {id:"handover",label:"申し送り・補充品"},
   {id:"records",label:"記録"},
-  {id:"shifts",label:"職員シフト"},
+  {id:"shifts",label:"利用者予定／職員シフト"},
   {id:"plans",label:"利用予定カレンダー"},
   {id:"album",label:"写真記録"},
   {id:"users",label:"利用者情報"},
@@ -2232,6 +2240,7 @@ const TABS=[
   {id:"traits",label:"障害特性と支援"},
   {id:"materials",label:"研修資料"},
   {id:"history",label:"あゆみ"},
+  {id:"events",label:"イベント"},
   {id:"timecard",label:"出勤簿（勤怠）"},
 ];
 function Inside({me,data,tab,setTab,onLogout,persist,reload}){
@@ -2276,7 +2285,7 @@ function Inside({me,data,tab,setTab,onLogout,persist,reload}){
       {pwMsg&&<p className="ok">{pwMsg}</p>}
       <div className="row-end"><Btn onClick={changeMyPw}>変更する</Btn></div>
     </Modal>}
-    <nav className="tabs">{tabs.map(t=>{ const two={schedule:["タイム","スケジュール"],handover:["申し送り","・補充品"],plans:["利用予定","カレンダー"],traits:["障害特性","と支援"],admin:["管理者","パネル"]}[t.id]; return (
+    <nav className="tabs">{tabs.map(t=>{ const two={schedule:["タイム","スケジュール"],handover:["申し送り","・補充品"],shifts:["利用者予定","／職員シフト"],plans:["利用予定","カレンダー"],traits:["障害特性","と支援"],admin:["管理者","パネル"]}[t.id]; return (
       <button key={t.id} className={"tab tab-"+t.id+" "+(tab===t.id?"on":"")} onClick={()=>setTab(t.id)}>{two?<span className="tab2">{two[0]}<br/>{two[1]}</span>:t.label}</button>);})}</nav>
     <main className="ins-body">
       {me.isAdmin&&(()=>{ let last=""; try{ last=localStorage.getItem("mizuho_last_backup")||""; }catch(e){} const days=last?Math.floor((Date.now()-new Date(last).getTime())/86400000):9999; if(days>=7){ return <div className="bk-banner" onClick={()=>setTab("admin")}>⏰ バックアップの時期です（{last?("前回 "+last.slice(0,10)):"未実施"}）。タップして管理者パネルで書き出し →</div>; } return null; })()}
@@ -2294,6 +2303,7 @@ function Inside({me,data,tab,setTab,onLogout,persist,reload}){
       {tab==="materials"&&<Materials me={me} data={data} persist={persist}/>}
       {tab==="consult"&&<Consult data={data}/>}
       {tab==="history"&&<HistoryView/>}
+      {tab==="events"&&<Events me={me} data={data} persist={persist}/>}
       {tab==="users"&&<UsersView me={me}/>}
       {tab==="admin"&&me.isAdmin&&<AdminPanel data={data} persist={persist}/>}
     </main>
@@ -2723,11 +2733,46 @@ function ResidentDetail({me,res,onBack,onEdit,onDel,onChange}){
     {toast&&<div className="toast">{toast}</div>}
   </Section>;
 }
+/* ============================ イベント（年4回） ============================ */
+function Events({me,data,persist}){
+  const base=[1,2,3,4].map(n=>({no:n,title:"",date:"",start:"",end:"",body:"",status:"予定"}));
+  const list=(()=>{ const m={}; (data.events||[]).forEach(e=>{ if(e&&e.no) m[e.no]=e; }); return base.map(b=>Object.assign({},b,m[b.no]||{})); })();
+  const [edit,setEdit]=useState(null);
+  const openEdit=(e)=>setEdit(Object.assign({},e));
+  const save=()=>{ const e=edit; const others=(data.events||[]).filter(x=>x&&x.no!==e.no); const ne=Object.assign({},e,{title:(e.title||"").trim(),body:(e.body||"").trim()}); persist(Object.assign({},data,{events:[...others,ne].sort((a,b)=>a.no-b.no)})); setEdit(null); };
+  const STAT={ "予定":{bg:"#EFE7D6",c:"#8A7A4E"}, "実施済み":{bg:"#DDEEDD",c:"#3C7A4A"}, "終了":{bg:"#E7DCE0",c:"#8A6B74"} };
+  return <Section title="イベント（年4回）" note="年4回の行事予定です。日程・時間・内容・実施状況を登録できます（管理者）。">
+    {list.map(e=>{ const st=STAT[e.status]||STAT["予定"]; return <div key={e.no} className="day-row">
+      <div className="day-head"><span className="day-date">第{e.no}回{e.title?("　"+e.title):"（イベント名未設定）"}</span><span className="ev-badge" style={{background:st.bg,color:st.c}}>{e.status||"予定"}</span></div>
+      <div className="ev-meta">📅 {e.date?fmtDate(e.date):"日程未定"}{(e.start||e.end)?("　🕐 "+(e.start||"")+"〜"+(e.end||"")):""}</div>
+      {e.body&&<div className="ev-body">{e.body}</div>}
+      {me.isAdmin&&<div className="row-end" style={{marginTop:6}}><button className="link-btn" onClick={()=>openEdit(e)}>編集</button></div>}
+    </div>; })}
+    {edit&&<Modal title={"第"+edit.no+"回イベントの編集"} tint="#C9788F" onClose={()=>setEdit(null)}>
+      <Field label="イベント名" value={edit.title} onChange={e=>setEdit(Object.assign({},edit,{title:e.target.value}))} placeholder="例：夏祭り"/>
+      <Field label="日程（日付）" type="date" value={edit.date} onChange={e=>setEdit(Object.assign({},edit,{date:e.target.value}))}/>
+      <div className="row-between"><label className="field" style={{flex:1}}><span>開始時間</span><input type="time" value={edit.start} onChange={e=>setEdit(Object.assign({},edit,{start:e.target.value}))}/></label><label className="field" style={{flex:1}}><span>終了時間</span><input type="time" value={edit.end} onChange={e=>setEdit(Object.assign({},edit,{end:e.target.value}))}/></label></div>
+      <label className="field"><span>内容</span><textarea rows={4} value={edit.body} onChange={e=>setEdit(Object.assign({},edit,{body:e.target.value}))} placeholder="内容・持ち物・担当など"/></label>
+      <label className="field"><span>状態</span><select value={edit.status} onChange={e=>setEdit(Object.assign({},edit,{status:e.target.value}))}><option>予定</option><option>実施済み</option><option>終了</option></select></label>
+      <div className="row-end"><Btn onClick={save}>保存</Btn></div>
+    </Modal>}
+  </Section>;
+}
+
 function Shifts({me,data,persist}){
   const [weekStart,setWeekStart]=useState(()=>mondayOf(new Date()));
   const [open,setOpen]=useState(false); const [editId,setEditId]=useState(null);
   const openEdit=(s)=>{ setForm({date:s.date,name:s.name,role:s.role,start:s.start,end:s.end,note:s.note||"",nameMode:(s.help?"free":"list")}); setEditId(s.id); setOpen(true); };
   const [form,setForm]=useState({date:(()=>{const n=new Date();return (n.getHours()*60+n.getMinutes())<(15*60)?iso(addDays(n,-1)):iso(n);})(),name:"",role:"A",start:"15:30",end:"09:30",note:""});
+  const todayShift=()=>{ const n=new Date(); return (n.getHours()*60+n.getMinutes())<(15*60)?iso(addDays(n,-1)):iso(n); };
+  const [resNames,setResNames]=useState([]);
+  useEffect(()=>{ (async()=>{ if(!SB_ON) return; try{ const rows=await resList(); setResNames(rows.map(r=>r.data&&r.data.name).filter(Boolean)); }catch(e){} })(); },[]);
+  const allUsers=Array.from(new Set([].concat(resNames,(data.userList||[])).filter(Boolean)));
+  const [upOpen,setUpOpen]=useState(false); const [upDate,setUpDate]=useState(todayShift()); const [upUsers,setUpUsers]=useState([]); const [newU,setNewU]=useState("");
+  const openUserPlan=(dk)=>{ const cur=(data.dayPlans||{})[dk]||{}; setUpDate(dk); setUpUsers((cur.users||[]).slice()); setUpOpen(true); };
+  const toggleUpUser=(n)=>setUpUsers(p=>p.includes(n)?p.filter(x=>x!==n):p.concat([n]));
+  const addNewU=()=>{ const n=newU.trim(); if(!n)return; if(!(data.userList||[]).includes(n)) persist(Object.assign({},data,{userList:[...(data.userList||[]),n]})); setUpUsers(p=>p.includes(n)?p:p.concat([n])); setNewU(""); };
+  const saveUserPlan=()=>{ const users=upUsers.map(x=>x.trim()).filter(Boolean); const dp=Object.assign({},data.dayPlans||{}); const cur=Object.assign({},dp[upDate]||{}); cur.users=users; dp[upDate]=cur; persist(Object.assign({},data,{dayPlans:dp})); setUpOpen(false); };
   const days=Array.from({length:7}).map((_,i)=>addDays(weekStart,i));
   const label=`${weekStart.getMonth()+1}/${weekStart.getDate()} 〜 ${addDays(weekStart,6).getMonth()+1}/${addDays(weekStart,6).getDate()}`;
   const add=()=>{
@@ -2743,22 +2788,27 @@ function Shifts({me,data,persist}){
     setForm(Object.assign({},form,{note:""}));
   };
   const remove=(id)=>{ if(!confirm("このシフトを削除しますか？"))return; persist({...data,shifts:data.shifts.filter(s=>s.id!==id)}); };
-  return <Section title="シフト" note="職員の勤務予定です。管理者が登録・削除できます。">
+  return <Section title="利用者予定／職員シフト" note="上段に利用者の予定、下段に職員の勤務予定を表示します。利用者予定は全職員が、職員シフトは管理者が登録できます。">
     <div className="week-nav">
       <Btn kind="ghost2" onClick={()=>setWeekStart(addDays(weekStart,-7))}>‹ 前の週</Btn>
       <b>{label}</b>
       <Btn kind="ghost2" onClick={()=>setWeekStart(addDays(weekStart,7))}>次の週 ›</Btn>
     </div>
-    <div className="row-between" style={{marginBottom:10}}>
+    <div className="row-between" style={{marginBottom:10,alignItems:"flex-start"}}>
       <button className="link-btn" onClick={()=>setWeekStart(mondayOf(new Date()))}>今週に戻る</button>
-      {me.isAdmin&&<Btn onClick={()=>{setEditId(null);setForm({date:(()=>{const n=new Date();return (n.getHours()*60+n.getMinutes())<(15*60)?iso(addDays(n,-1)):iso(n);})(),name:"",role:"A",start:"15:30",end:"09:30",note:"",nameMode:"list"});setOpen(true);}}>＋ シフトを追加</Btn>}
+      <div style={{display:"flex",flexDirection:"column",gap:6,alignItems:"stretch"}}>
+        <Btn onClick={()=>openUserPlan(todayShift())}>＋ 利用者予定の追加</Btn>
+        {me.isAdmin&&<Btn onClick={()=>{setEditId(null);setForm({date:todayShift(),name:"",role:"A",start:"15:30",end:"09:30",note:"",nameMode:"list"});setOpen(true);}}>＋ 職員シフトの追加</Btn>}
+      </div>
     </div>
     {days.map(d=>{
       const key=iso(d); const list=data.shifts.filter(s=>s.date===key).sort((a,b)=>a.start.localeCompare(b.start));
+      const pUsers=((data.dayPlans||{})[key]||{}).users||[];
       const wd=d.getDay(); const cls=wd===0?"day-date sun":wd===6?"day-date sat":"day-date";
       return <div key={key} className="day-row">
         <div className="day-head"><span className={cls}>{d.getMonth()+1}/{d.getDate()}（{WD[wd]}）</span></div>
-        {list.length===0?<div className="noshift">予定なし</div>:list.map(s=>(
+        <div className="plan-users" onClick={()=>openUserPlan(key)} title="利用者予定を編集"><span className="pu-label">👤利用者</span>{pUsers.length?pUsers.map((u,i)=><span key={i} className="pu-chip">{u}</span>):<span className="pu-none">未設定（タップで追加）</span>}<span className="pu-edit">✎</span></div>
+        {list.length===0?<div className="noshift">勤務予定なし</div>:list.map(s=>(
           <div key={s.id} className="shift-item">
             <span className="shift-time">{s.start}–{s.end}</span>{s.role&&<span className="chip">{({A:"夜勤A",B:"夜勤B",nightonly:"夜勤のみ",eve:"夕勤",event:"イベント",day:"日勤",other:"その他"})[s.role]||""}</span>}<span>{s.name}</span>{s.help&&<span className="proxy-tag">ヘルプ</span>}
             {s.note&&<span className="shift-note">{s.note}</span>}
@@ -2784,6 +2834,15 @@ function Shifts({me,data,persist}){
       </div>
       <Field label="メモ（任意）" value={form.note} onChange={e=>setForm({...form,note:e.target.value})} placeholder="例：送迎担当"/>
       <div className="row-end"><Btn onClick={add}>追加する</Btn></div>
+    </Modal>}
+    {upOpen&&<Modal title="利用者予定の設定" tint="#C9788F" onClose={()=>setUpOpen(false)}>
+      <label className="field"><span>日付（勤務日）</span><input type="date" value={upDate} onChange={e=>e.target.value&&openUserPlan(e.target.value)}/></label>
+      <div className="tl-datenav" style={{margin:"4px 0 8px"}}><button className="link-btn" onClick={()=>openUserPlan(iso(addDays(new Date(upDate+"T00:00:00"),-1)))}>‹ 前の日</button><b>{fmtDate(upDate)}</b><button className="link-btn" onClick={()=>openUserPlan(iso(addDays(new Date(upDate+"T00:00:00"),1)))}>次の日 ›</button></div>
+      <p className="tiny">この日に利用する利用者を選びます。記録・日誌・タイムスケジュールにも反映されます。</p>
+      {allUsers.length>0?<div className="chk-grid" style={{gridTemplateColumns:"repeat(2,1fr)",gap:6}}>{allUsers.map(n=><label className="chk" key={n}><input type="checkbox" checked={upUsers.includes(n)} onChange={()=>toggleUpUser(n)}/>{n}</label>)}</div>:<p className="empty">利用者が未登録です。下で追加できます。</p>}
+      <div className="composer" style={{marginTop:6}}><textarea rows={1} value={newU} placeholder="リストに無い利用者名を追加" onChange={e=>setNewU(e.target.value)}/><button className="send" onClick={addNewU} title="利用者名を追加">＋</button></div>
+      <p className="tiny" style={{marginTop:4}}>選択中：{upUsers.length?upUsers.join("・"):"なし"}</p>
+      <div className="row-end"><Btn kind="ghost2" onClick={()=>setUpOpen(false)}>閉じる</Btn><Btn onClick={saveUserPlan}>保存</Btn></div>
     </Modal>}
   </Section>;
 }
