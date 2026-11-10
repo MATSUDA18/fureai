@@ -493,7 +493,13 @@
   .care-tpl{padding:5px 9px;border-radius:999px;border:1px solid #E7D3B8;background:#FFF6E8;color:#B07A2E;font-size:12px;cursor:pointer;}
   .care-levels{display:flex;flex-direction:column;gap:4px;margin:6px 0;}
   /* ===== 食事記録 A3印刷 ===== */
-  #mealPrintArea{height:0;overflow:hidden;}
+  #mealPrintArea{display:none;}
+  #mealPrintBar{display:none;}
+  body.printing{overflow:hidden;}
+  body.printing #root{display:none !important;}
+  body.printing #mealPrintArea{display:block !important;padding-top:50px;}
+  body.printing #mealPrintBar{display:flex !important;position:fixed;top:0;left:0;right:0;z-index:100;background:#B25E77;color:#fff;padding:9px 12px;box-sizing:border-box;justify-content:space-between;align-items:center;gap:10px;font-family:sans-serif;font-size:13px;box-shadow:0 2px 6px rgba(0,0,0,.2);}
+  body.printing #mealPrintBar button{background:#fff;color:#B25E77;border:none;border-radius:999px;padding:7px 16px;font-size:14px;font-weight:700;white-space:nowrap;}
   #mealPrintArea h1{font-size:12pt;text-align:center;margin:0 0 2px;color:#B25E77;font-family:sans-serif;}
   #mealPrintArea table{width:100%;border-collapse:collapse;table-layout:fixed;font-family:sans-serif;color:#333;}
   #mealPrintArea th{background:#F6D4DD;color:#B25E77;border:1px solid #ddd;padding:1px;font-size:8.5pt;}
@@ -513,12 +519,14 @@
     @page{size:A3 landscape;margin:5mm;}
     html,body{background:#fff !important;}
     body>*:not(#mealPrintArea){display:none !important;}
-    #mealPrintArea{display:block !important;height:auto !important;overflow:visible !important;}
+    body.printing #mealPrintBar{display:none !important;}
+    #mealPrintArea{display:block !important;padding-top:0 !important;}
   }
 </style>
 </head>
 <body>
 <div id="root"></div>
+<div id="mealPrintBar"><span>印刷の設定画面が開きます。元のアプリに戻るには右のボタンを押してください。</span><button type="button" onclick="document.body.classList.remove('printing')">とじる</button></div>
 <div id="mealPrintArea"></div>
 <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
 <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
@@ -1545,7 +1553,8 @@ function Records({me,data,persist,reload}){
   const mealShrunkRef=useRef({});
   const buildMealPrint=()=>{ const p=mealMonth.split("-"); const y=+p[0],m=+p[1]; const wd=["日","月","火","水","木","金","土"]; const numRows=Math.max(1,Math.round(mealCells.length/7)); const bodyH=206; const rowH=bodyH/numRows; const rowHmm=rowH.toFixed(1); const imgH=Math.min(15,rowH*0.42).toFixed(1); const esc=s=>String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;"); const gi=(src)=>src?(mealShrunkRef.current[src]||src):""; const slot=(x,lab,cls)=>"<div class='slot "+cls+"'><span class='tag'>"+lab+"</span>"+(x.img?("<img src='"+gi(x.img)+"'/>"):"")+"<div class='mn'>"+esc(x.menu)+"</div>"+((x.cook1||x.cook2)?("<div class='ck'>調 "+esc([x.cook1,x.cook2].filter(Boolean).join("・"))+"</div>"):"")+"</div>"; let rows=""; for(let i=0;i<mealCells.length;i++){ if(i%7===0) rows+="<tr>"; const ds=mealCells[i]; if(!ds){ rows+="<td class='empty'><div class='cell'></div></td>"; } else { const d=+ds.slice(8); const v=mealNorm(mealLog[ds]); const dd=new Date(ds+"T00:00:00"); const hasD=!!(v.dinner.menu||v.dinner.img||v.dinner.cook1||v.dinner.cook2); const hasB=!!(v.breakfast.menu||v.breakfast.img||v.breakfast.cook1||v.breakfast.cook2); let sl=""; if(hasD&&hasB) sl="<div class='slots'>"+slot(v.dinner,"晩","d")+slot(v.breakfast,"朝","b")+"</div>"; else if(hasD) sl="<div class='slots'>"+slot(v.dinner,"晩","d")+"</div>"; else if(hasB) sl="<div class='slots'>"+slot(v.breakfast,"朝","b")+"</div>"; rows+="<td><div class='cell'><div class='dn'>"+d+"（"+wd[dd.getDay()]+"）</div>"+sl+"</div></td>"; } if(i%7===6) rows+="</tr>"; } const title=y+"年"+m+"月 食事記録"; const area=document.getElementById("mealPrintArea"); if(!area) return; area.style.setProperty("--cellH",rowHmm+"mm"); area.style.setProperty("--imgH",imgH+"mm"); area.innerHTML="<h1>"+title+"（左：晩／右：翌朝　メニュー・調理担当・写真）</h1><table><thead><tr>"+wd.map(w=>"<th>"+w+"</th>").join("")+"</tr></thead><tbody>"+rows+"</tbody></table>"; void area.offsetHeight; };
   useEffect(()=>{ let dead=false; (async()=>{ const imgs=[]; for(let i=0;i<mealCells.length;i++){ const ds=mealCells[i]; if(!ds)continue; const v=mealNorm(mealLog[ds]); [v.dinner.img,v.breakfast.img].forEach(im=>{ if(im&&!mealShrunkRef.current[im]&&imgs.indexOf(im)<0) imgs.push(im); }); } buildMealPrint(); for(const im of imgs){ if(dead)return; try{ mealShrunkRef.current[im]=await resizeDataUrl(im,170,0.5); }catch(e){ mealShrunkRef.current[im]=im; } } if(!dead) buildMealPrint(); })(); return ()=>{dead=true;}; },[mealMonth,data.mealLog]);
-  const printMealA3=()=>{ buildMealPrint(); try{ window.print(); }catch(e){ flash("この端末では印刷を開けませんでした"); } };
+  useEffect(()=>{ const h=()=>document.body.classList.remove("printing"); window.addEventListener("afterprint",h); return ()=>window.removeEventListener("afterprint",h); },[]);
+  const printMealA3=()=>{ buildMealPrint(); document.body.classList.add("printing"); const area=document.getElementById("mealPrintArea"); if(area) void area.offsetHeight; try{ window.print(); }catch(e){ flash("この端末では印刷を開けませんでした"); } };
   const startPhoto=(cat)=>{ photoCatRef.current=cat||""; setPhotoPick(false); if(sel.filter(u=>dayUsers.includes(u)).length===0){ flash("先に利用者を選んでください"); return; } setTimeout(()=>{ if(fileRef.current) fileRef.current.click(); },0); };
   // 配慮メモ（本人の取扱説明）
   const careNotes=data.careNotes||[];
@@ -2029,7 +2038,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.139〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.140〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
