@@ -2048,7 +2048,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.145〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.146〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
@@ -2962,6 +2962,7 @@ function Consult({data}){
   useEffect(()=>{endRef.current&&endRef.current.scrollIntoView({behavior:"smooth"});},[messages,loading]);
   const starters=["感覚過敏があり、集団活動が苦手な方への配慮は？","予定変更でパニックになったときの落ち着き方は？","本人の「やりたい」を引き出す関わり方を知りたい"];
   const saveKey=()=>{localStorage.setItem("mizuho_api_key",keyInput.trim());setApiKey(keyInput.trim());setSetup(false);};
+  const renderMsg=(txt)=>{ const clean=String(txt||"").replace(/^#{1,6}[ \t]+/gm,"").replace(/^[ \t]*[-*][ \t]+/gm,"・"); const parts=clean.split(/(\*\*[^*\n]+\*\*)/g); return parts.map((p,j)=> /^\*\*[^*\n]+\*\*$/.test(p)? <strong key={j}>{p.slice(2,-2)}</strong> : p ); };
 
   const send=async(text)=>{
     const content=(text??input).trim(); if(!content||loading)return;
@@ -2972,11 +2973,12 @@ function Consult({data}){
       const res=await fetch("https://api.anthropic.com/v1/messages",{
         method:"POST",
         headers:{"content-type":"application/json","x-api-key":apiKey,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
-        body:JSON.stringify({model:"claude-sonnet-5",max_tokens:1024,system:buildSystem(data),messages:history.map(m=>({role:m.role,content:m.content}))}),
+        body:JSON.stringify({model:"claude-sonnet-5",max_tokens:3000,system:buildSystem(data),messages:history.map(m=>({role:m.role,content:m.content}))}),
       });
       const d=await res.json();
       if(d.error){setError("AIからの応答でエラーが出ました："+(d.error.message||"")); setMessages(history); }
-      else{ const txt=(d.content||[]).filter(b=>b.type==="text").map(b=>b.text).join("\n").trim();
+      else{ let txt=(d.content||[]).filter(b=>b.type==="text").map(b=>b.text).join("\n").trim();
+        if(d.stop_reason==="max_tokens"&&txt){ txt+="\n\n……（回答が長くなったため、ここで止まりました。続きが必要なときは「続きを教えて」と送ってください）"; }
         setMessages([...history,{role:"assistant",content:txt||"うまく答えられませんでした。もう一度お試しください。"}]); }
     }catch(e){ setError("AI相談に接続できませんでした。通信状況やAPIキーをご確認ください。"); setMessages(history); }
     finally{ setLoading(false); }
@@ -2992,7 +2994,7 @@ function Consult({data}){
     <div className="chat">
       {messages.length===0&&!loading&&<div className="chat-empty"><p>気になることを話しかけてみてください。例えば…</p>
         <div className="starters">{starters.map(s=><button key={s} className="starter" onClick={()=>send(s)}>{s}</button>)}</div></div>}
-      {messages.map((m,i)=><div key={i} className={"bubble "+m.role}>{m.content}</div>)}
+      {messages.map((m,i)=><div key={i} className={"bubble "+m.role}>{m.role==="assistant"?renderMsg(m.content):m.content}</div>)}
       {loading&&<div className="bubble assistant loading">考えています…</div>}
       <div ref={endRef}/>
     </div>
