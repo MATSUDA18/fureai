@@ -1971,9 +1971,9 @@ function App(){
   })();},[sbAuthed]);
   useEffect(()=>{ if(me||!data) return; try{ const ses=JSON.parse(localStorage.getItem("mizuho_session")||"null"); if(ses&&ses.exp>Date.now()){ const acc=(data.accounts||[]).find(a=>a.id===ses.id); if(acc){ localStorage.setItem("mizuho_session",JSON.stringify({id:acc.id,exp:Date.now()+86400000})); setMe(acc); if(SB_ON&&!sessTried){ setSessTried(true); logAccess(acc.name,"開いた"); } } } }catch(e){} setSessChecked(true); },[data,me]);
   useEffect(()=>{ if(!SB_ON||!sbAuthed) return; const iv=setInterval(async()=>{ if(!saveFailRef.current){ try{ const row=await sbGet(); if(row&&row.updated_at&&row.updated_at!==tsRef.current){ tsRef.current=row.updated_at; if(row.data&&Object.keys(row.data).length>0) setData(prev=>Object.assign({},row.data,{records:(prev&&prev.records)||[]})); } }catch(e){} } try{ await refreshRecords(); }catch(e){} },12000); return ()=>clearInterval(iv); },[sbAuthed]);
-  const dataRef=useRef(null); dataRef.current=data;
+  /* ver.149: 軽量化は「サーバーの最新データ」を取得してから写真だけ縮小して保存する（端末のローカル=古い可能性 を上書きに使わない）。アカウントは欠落時のみ補い、既存ハッシュは変更しない。 */
   const shrunkRef=useRef(false);
-  useEffect(()=>{ if(!me||!data||shrunkRef.current||(data.photoLite|0)>=2) return; shrunkRef.current=true; const t=setTimeout(async()=>{ try{ const base=dataRef.current; if(!base||(base.photoLite|0)>=2) return; saveFailRef.current=true; const clone=JSON.parse(JSON.stringify(base)); await shrinkPhotosInData(clone); clone.photoLite=2; persist(clone); }catch(e){ console.error("photo shrink",e); shrunkRef.current=false; saveFailRef.current=false; } },3500); return ()=>clearTimeout(t); },[me,data]);
+  useEffect(()=>{ if(!me||!data||shrunkRef.current) return; if((data.photoLite|0)>=2) return; shrunkRef.current=true; const t=setTimeout(async()=>{ try{ let srv=null; try{ const row=await sbGet(); if(row&&row.data&&Object.keys(row.data).length>0) srv=row.data; }catch(e){ shrunkRef.current=false; return; } if(!srv||(srv.photoLite|0)>=2) return; const clone=JSON.parse(JSON.stringify(srv)); try{ const byName={}; (clone.accounts||[]).forEach(a=>{ if(a&&a.name) byName[a.name]=a; }); ((data&&data.accounts)||[]).forEach(a=>{ if(a&&a.name&&!byName[a.name]) byName[a.name]=a; }); const merged=Object.values(byName); if(merged.length>=((clone.accounts||[]).length)) clone.accounts=merged; }catch(e){} await shrinkPhotosInData(clone); clone.photoLite=2; const ts=new Date().toISOString(); await sbSave(clone,ts); tsRef.current=ts; saveFailRef.current=false; setSaveErr(""); setData(prev=>Object.assign({},clone,{records:(prev&&prev.records)||[]})); save(clone); }catch(e){ console.error("shrink",e); shrunkRef.current=false; } },3500); return ()=>clearTimeout(t); },[me,data]);
 
   const persist=(next)=>{ setData(next); save(next); if(SB_ON){ const ts=new Date().toISOString(); saveFailRef.current=true; (async()=>{ let ok=false,lastErr=null; for(let a=0;a<3&&!ok;a++){ try{ await sbSave(next,ts); ok=true; }catch(e){ lastErr=e; await new Promise(r=>setTimeout(r,800)); } } if(ok){ tsRef.current=ts; saveFailRef.current=false; setSaveErr(""); } else { saveFailRef.current=true; setSaveErr("save-failed"); console.error("persist save failed",lastErr); } })(); } };
   const logout=()=>{localStorage.removeItem("mizuho_session");setMe(null);};
@@ -2057,7 +2057,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.148〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.149〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
