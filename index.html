@@ -1253,7 +1253,7 @@ function Handover({me,data,persist}){
   const mdOnly=(ts)=>{ if(!ts)return ""; const d=new Date(ts); return (d.getMonth()+1)+"/"+d.getDate(); };
   const setSection=(id,section)=>persist(Object.assign({},data,{supplyItems:items.map(x=>x.id===id?Object.assign({},x,{section}):x)}));
   const [nCat,setNCat]=useState(""); const [nItemCat,setNItemCat]=useState(""); const [nItemCats,setNItemCats]=useState([]); const [nVars,setNVars]=useState(""); const [supQ,setSupQ]=useState("");
-  const [pendingAtt,setPendingAtt]=useState([]); const [av,setAv]=useState(null); const [supPhotoFor,setSupPhotoFor]=useState(null); const [supCatFor,setSupCatFor]=useState(null); const [supCrop,setSupCrop]=useState(null);
+  const [pendingAtt,setPendingAtt]=useState([]); const [av,setAv]=useState(null); const [supPhotoFor,setSupPhotoFor]=useState(null); const [supCatFor,setSupCatFor]=useState(null); const [supCrop,setSupCrop]=useState(null); const [newCatIn,setNewCatIn]=useState("");
   const hoFileRef=useRef(null); const supFileRef=useRef(null); const noteFileRef=useRef(null);
   const readDU=(f)=>new Promise((rs,rj)=>{const fr=new FileReader();fr.onload=()=>rs(fr.result);fr.onerror=rj;fr.readAsDataURL(f);});
   const onHoFile=async(e)=>{ const f=e.target.files&&e.target.files[0]; e.target.value=""; if(!f)return; if(!SB_ON){flash("共有DBが必要です");return;} try{ const id=uid()+"_"+Date.now(); const isImg=/^image\//.test(f.type); let full,thumb=null,type; if(isImg){ full=await compressImage(f,1200,0.7); thumb=await compressImage(f,200,0.5); type="image"; } else { full=await readDU(f); type="file"; } await sbInsertAttach({id,meta:{kind:"handover",name:f.name,type,thumb},data:full,created:new Date().toISOString()}); setPendingAtt(p=>[...p,{id,name:f.name,type,thumb}]); flash("添付しました"); }catch(err){ flash("添付に失敗（attachments表の設定をご確認ください）"); } };
@@ -1301,6 +1301,7 @@ function Handover({me,data,persist}){
   const siSetCat=(id,cat)=>persist(Object.assign({},data,{supplyItems:items.map(x=>x.id===id?Object.assign({},x,{cat}):x),supplyCats:supCats}));
   const scatsOf=(it)=> (it.cats&&it.cats.length)?it.cats:(it.cat?[it.cat]:["その他"]);
   const toggleItemCat=(id,cat)=>persist(Object.assign({},data,{supplyCats:supCats,supplyItems:items.map(x=>{ if(x.id!==id) return x; const cur=scatsOf(x); const next=cur.indexOf(cat)>=0?cur.filter(c=>c!==cat):cur.concat([cat]); const fin=next.length?next:[supCats[0]||"その他"]; return Object.assign({},x,{cats:fin,cat:fin[0]}); })}));
+  const addCatToItem=(id,nm)=>{ const name=(nm||"").trim(); if(!name){flash("カテゴリー名を入力してください");return;} const cats=supCats.includes(name)?supCats:[...supCats,name]; persist(Object.assign({},data,{supplyCats:cats,supplyItems:items.map(x=>{ if(x.id!==id) return x; const cur=scatsOf(x); const next=cur.indexOf(name)>=0?cur:cur.concat([name]); return Object.assign({},x,{cats:next,cat:next[0]}); })})); setNewCatIn(""); flash("カテゴリー「"+name+"」を追加しました"); };
   const isVar=(it)=> it.variants && it.variants.length>0;
   const wvOf=(it)=> it.wantVariants ? it.wantVariants : (it.wantVariant?[it.wantVariant]:[]);
   const isWant=(it)=> isVar(it) ? wvOf(it).length>0 : !!it.want;
@@ -1393,7 +1394,11 @@ function Handover({me,data,persist}){
     {supCatFor&&(()=>{ const cur=items.find(i=>i.id===supCatFor.id)||supCatFor; const sel=scatsOf(cur); return <Modal title={"カテゴリー："+(cur.name||"")} tint="#C9788F" onClose={()=>setSupCatFor(null)}>
       <p className="hint">この品目を表示するカテゴリーを選びます（複数選べます）。選んだ全てのカテゴリーに表示されます。</p>
       <div className="chk-grid" style={{gridTemplateColumns:"repeat(2,1fr)",gap:8}}>{supCats.map(c=><label className="chk" key={c}><input type="checkbox" checked={sel.indexOf(c)>=0} onChange={()=>toggleItemCat(cur.id,c)}/>{c}</label>)}</div>
-      <div className="row-end"><Btn onClick={()=>setSupCatFor(null)}>閉じる</Btn></div>
+      <div style={{marginTop:12,paddingTop:10,borderTop:"1px solid #F0D3DB"}}>
+        <p className="hint" style={{marginTop:0}}>新しいカテゴリーを作ってこの品目に追加：</p>
+        <div style={{display:"flex",gap:6}}><input value={newCatIn} onChange={e=>setNewCatIn(e.target.value)} onKeyDown={e=>e.key==="Enter"&&addCatToItem(cur.id,newCatIn)} placeholder="例：冷蔵・季節もの など" style={{flex:1,padding:"10px 12px",border:"1px solid #E7C9D4",borderRadius:10,fontSize:15,boxSizing:"border-box"}}/><Btn onClick={()=>addCatToItem(cur.id,newCatIn)}>追加</Btn></div>
+      </div>
+      <div className="row-end" style={{marginTop:12}}><Btn onClick={()=>{setSupCatFor(null);setNewCatIn("");}}>閉じる</Btn></div>
     </Modal>;})()}
     {supCrop&&<CropModal src={supCrop.src} onCancel={()=>setSupCrop(null)} onDone={applySupCrop}/>}
     {noteItem&&<Modal title={"📝 メモ："+((items.find(i=>i.id===noteItem.id)||{}).name||"")} tint="#C9788F" onClose={()=>setNoteItem(null)}>
@@ -1995,12 +2000,11 @@ function App(){
       ? <Inside me={me} data={data} tab={tab} setTab={setTab} onLogout={logout} persist={persist} reload={refreshRecords}/>
       : <Top data={data} season={season} onPick={a=>{setLogin(a);setErr("");}} onAdminReg={()=>setAdminReg(true)} onHotaru={()=>setHotaruOpen(true)} onSbLogout={()=>{authClear();setSbAuthed(false);}}/>}
 
-    {login && <Modal title={`${login.name} さん  ―  パスワード`} onClose={()=>{setLogin(null);setPw("");setErr("");}}>
+    {login && !me && <Modal title={`${login.name} さん  ―  パスワード`} onClose={()=>{setLogin(null);setPw("");setErr("");}}>
       <p className="hint">🔒 このアプリの内容を見るにはパスワードが必要です。</p>
       <Field label="パスワード" type="password" value={pw} autoFocus onChange={e=>setPw(e.target.value)} onKeyDown={e=>e.key==="Enter"&&doLogin()}/>
       {err&&<p className="err">{err}</p>}
       <div className="row-end"><Btn onClick={doLogin}>ログイン</Btn></div>
-      <p className="tiny">デモのパスワードは「1234」です。</p>
     </Modal>}
 
     {adminReg && <AdminRegister data={data} persist={persist} onClose={()=>setAdminReg(false)}/>}
@@ -2058,7 +2062,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.151〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.152〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
