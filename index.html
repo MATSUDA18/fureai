@@ -612,7 +612,7 @@ function resizeDataUrl(src,max,q){ max=max||240;q=q||0.6; return new Promise((re
 /* ===== 共有データ軽量化：base64写真が大きすぎると共有データ保存が失敗するため、一定サイズ超の写真を縮小 ===== */
 const PHOTO_TH=10000; // この文字数を超える画像を縮小対象（枚数が多いので強めに）
 // データ内のあらゆる大きな base64 画像（食事・補充品・補充品メモ・イベントのチラシ等）を再帰的に縮小する
-async function shrinkPhotosInData(obj){ if(!obj||typeof obj!=="object") return obj; const keys=Array.isArray(obj)?obj.map((_,i)=>i):Object.keys(obj); for(const k of keys){ const v=obj[k]; if(typeof v==="string"){ if(v.length>PHOTO_TH&&v.indexOf("data:image")===0){ try{ const r=await resizeDataUrl(v,360,0.45); if(r&&r.length<v.length) obj[k]=r; }catch(e){} } } else if(v&&typeof v==="object"){ await shrinkPhotosInData(v); } } return obj; }
+async function shrinkPhotosInData(obj){ if(!obj||typeof obj!=="object") return obj; const keys=Array.isArray(obj)?obj.map((_,i)=>i):Object.keys(obj); for(const k of keys){ const v=obj[k]; if(typeof v==="string"){ if(v.length>PHOTO_TH&&v.indexOf("data:image")===0){ try{ const r=await resizeDataUrl(v,240,0.4); if(r&&r.length<v.length) obj[k]=r; }catch(e){} } } else if(v&&typeof v==="object"){ await shrinkPhotosInData(v); } } return obj; }
 function hasLargePhoto(obj,seen){ try{ if(!obj||typeof obj!=="object") return false; const keys=Array.isArray(obj)?obj.map((_,i)=>i):Object.keys(obj); for(const k of keys){ const v=obj[k]; if(typeof v==="string"){ if(v.length>PHOTO_TH&&v.indexOf("data:image")===0) return true; } else if(v&&typeof v==="object"){ if(hasLargePhoto(v)) return true; } } }catch(e){} return false; }
 
 /* 所属（応援元）とタイムライン/シフトの役割 */
@@ -1951,6 +1951,9 @@ function App(){
   const refreshRecords=async()=>{ if(!SB_ON) return; try{ const rows=await recFetch(); setData(prev=>prev?Object.assign({},prev,{records:rows}):prev); }catch(e){} };
   const [alarm,setAlarm]=useState(null);
   const [saveErr,setSaveErr]=useState(""); const saveFailRef=useRef(false);
+  const [reco,setReco]=useState(null); const [recoBusy,setRecoBusy]=useState(false);
+  const recoCheck=()=>{ try{ const raw=localStorage.getItem(LS); if(!raw){ setReco({none:true}); return; } const d=JSON.parse(raw); setReco({ supply:(d.supplyItems||[]).length, handovers:(d.handovers||[]).length, meal:Object.keys(d.mealLog||{}).length, accounts:(d.accounts||[]).length, events:(d.events||[]).length, users:(d.userList||[]).length, kb:Math.round(raw.length/1024) }); }catch(e){ setReco({err:String(e&&e.message||e)}); } };
+  const recoRestore=async()=>{ let d; try{ d=JSON.parse(localStorage.getItem(LS)||"null"); }catch(e){} if(!d){ alert("この端末に復元できるデータがありません。"); return; } if(!confirm("この端末に残っているデータでサーバーを上書き復元します。\n補充品"+((d.supplyItems||[]).length)+"件／申し送り"+((d.handovers||[]).length)+"件／食事"+(Object.keys(d.mealLog||{}).length)+"日分\nよろしいですか？")) return; setRecoBusy(true); try{ const clone=JSON.parse(JSON.stringify(d)); await shrinkPhotosInData(clone); clone.photoLite=7; const ts=new Date().toISOString(); await sbSave(clone,ts); tsRef.current=ts; saveFailRef.current=false; setSaveErr(""); setData(clone); save(clone); alert("復元しました。他の端末も再読み込みすると反映されます。"); setReco(null); }catch(e){ alert("復元に失敗しました："+String(e&&e.message||e)); } finally{ setRecoBusy(false); } };
   const audioRef=useRef(null); const firedRef=useRef({});
   const playChime=()=>{ try{ const ac=audioRef.current; if(!ac) return; if(ac.state==="suspended") ac.resume(); const t0=ac.currentTime; [880,1108.73,1318.51].forEach((f,i)=>{ const o=ac.createOscillator(),g=ac.createGain(); o.type="sine"; o.frequency.value=f; o.connect(g); g.connect(ac.destination); const t=t0+i*0.18; g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(0.25,t+0.02); g.gain.exponentialRampToValueAtTime(0.0001,t+0.9); o.start(t); o.stop(t+0.95); }); }catch(e){} };
   useEffect(()=>{ const unlock=()=>{ try{ if(!audioRef.current){ const AC=window.AudioContext||window.webkitAudioContext; if(AC) audioRef.current=new AC(); } if(audioRef.current&&audioRef.current.state==="suspended") audioRef.current.resume(); }catch(e){} }; window.addEventListener("pointerdown",unlock); window.addEventListener("touchstart",unlock); return ()=>{ window.removeEventListener("pointerdown",unlock); window.removeEventListener("touchstart",unlock); }; },[]);
@@ -2001,6 +2004,27 @@ function App(){
   if(!me && !sessChecked) return <div style={{padding:40,color:"#C9788F"}}>読み込み中…</div>;
 
   return <div>
+    <div style={{position:"fixed",bottom:"calc(env(safe-area-inset-bottom, 0px) + 10px)",right:10,zIndex:9998}}><button onClick={()=>{setReco(null);recoCheck();}} style={{background:"#C0392B",color:"#fff",border:"none",borderRadius:999,padding:"10px 16px",fontSize:13,fontWeight:700,fontFamily:"sans-serif",boxShadow:"0 4px 14px rgba(0,0,0,.3)"}}>🆘 データ復旧</button></div>
+    {reco && <div style={{position:"fixed",inset:0,zIndex:10000,background:"rgba(0,0,0,.5)",display:"flex",alignItems:"center",justifyContent:"center",padding:16,fontFamily:"sans-serif"}} onClick={()=>!recoBusy&&setReco(null)}><div onClick={e=>e.stopPropagation()} style={{background:"#fff",borderRadius:14,maxWidth:440,width:"100%",padding:18,boxSizing:"border-box",maxHeight:"85vh",overflow:"auto"}}>
+      <h3 style={{margin:"0 0 10px",color:"#C0392B"}}>🆘 この端末のデータ復旧</h3>
+      {reco.none?<p style={{color:"#8A6B74",lineHeight:1.6}}>この端末のブラウザには、復元できるデータが見つかりませんでした。別の端末（特に最近このアプリで保存した端末）で同じボタンをお試しください。</p>
+      :reco.err?<p style={{color:"#C0392B"}}>読み取りエラー：{reco.err}</p>
+      :<>
+        <p style={{lineHeight:1.6,color:"#5A4A50",margin:"0 0 8px"}}>この端末の中に、以下のデータが残っています：</p>
+        <ul style={{lineHeight:1.9,color:"#5A4A50",margin:"0 0 8px",paddingLeft:20}}>
+          <li>補充品の品目：<b>{reco.supply}</b> 件</li>
+          <li>申し送り：<b>{reco.handovers}</b> 件</li>
+          <li>食事記録：<b>{reco.meal}</b> 日分</li>
+          <li>利用者：<b>{reco.users}</b> 名</li>
+          <li>アカウント：<b>{reco.accounts}</b> 件／イベント：<b>{reco.events}</b> 件（データ量 約{reco.kb}KB）</li>
+        </ul>
+        {(reco.supply+reco.handovers+reco.meal>0)
+          ?<><p style={{lineHeight:1.6,color:"#B25E77",fontWeight:700,margin:"6px 0"}}>このデータでサーバーを復元できます。復元すると、他の端末にも反映されます。</p>
+            <div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:10}}><button disabled={recoBusy} onClick={()=>setReco(null)} style={{background:"#eee",border:"none",borderRadius:10,padding:"10px 16px"}}>閉じる</button><button disabled={recoBusy} onClick={recoRestore} style={{background:"#C0392B",color:"#fff",border:"none",borderRadius:10,padding:"10px 18px",fontWeight:700}}>{recoBusy?"復元中…":"このデータで復元する"}</button></div></>
+          :<><p style={{lineHeight:1.6,color:"#8A6B74",margin:"6px 0"}}>この端末には、補充品・申し送り・食事記録のデータがほとんど残っていません。別の端末でお試しください。</p>
+            <div style={{display:"flex",justifyContent:"flex-end",marginTop:10}}><button onClick={()=>setReco(null)} style={{background:"#eee",border:"none",borderRadius:10,padding:"10px 16px"}}>閉じる</button></div></>}
+      </>}
+    </div></div>}
     {saveErr && <div style={{position:"fixed",top:"calc(env(safe-area-inset-top, 0px) + 8px)",left:8,right:8,maxWidth:"calc(100vw - 16px)",zIndex:9999,background:"#C0392B",color:"#fff",padding:"10px 12px",fontSize:12.5,lineHeight:1.5,fontFamily:"sans-serif",boxSizing:"border-box",overflowWrap:"break-word",wordBreak:"break-word",borderRadius:10,boxShadow:"0 4px 14px rgba(0,0,0,.3)"}}>{(typeof saveErr==="string"&&saveErr.length>16)?saveErr:"⚠️ サーバーに保存できていません。入力はこの端末に残っていますが、他の端末には反映されていません。数分待っても消えない場合は管理者（松田）へご連絡ください。"}</div>}
     {showInstall && <InstallPrompt onNever={()=>dismissInstall(true)} onLater={()=>dismissInstall(false)}/>}
       {alarm && <AlarmPopup type={alarm.type} onClose={()=>setAlarm(null)}/>}
@@ -2070,7 +2094,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.157〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.158〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
