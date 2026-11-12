@@ -604,7 +604,7 @@ function resizeDataUrl(src,max,q){ max=max||240;q=q||0.6; return new Promise((re
 /* ===== 共有データ軽量化：base64写真が大きすぎると共有データ保存が失敗するため、一定サイズ超の写真を縮小 ===== */
 const PHOTO_TH=42000; // この文字数を超える画像だけ縮小対象
 // データ内のあらゆる大きな base64 画像（食事・補充品・補充品メモ・イベントのチラシ等）を再帰的に縮小する
-async function shrinkPhotosInData(obj){ if(!obj||typeof obj!=="object") return obj; const keys=Array.isArray(obj)?obj.map((_,i)=>i):Object.keys(obj); for(const k of keys){ const v=obj[k]; if(typeof v==="string"){ if(v.length>PHOTO_TH&&v.indexOf("data:image")===0){ try{ const r=await resizeDataUrl(v,520,0.5); if(r&&r.length<v.length) obj[k]=r; }catch(e){} } } else if(v&&typeof v==="object"){ await shrinkPhotosInData(v); } } return obj; }
+async function shrinkPhotosInData(obj){ if(!obj||typeof obj!=="object") return obj; const keys=Array.isArray(obj)?obj.map((_,i)=>i):Object.keys(obj); for(const k of keys){ const v=obj[k]; if(typeof v==="string"){ if(v.length>PHOTO_TH&&v.indexOf("data:image")===0){ try{ const r=await resizeDataUrl(v,400,0.42); if(r&&r.length<v.length) obj[k]=r; }catch(e){} } } else if(v&&typeof v==="object"){ await shrinkPhotosInData(v); } } return obj; }
 function hasLargePhoto(obj,seen){ try{ if(!obj||typeof obj!=="object") return false; const keys=Array.isArray(obj)?obj.map((_,i)=>i):Object.keys(obj); for(const k of keys){ const v=obj[k]; if(typeof v==="string"){ if(v.length>PHOTO_TH&&v.indexOf("data:image")===0) return true; } else if(v&&typeof v==="object"){ if(hasLargePhoto(v)) return true; } } }catch(e){} return false; }
 
 /* 所属（応援元）とタイムライン/シフトの役割 */
@@ -1979,7 +1979,7 @@ function App(){
   useEffect(()=>{ if(!SB_ON||!sbAuthed) return; const iv=setInterval(async()=>{ if(!saveFailRef.current){ try{ const row=await sbGet(); if(row&&row.updated_at&&row.updated_at!==tsRef.current){ tsRef.current=row.updated_at; if(row.data&&Object.keys(row.data).length>0) setData(prev=>Object.assign({},row.data,{records:(prev&&prev.records)||[]})); } }catch(e){} } try{ await refreshRecords(); }catch(e){} },12000); return ()=>clearInterval(iv); },[sbAuthed]);
   /* ver.149: 軽量化は「サーバーの最新データ」を取得してから写真だけ縮小して保存する（端末のローカル=古い可能性 を上書きに使わない）。アカウントは欠落時のみ補い、既存ハッシュは変更しない。 */
   const shrunkRef=useRef(false);
-  useEffect(()=>{ if(!me||!data||shrunkRef.current) return; if((data.photoLite|0)>=3) return; shrunkRef.current=true; const t=setTimeout(async()=>{ let srv=null; try{ const row=await sbGet(); if(row&&row.data&&Object.keys(row.data).length>0) srv=row.data; }catch(e){ shrunkRef.current=false; return; } if(!srv||(srv.photoLite|0)>=3) return; let clone; try{ clone=JSON.parse(JSON.stringify(srv)); const byName={}; (clone.accounts||[]).forEach(a=>{ if(a&&a.name) byName[a.name]=a; }); ((data&&data.accounts)||[]).forEach(a=>{ if(a&&a.name&&!byName[a.name]) byName[a.name]=a; }); const merged=Object.values(byName); if(merged.length>=((clone.accounts||[]).length)) clone.accounts=merged; await shrinkPhotosInData(clone); clone.photoLite=3; }catch(e){ console.error("shrink build",e); shrunkRef.current=false; return; } const ts=new Date().toISOString(); try{ await sbSave(clone,ts); tsRef.current=ts; saveFailRef.current=false; setSaveErr(""); setData(prev=>Object.assign({},clone,{records:(prev&&prev.records)||[]})); save(clone); }catch(e){ console.error("shrink save",e); setSaveErr("save-failed"); } },3500); return ()=>clearTimeout(t); },[me,data]);
+  useEffect(()=>{ if(!me||!data||shrunkRef.current) return; if((data.photoLite|0)>=4) return; shrunkRef.current=true; const t=setTimeout(async()=>{ let srv=null; try{ const row=await sbGet(); if(row&&row.data&&Object.keys(row.data).length>0) srv=row.data; }catch(e){ shrunkRef.current=false; return; } if(!srv||(srv.photoLite|0)>=4) return; let clone; try{ clone=JSON.parse(JSON.stringify(srv)); const byName={}; (clone.accounts||[]).forEach(a=>{ if(a&&a.name) byName[a.name]=a; }); ((data&&data.accounts)||[]).forEach(a=>{ if(a&&a.name&&!byName[a.name]) byName[a.name]=a; }); const merged=Object.values(byName); if(merged.length>=((clone.accounts||[]).length)) clone.accounts=merged; await shrinkPhotosInData(clone); clone.photoLite=4; }catch(e){ console.error("shrink build",e); shrunkRef.current=false; return; } const ts=new Date().toISOString(); const mb=(JSON.stringify(clone).length/1048576).toFixed(1); try{ await sbSave(clone,ts); tsRef.current=ts; saveFailRef.current=false; setSaveErr(""); setData(prev=>Object.assign({},clone,{records:(prev&&prev.records)||[]})); save(clone); }catch(e){ console.error("shrink save",e); setSaveErr("⚠️ 写真が多く、データが大きすぎて保存できません（縮小後 約"+mb+"MB）。写真を外部保管に移す対応が必要です。この値を松田さんへお伝えください。入力はこの端末に残ります。"); } },3500); return ()=>clearTimeout(t); },[me,data]);
 
   const persist=(next)=>{ setData(next); save(next); if(SB_ON){ const ts=new Date().toISOString(); saveFailRef.current=true; (async()=>{ let ok=false,lastErr=null; for(let a=0;a<3&&!ok;a++){ try{ await sbSave(next,ts); ok=true; }catch(e){ lastErr=e; await new Promise(r=>setTimeout(r,800)); } } if(ok){ tsRef.current=ts; saveFailRef.current=false; setSaveErr(""); } else { saveFailRef.current=true; setSaveErr("save-failed"); console.error("persist save failed",lastErr); } })(); } };
   const logout=()=>{localStorage.removeItem("mizuho_session");setMe(null);};
@@ -1993,7 +1993,7 @@ function App(){
   if(!me && !sessChecked) return <div style={{padding:40,color:"#C9788F"}}>読み込み中…</div>;
 
   return <div>
-    {saveErr && <div style={{position:"fixed",top:0,left:0,right:0,zIndex:9999,background:"#C0392B",color:"#fff",padding:"8px 12px",fontSize:12.5,lineHeight:1.45,fontFamily:"sans-serif",boxSizing:"border-box",overflowWrap:"break-word",boxShadow:"0 2px 6px rgba(0,0,0,.25)"}}>⚠️ サーバーに保存できていません。入力はこの端末に残っていますが、他の端末には反映されていません。数分待っても消えない場合は管理者（松田）へご連絡ください。</div>}
+    {saveErr && <div style={{position:"fixed",top:8,left:8,right:8,zIndex:9999,background:"#C0392B",color:"#fff",padding:"10px 12px",fontSize:12.5,lineHeight:1.5,fontFamily:"sans-serif",boxSizing:"border-box",overflowWrap:"break-word",wordBreak:"break-word",borderRadius:10,boxShadow:"0 4px 14px rgba(0,0,0,.3)"}}>{(typeof saveErr==="string"&&saveErr.length>16)?saveErr:"⚠️ サーバーに保存できていません。入力はこの端末に残っていますが、他の端末には反映されていません。数分待っても消えない場合は管理者（松田）へご連絡ください。"}</div>}
     {showInstall && <InstallPrompt onNever={()=>dismissInstall(true)} onLater={()=>dismissInstall(false)}/>}
       {alarm && <AlarmPopup type={alarm.type} onClose={()=>setAlarm(null)}/>}
     {me
@@ -2062,7 +2062,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.152〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.153〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
