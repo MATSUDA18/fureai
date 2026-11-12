@@ -1981,7 +1981,7 @@ function App(){
   const shrunkRef=useRef(false);
   useEffect(()=>{ if(!me||!data||shrunkRef.current) return; if((data.photoLite|0)>=4) return; shrunkRef.current=true; const t=setTimeout(async()=>{ let srv=null; try{ const row=await sbGet(); if(row&&row.data&&Object.keys(row.data).length>0) srv=row.data; }catch(e){ shrunkRef.current=false; return; } if(!srv||(srv.photoLite|0)>=4) return; let clone; try{ clone=JSON.parse(JSON.stringify(srv)); const byName={}; (clone.accounts||[]).forEach(a=>{ if(a&&a.name) byName[a.name]=a; }); ((data&&data.accounts)||[]).forEach(a=>{ if(a&&a.name&&!byName[a.name]) byName[a.name]=a; }); const merged=Object.values(byName); if(merged.length>=((clone.accounts||[]).length)) clone.accounts=merged; await shrinkPhotosInData(clone); clone.photoLite=4; }catch(e){ console.error("shrink build",e); shrunkRef.current=false; return; } const ts=new Date().toISOString(); const mb=(JSON.stringify(clone).length/1048576).toFixed(1); try{ await sbSave(clone,ts); tsRef.current=ts; saveFailRef.current=false; setSaveErr(""); setData(prev=>Object.assign({},clone,{records:(prev&&prev.records)||[]})); save(clone); }catch(e){ console.error("shrink save",e); setSaveErr("⚠️ 写真が多く、データが大きすぎて保存できません（縮小後 約"+mb+"MB）。写真を外部保管に移す対応が必要です。この値を松田さんへお伝えください。入力はこの端末に残ります。"); } },3500); return ()=>clearTimeout(t); },[me,data]);
 
-  const persist=(next)=>{ setData(next); save(next); if(SB_ON){ const ts=new Date().toISOString(); saveFailRef.current=true; (async()=>{ let ok=false,lastErr=null; for(let a=0;a<3&&!ok;a++){ try{ await sbSave(next,ts); ok=true; }catch(e){ lastErr=e; await new Promise(r=>setTimeout(r,800)); } } if(ok){ tsRef.current=ts; saveFailRef.current=false; setSaveErr(""); } else { saveFailRef.current=true; setSaveErr("save-failed"); console.error("persist save failed",lastErr); } })(); } };
+  const persist=(next)=>{ setData(next); save(next); if(SB_ON){ const ts=new Date().toISOString(); saveFailRef.current=true; (async()=>{ let ok=false,lastErr=null; for(let a=0;a<3&&!ok;a++){ try{ await sbSave(next,ts); ok=true; }catch(e){ lastErr=e; await new Promise(r=>setTimeout(r,800)); } } if(ok){ tsRef.current=ts; saveFailRef.current=false; setSaveErr(""); } else { saveFailRef.current=true; let mb="?"; try{ mb=(JSON.stringify(next).length/1048576).toFixed(1); }catch(e){} let detail=""; try{ detail=String((lastErr&&lastErr.message)||"").replace(/\s+/g," ").slice(0,70); }catch(e){} setSaveErr("⚠️ サーバーに保存できていません。【データ量 約"+mb+"MB ／ エラー："+(detail||"不明")+"】この表示内容を松田さんへお伝えください。入力はこの端末に残っています。"); console.error("persist save failed",lastErr,mb+"MB"); } })(); } };
   const logout=()=>{localStorage.removeItem("mizuho_session");setMe(null);};
   const doLogin=async()=>{const h=await sha256(pw);
     if(login&&(h===login.hash||(data&&data.master&&h===data.master))){localStorage.setItem("mizuho_session",JSON.stringify({id:login.id,exp:Date.now()+86400000}));if(SB_ON)logAccess(login.name,"ログイン");setMe(login);setLogin(null);setPw("");setErr("");setTab("schedule");}
@@ -2062,7 +2062,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.153〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.154〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
