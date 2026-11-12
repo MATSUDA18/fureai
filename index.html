@@ -492,6 +492,7 @@
   .care-tpls{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px;}
   .care-tpl{padding:5px 9px;border-radius:999px;border:1px solid #E7D3B8;background:#FFF6E8;color:#B07A2E;font-size:12px;cursor:pointer;}
   .care-levels{display:flex;flex-direction:column;gap:4px;margin:6px 0;}
+  img[src^="pref:"]{visibility:hidden;}
   /* ===== 食事記録 A3印刷 ===== */
   #mealPrintArea{display:none;}
   #mealPrintBar{display:none;}
@@ -550,22 +551,43 @@ const SUPABASE_URL = "https://cxagugepnwivmestnnqk.supabase.co"; // 例: https:/
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN4YWd1Z2Vwbndpdm1lc3RubnFrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg1NDA2NTgsImV4cCI6MjEwNDExNjY1OH0.VCxIn0xKZiaR7sqAiiJVER8Fs4HmTylfPChFQWy6_g0"; // anon public key
 const SB_ON = SUPABASE_URL.length>10 && SUPABASE_KEY.length>10;
 const sbHead = ()=>({ "apikey":SUPABASE_KEY, "Authorization":"Bearer "+SUPABASE_KEY, "Content-Type":"application/json" });
-/* ===== 写真の外部化：base64画像を photos テーブルへ退避し、共有データ本体には参照(pref:id)だけ保存。読み込み時に復元。これで本体が極小になり statement timeout を回避。 ===== */
+/* ===== ver.160 データ保護：写真の外部化（任意・検証つき）／件数チェック／自動バックアップ ===== */
 const _photoCache={}; const _photoIdByData=new Map();
 const _mkPid=()=>"pf_"+Date.now().toString(36)+Math.random().toString(36).slice(2,10);
 const _isDataImg=(s)=> typeof s==="string" && s.length>3000 && s.indexOf("data:image")===0;
 const _isPref=(s)=> typeof s==="string" && s.length<80 && s.indexOf("pref:")===0;
-async function externPhotosWalk(obj){ const tasks=[]; const collect=(o)=>{ if(!o||typeof o!=="object")return; const keys=Array.isArray(o)?o.map((_,i)=>i):Object.keys(o); for(const k of keys){ const v=o[k]; if(_isDataImg(v)){ tasks.push({o,k,v}); } else if(v&&typeof v==="object"){ collect(v); } } }; collect(obj); if(!tasks.length) return; let i=0; const worker=async()=>{ while(i<tasks.length){ const t=tasks[i++]; let id=_photoIdByData.get(t.v); if(!id){ id=_mkPid(); let done=false; for(let a=0;a<2&&!done;a++){ try{ await sbInsertPhoto({id, meta:{t:"b"}, image:t.v, created:new Date().toISOString()}); done=true; }catch(e){ await new Promise(r=>setTimeout(r,500)); } } if(done){ _photoIdByData.set(t.v,id); _photoCache[id]=t.v; } else { id=null; } } if(id) t.o[t.k]="pref:"+id; } }; const n=Math.min(6,tasks.length); const ws=[]; for(let w=0;w<n;w++) ws.push(worker()); await Promise.all(ws); }
-async function hydratePhotosWalk(obj){ const tasks=[]; const collect=(o)=>{ if(!o||typeof o!=="object")return; const keys=Array.isArray(o)?o.map((_,i)=>i):Object.keys(o); for(const k of keys){ const v=o[k]; if(_isPref(v)){ const id=v.slice(5); if(_photoCache[id]!==undefined){ o[k]=_photoCache[id]; } else { tasks.push({o,k,id}); } } else if(v&&typeof v==="object"){ collect(v); } } }; collect(obj); if(!tasks.length) return; let i=0; const worker=async()=>{ while(i<tasks.length){ const t=tasks[i++]; try{ const p=await sbPhotoFull(t.id); if(p&&p.image){ _photoCache[t.id]=p.image; _photoIdByData.set(p.image,t.id); t.o[t.k]=p.image; } else { t.o[t.k]=""; } }catch(e){ t.o[t.k]=""; } } }; const n=Math.min(6,tasks.length); const ws=[]; for(let w=0;w<n;w++) ws.push(worker()); await Promise.all(ws); }
-// ver.157: 緊急措置で外部化・復元を一旦オフ（生データをそのまま読み書き）。移行処理も停止。
-async function sbGet(){ const r=await authFetch(`${SUPABASE_URL}/rest/v1/app_state?id=eq.1&select=data,updated_at`); if(!r.ok) throw new Error("sbGet "+r.status); const j=await r.json(); return (j&&j[0])?j[0]:null; }
-async function sbSave(data,ts){ const d2=Object.assign({},data); delete d2.records; const body=JSON.stringify({id:1,data:d2,updated_at:ts||new Date().toISOString()}); const r=await authFetch(`${SUPABASE_URL}/rest/v1/app_state`,{method:"POST",headers:{"Prefer":"resolution=merge-duplicates,return=minimal"},body}); if(!r.ok){ let t=""; try{ t=await r.text(); }catch(e){} throw new Error("sbSave "+r.status+" "+t); } }
+function _walkStr(obj,fn){ if(!obj||typeof obj!=="object")return; const keys=Array.isArray(obj)?obj.map((_,i)=>i):Object.keys(obj); for(const k of keys){ const v=obj[k]; if(typeof v==="string"){ fn(obj,k,v); } else if(v&&typeof v==="object"){ _walkStr(v,fn); } } }
+function countImgs(obj){ let inl=0,ref=0; _walkStr(obj,(o,k,v)=>{ if(_isDataImg(v))inl++; else if(_isPref(v))ref++; }); return {inl,ref,total:inl+ref}; }
+async function _pool(tasks,n,fn){ let i=0; const w=async()=>{ while(i<tasks.length){ const t=tasks[i++]; await fn(t); } }; const ws=[]; for(let k=0;k<Math.min(n,tasks.length);k++) ws.push(w()); await Promise.all(ws); }
+// 保存用：base64画像を photos テーブルへ退避し、本体には参照(pref:id)だけ残す。退避に失敗した画像は本体に残す（消さない）。
+async function externPhotosWalk(obj){ const tasks=[]; _walkStr(obj,(o,k,v)=>{ if(_isDataImg(v)) tasks.push({o,k,v}); }); let done=0,failed=0; await _pool(tasks,5,async(t)=>{ let id=_photoIdByData.get(t.v); if(!id){ id=_mkPid(); let ok=false; for(let a=0;a<2&&!ok;a++){ try{ await sbInsertPhoto({id,meta:{t:"b"},image:t.v,created:new Date().toISOString()}); ok=true; }catch(e){ await new Promise(r=>setTimeout(r,600)); } } if(ok){ _photoIdByData.set(t.v,id); _photoCache[id]=t.v; } else { id=null; } } if(id){ t.o[t.k]="pref:"+id; done++; } else { failed++; } }); return {total:tasks.length,done,failed}; }
+async function sbPhotosBatch(ids){ const out={}; const r=await authFetch(`${SUPABASE_URL}/rest/v1/photos?id=in.(${ids.join(",")})&select=id,image`); if(!r.ok) throw new Error("photo batch "+r.status); const j=await r.json(); (j||[]).forEach(p=>{ if(p&&p.id&&typeof p.image==="string") out[p.id]=p.image; }); return out; }
+// 読み込み用：参照(pref:id)を画像に戻す。取得できなかった参照は「参照のまま」残す（次回また取得する。空文字にしない＝失われない）。
+async function hydratePhotosWalk(obj){ const tasks=[]; _walkStr(obj,(o,k,v)=>{ if(_isPref(v)){ const id=v.slice(5); if(typeof _photoCache[id]==="string"){ o[k]=_photoCache[id]; } else { tasks.push({o,k,id}); } } }); if(!tasks.length) return {missing:0}; const ids=Array.from(new Set(tasks.map(t=>t.id))); const chunks=[]; for(let i=0;i<ids.length;i+=20) chunks.push(ids.slice(i,i+20)); await _pool(chunks,3,async(ch)=>{ let got=null; try{ got=await sbPhotosBatch(ch); }catch(e){ got=null; } if(!got){ got={}; for(const id of ch){ try{ const p=await sbPhotoFull(id); if(p&&typeof p.image==="string") got[id]=p.image; }catch(e){} } } for(const id of ch){ if(typeof got[id]==="string"&&got[id]){ _photoCache[id]=got[id]; _photoIdByData.set(got[id],id); } } }); let missing=0; tasks.forEach(t=>{ if(typeof _photoCache[t.id]==="string"){ t.o[t.k]=_photoCache[t.id]; } else { missing++; } }); return {missing}; }
+// 件数の要約と「大幅減」の検知（誤って空に近いデータで上書きするのを防ぐ）
+const STAT_KEYS=["accounts","userList","supplyItems","handovers","mealLog","dayPlans","shifts","timeline","materials","events","news"];
+const STAT_LABEL={accounts:"アカウント",userList:"利用者",supplyItems:"補充品",handovers:"申し送り",mealLog:"食事記録",dayPlans:"日ごとの予定",shifts:"シフト",timeline:"タイムスケジュール",materials:"資料",events:"イベント",news:"お知らせ"};
+function statOf(d){ const s={}; let tot=0; STAT_KEYS.forEach(k=>{ const v=d&&d[k]; const n=Array.isArray(v)?v.length:((v&&typeof v==="object")?Object.keys(v).length:0); s[k]=n; tot+=n; }); s._total=tot; return s; }
+function statLine(s){ if(!s) return "（件数不明）"; return "補充品"+(s.supplyItems||0)+"件／申し送り"+(s.handovers||0)+"件／食事"+(s.mealLog||0)+"日分／利用者"+(s.userList||0)+"名／アカウント"+(s.accounts||0)+"件"; }
+function wipeRisk(prev,next){ if(!prev||!next) return ""; const lost=[]; STAT_KEYS.forEach(k=>{ if((prev[k]||0)>=3&&(next[k]||0)===0) lost.push(STAT_LABEL[k]||k); }); if(lost.length) return "「"+lost.join("・")+"」が0件になります"; if((prev._total||0)>=20&&(next._total||0)<(prev._total*0.5)) return "データ全体が半分以下に減ります（"+prev._total+"件→"+next._total+"件）"; return ""; }
+// 軽量コピー（本体に埋め込まれた画像だけ除いた文字データ。参照 pref: は残る）
+function liteStr(d){ const t=Object.assign({},d); delete t.records; return JSON.stringify(t,(k,v)=> _isDataImg(v)?"":v); }
+function bkLocalDaily(lite){ try{ if(!lite) return; const key="mizuho_bk_"+iso(new Date()); if(localStorage.getItem(key)) return; const keys=[]; for(let i=0;i<localStorage.length;i++){ const k=localStorage.key(i); if(k&&/^mizuho_bk_\d{4}-\d{2}-\d{2}$/.test(k)) keys.push(k); } keys.sort(); while(keys.length>=4){ localStorage.removeItem(keys.shift()); } try{ localStorage.setItem(key,lite); }catch(e){ if(keys.length){ localStorage.removeItem(keys.shift()); try{ localStorage.setItem(key,lite); }catch(e2){} } } }catch(e){} }
+async function sbListBackups(){ const r=await authFetch(`${SUPABASE_URL}/rest/v1/photos?id=like.bk_*&select=id,meta,created&order=created.desc&limit=40`); if(!r.ok) throw new Error("bk list "+r.status); const j=await r.json(); return (j||[]).filter(p=>p&&/^bk_/.test(String(p.id||""))); }
+async function bkServerDaily(lite,stat){ try{ if(!lite||!stat||(stat._total||0)<5) return; const day=iso(new Date()); if(localStorage.getItem("mizuho_bk_srv_day")===day) return; const r=await authFetch(`${SUPABASE_URL}/rest/v1/photos`,{method:"POST",headers:{"Prefer":"return=minimal"},body:JSON.stringify({id:"bk_"+day,meta:{t:"bk",day,stat},image:lite,created:new Date().toISOString()})}); if(r.ok||r.status===409){ localStorage.setItem("mizuho_bk_srv_day",day); } if(r.ok){ try{ const rows=await sbListBackups(); const daily=rows.map(x=>String(x.id)).filter(id=>/^bk_\d{4}-\d{2}-\d{2}$/.test(id)).sort().reverse(); for(const id of daily.slice(14)){ if(/^bk_\d{4}-\d{2}-\d{2}$/.test(id)) await sbDeletePhoto(id); } }catch(e){} } }catch(e){} }
+async function sbGetTs(){ const r=await authFetch(`${SUPABASE_URL}/rest/v1/app_state?id=eq.1&select=updated_at`); if(!r.ok) throw new Error("sbGetTs "+r.status); const j=await r.json(); return (j&&j[0])?(j[0].updated_at||null):null; }
+async function sbGetRaw(){ const r=await authFetch(`${SUPABASE_URL}/rest/v1/app_state?id=eq.1&select=data,updated_at`); if(!r.ok) throw new Error("sbGet "+r.status); const j=await r.json(); return (j&&j[0])?j[0]:null; }
+async function sbGet(){ const row=await sbGetRaw(); if(row&&row.data){ try{ await hydratePhotosWalk(row.data); }catch(e){} } return row; }
+async function sbGetWithLite(){ const row=await sbGetRaw(); let lite=null; if(row&&row.data){ try{ lite=liteStr(row.data); }catch(e){} try{ await hydratePhotosWalk(row.data); }catch(e){} } return {row,lite}; }
+async function sbSaveRaw(d2,ts){ const body=JSON.stringify({id:1,data:d2,updated_at:ts||new Date().toISOString()}); const r=await authFetch(`${SUPABASE_URL}/rest/v1/app_state`,{method:"POST",headers:{"Prefer":"resolution=merge-duplicates,return=minimal"},body}); if(!r.ok){ let t=""; try{ t=await r.text(); }catch(e){} throw new Error("sbSave "+r.status+" "+t); } }
+// 保存：photoExt（外部保管）が有効なデータは、写真を退避したコピーを保存する（画面上のデータは書き換えない）。戻り値＝実際に保存した内容。
+async function sbSave(data,ts){ const t=Object.assign({},data); delete t.records; let d2=t; if(data&&data.photoExt){ d2=JSON.parse(JSON.stringify(t)); await externPhotosWalk(d2); } await sbSaveRaw(d2,ts); return d2; }
 async function recFetch(){ const r=await authFetch(`${SUPABASE_URL}/rest/v1/records?select=rec&order=ts.desc&limit=3000`); if(!r.ok) throw new Error("rec list "+r.status); const j=await r.json(); return j.map(x=>x.rec).filter(Boolean); }
 async function recAdd(rec){ const r=await authFetch(`${SUPABASE_URL}/rest/v1/records`,{method:"POST",headers:{"Prefer":"resolution=merge-duplicates,return=minimal"},body:JSON.stringify({id:rec.id,ts:rec.ts,rec})}); if(!r.ok) throw new Error("rec add "+r.status); }
 async function recUpdate(id,rec){ const r=await authFetch(`${SUPABASE_URL}/rest/v1/records?id=eq.${id}`,{method:"PATCH",headers:{"Prefer":"return=minimal"},body:JSON.stringify({ts:rec.ts,rec})}); if(!r.ok) throw new Error("rec upd "+r.status); }
 async function recDelete(id){ await authFetch(`${SUPABASE_URL}/rest/v1/records?id=eq.${id}`,{method:"DELETE"}); }
 async function sbInsertPhoto(rec){ const r=await authFetch(`${SUPABASE_URL}/rest/v1/photos`,{method:"POST",headers:{"Prefer":"return=minimal"},body:JSON.stringify(rec)}); if(!r.ok) throw new Error("photo insert "+r.status); }
-async function sbListPhotos(from,to){ let u=`${SUPABASE_URL}/rest/v1/photos?select=id,meta,created&order=created.desc&limit=300`; if(from) u+=`&created=gte.${from}T00:00:00`; if(to) u+=`&created=lte.${to}T23:59:59`; const r=await authFetch(u); if(!r.ok) throw new Error("photo list"); return await r.json(); }
+async function sbListPhotos(from,to){ let base=`${SUPABASE_URL}/rest/v1/photos?select=id,meta,created&order=created.desc&limit=300`; let rng=""; if(from) rng+=`&created=gte.${from}T00:00:00`; if(to) rng+=`&created=lte.${to}T23:59:59`; let r=await authFetch(base+"&id=not.like.pf_*&id=not.like.bk_*"+rng); if(!r.ok){ r=await authFetch(base+rng); } if(!r.ok) throw new Error("photo list"); const j=await r.json(); return (j||[]).filter(p=>p&&!/^(pf_|bk_)/.test(String(p.id||""))); }
 async function sbPhotoFull(id){ const r=await authFetch(`${SUPABASE_URL}/rest/v1/photos?id=eq.${id}&select=id,meta,image,created`); if(!r.ok) throw new Error("photo full"); const j=await r.json(); return j&&j[0]?j[0]:null; }
 async function sbDeletePhoto(id){ await authFetch(`${SUPABASE_URL}/rest/v1/photos?id=eq.${id}`,{method:"DELETE"}); }
 async function sbUpdatePhoto(id,patch){ const r=await authFetch(`${SUPABASE_URL}/rest/v1/photos?id=eq.${id}`,{method:"PATCH",headers:{"Prefer":"return=minimal"},body:JSON.stringify(patch)}); if(!r.ok) throw new Error("photo update "+r.status); }
@@ -1952,8 +1974,17 @@ function App(){
   const [alarm,setAlarm]=useState(null);
   const [saveErr,setSaveErr]=useState(""); const saveFailRef=useRef(false);
   const [reco,setReco]=useState(null); const [recoBusy,setRecoBusy]=useState(false);
-  const recoCheck=()=>{ try{ const raw=localStorage.getItem(LS); if(!raw){ setReco({none:true}); return; } const d=JSON.parse(raw); setReco({ supply:(d.supplyItems||[]).length, handovers:(d.handovers||[]).length, meal:Object.keys(d.mealLog||{}).length, accounts:(d.accounts||[]).length, events:(d.events||[]).length, users:(d.userList||[]).length, kb:Math.round(raw.length/1024) }); }catch(e){ setReco({err:String(e&&e.message||e)}); } };
-  const recoRestore=async()=>{ let d; try{ d=JSON.parse(localStorage.getItem(LS)||"null"); }catch(e){} if(!d){ alert("この端末に復元できるデータがありません。"); return; } if(!confirm("この端末に残っているデータでサーバーを上書き復元します。\n補充品"+((d.supplyItems||[]).length)+"件／申し送り"+((d.handovers||[]).length)+"件／食事"+(Object.keys(d.mealLog||{}).length)+"日分\nよろしいですか？")) return; setRecoBusy(true); try{ const clone=JSON.parse(JSON.stringify(d)); await shrinkPhotosInData(clone); clone.photoLite=7; const ts=new Date().toISOString(); await sbSave(clone,ts); tsRef.current=ts; saveFailRef.current=false; setSaveErr(""); setData(clone); save(clone); alert("復元しました。他の端末も再読み込みすると反映されます。"); setReco(null); }catch(e){ alert("復元に失敗しました："+String(e&&e.message||e)); } finally{ setRecoBusy(false); } };
+  const [srvOk,setSrvOk]=useState(!SB_ON); const srvOkRef=useRef(!SB_ON); const [srvErr,setSrvErr]=useState("");
+  const srvStatRef=useRef(null); const conflictRef=useRef(false); const dataRef=useRef(null); dataRef.current=data;
+  const [migMsg,setMigMsg]=useState(""); const migBusyRef=useRef(false); const actRef=useRef({});
+  const recoOpen=async()=>{ const info={list:[],local:null,mem:null}; try{ if(dataRef.current&&Array.isArray(dataRef.current.accounts)) info.mem={stat:statOf(dataRef.current),conflict:!!conflictRef.current}; }catch(e){} try{ const raw=localStorage.getItem(LS); if(raw){ const d=JSON.parse(raw); info.local={stat:statOf(d),kb:Math.round(raw.length/1024)}; } }catch(e){} try{ for(let i=0;i<localStorage.length;i++){ const k=localStorage.key(i); if(k&&/^mizuho_bk_(\d{4}-\d{2}-\d{2}|premig)$/.test(k)){ try{ const d=JSON.parse(localStorage.getItem(k)); info.list.push({src:"端末",key:k,day:k.replace("mizuho_bk_",""),stat:statOf(d)}); }catch(e){} } } }catch(e){} setReco(Object.assign({},info,{loading:true})); try{ const rows=await sbListBackups(); rows.forEach(r=>info.list.push({src:"サーバー",id:r.id,day:(r.meta&&r.meta.day)||String(r.created||"").slice(0,10),stat:(r.meta&&r.meta.stat)||null,pre:!!(r.meta&&r.meta.pre)})); }catch(e){} info.list.sort((a,b)=>String(b.day).localeCompare(String(a.day))); setReco(Object.assign({},info,{loading:false})); };
+  const recoApply=async(getter,label)=>{ setRecoBusy(true); try{ const d=await getter(); if(!d||typeof d!=="object"||!Array.isArray(d.accounts)||!d.accounts.length) throw new Error("バックアップの内容を読めませんでした"); const st=statOf(d); let pw_=""; try{ const ci=countImgs(d).total, cur=dataRef.current?countImgs(dataRef.current).total:0; if(cur>ci) pw_="\n\n⚠️ このバックアップに含まれる写真は"+ci+"枚です（現在は"+cur+"枚）。差の分の写真は表示されなくなります。"; }catch(e){} if(!window.confirm("「"+label+"」の内容でサーバーを上書きして戻します。\n\n"+statLine(st)+pw_+"\n\n現在のデータは置き換わります。よろしいですか？")) return; const clone=JSON.parse(JSON.stringify(d)); delete clone.records; if(dataRef.current&&dataRef.current.photoExt) clone.photoExt=true; if(!clone.photoExt){ let sz=0; try{ sz=JSON.stringify(clone).length; }catch(e){} if(sz>3500000) await shrinkPhotosInData(clone); } const ts=new Date().toISOString(); const d2=await sbSave(clone,ts); const full=JSON.parse(JSON.stringify(d2)); try{ await hydratePhotosWalk(full); }catch(e){} tsRef.current=ts; srvStatRef.current=statOf(full); conflictRef.current=false; saveFailRef.current=false; srvOkRef.current=true; setSrvOk(true); setSaveErr(""); setData(prev=>Object.assign({},full,{records:(prev&&prev.records)||[]})); save(d2); alert("復元しました。他の端末は再読み込みすると反映されます。"); setReco(null); }catch(e){ alert("復元に失敗しました："+String((e&&e.message)||e)); } finally{ setRecoBusy(false); } };
+  const recoFromMem=()=>recoApply(async()=>dataRef.current,"いまこの画面に表示中のデータ");
+  const recoFromLocal=()=>recoApply(async()=>JSON.parse(localStorage.getItem(LS)||"null"),"この端末に残っているデータ");
+  const recoFromItem=(it)=>recoApply(async()=>{ if(it.key) return JSON.parse(localStorage.getItem(it.key)||"null"); const p=await sbPhotoFull(it.id); return p&&p.image?JSON.parse(p.image):null; },(it.day==="premig"||it.pre?"写真移行の直前":it.day)+"（"+it.src+"の自動バックアップ）");
+  const runExtMig=async()=>{ if(migBusyRef.current) return; if(!srvOkRef.current||conflictRef.current||saveFailRef.current){ alert("いまは実行できません（サーバーと同期できていません）。画面を再読み込みしてからお試しください。"); return; } if(dataRef.current&&dataRef.current.photoExt){ alert("写真はすでに外部保管へ移行済みです。"); return; } if(!window.confirm("写真を「外部保管」へ移します。\n\n・文字のデータはそのまま、写真だけを別の保管場所へ移します\n・実行前に自動でバックアップを取り、結果を自動で検証します\n・問題があれば自動で元に戻します\n・数十秒〜数分かかります。完了の表示が出るまで画面を閉じないでください\n・他の職員が入力していない時間帯に実行してください\n\n実行しますか？")) return; migBusyRef.current=true; let orig=null, saved=false; try{ setMigMsg("① 最新のデータを取得しています…"); const row=await sbGetRaw(); if(!row||!row.data||!Object.keys(row.data).length) throw new Error("サーバーのデータを取得できませんでした"); orig=row.data; if(orig.photoExt) throw new Error("すでに移行済みです"); const before=statOf(orig), imgB=countImgs(orig); setMigMsg("② バックアップを作成しています…"); const lite=liteStr(orig); let bk=false; try{ localStorage.setItem("mizuho_bk_premig",lite); bk=true; }catch(e){} try{ const r=await authFetch(`${SUPABASE_URL}/rest/v1/photos`,{method:"POST",headers:{"Prefer":"return=minimal"},body:JSON.stringify({id:"bk_pre_"+Date.now().toString(36),meta:{t:"bk",day:iso(new Date()),pre:true,stat:before},image:lite,created:new Date().toISOString()})}); if(r.ok) bk=true; }catch(e){} if(!bk) throw new Error("事前バックアップを作成できませんでした"); setMigMsg("③ 写真を外部保管へ移しています…（"+imgB.inl+"枚）"); const c=JSON.parse(JSON.stringify(orig)); delete c.records; await externPhotosWalk(c); for(let rt=0; rt<2 && countImgs(c).inl>0; rt++){ await new Promise(r=>setTimeout(r,1500)); await externPhotosWalk(c); } { const left=countImgs(c).inl; if(left>0) throw new Error("写真を保管場所へ送れませんでした（"+left+"枚）。通信の良い場所で、もう一度実行してください"); } setMigMsg("④ 移した写真を確認しています…"); const refs=[]; _walkStr(c,(o,k,v)=>{ if(_isPref(v)) refs.push({o,k,id:v.slice(5)}); }); const ids=Array.from(new Set(refs.map(r=>r.id))); const exist=new Set(); for(let i=0;i<ids.length;i+=40){ const ch=ids.slice(i,i+40); const r=await authFetch(`${SUPABASE_URL}/rest/v1/photos?id=in.(${ch.join(",")})&select=id`); if(!r.ok) throw new Error("写真の確認に失敗しました（"+r.status+"）"); const jj=await r.json(); (jj||[]).forEach(p=>exist.add(p.id)); } refs.forEach(r=>{ if(!exist.has(r.id)){ const img=_photoCache[r.id]; if(typeof img==="string"){ r.o[r.k]=img; } else { throw new Error("写真の保管先が確認できませんでした"); } } }); const after=statOf(c), imgA=countImgs(c); STAT_KEYS.forEach(k=>{ if(before[k]!==after[k]) throw new Error("件数が一致しません（"+(STAT_LABEL[k]||k)+"）"); }); if(imgA.total!==imgB.total) throw new Error("写真の枚数が一致しません"); c.photoExt=true; try{ const lite2=liteStr(c); try{ localStorage.setItem("mizuho_bk_premig",lite2); }catch(e){} await authFetch(`${SUPABASE_URL}/rest/v1/photos`,{method:"POST",headers:{"Prefer":"return=minimal"},body:JSON.stringify({id:"bk_pre_"+Date.now().toString(36)+"r",meta:{t:"bk",day:iso(new Date()),pre:true,stat:after},image:lite2,created:new Date().toISOString()})}); }catch(e){} setMigMsg("⑤ 保存しています…"); const tsNow=await sbGetTs(); if(tsNow!==(row.updated_at||null)) throw new Error("作業中に他の端末でデータが変更されました。少し待ってから、もう一度実行してください"); const ts=new Date().toISOString(); await sbSaveRaw(c,ts); saved=true; setMigMsg("⑥ 保存結果を検証しています…"); const row2=await sbGetRaw(); if(!row2||!row2.data) throw new Error("保存後の確認ができませんでした"); const st2=statOf(row2.data), img2=countImgs(row2.data); STAT_KEYS.forEach(k=>{ if(before[k]!==st2[k]) throw new Error("保存後の件数が一致しません（"+(STAT_LABEL[k]||k)+"）"); }); if(img2.total!==imgB.total) throw new Error("保存後の写真の枚数が一致しません"); const full=JSON.parse(JSON.stringify(row2.data)); const hy=await hydratePhotosWalk(full); if(hy&&hy.missing>0) throw new Error("写真を読み戻せませんでした（"+hy.missing+"枚）"); tsRef.current=row2.updated_at||ts; srvStatRef.current=st2; setData(prev=>Object.assign({},full,{records:(prev&&prev.records)||[]})); save(row2.data); setMigMsg(""); alert("✅ 写真の外部保管への移行が完了しました。\n\n外部保管に移した写真："+imgA.ref+"枚"+(imgA.inl?("\n本体に残した写真："+imgA.inl+"枚（次回の保存時に自動で再試行します）"):"")+"\n件数の検証：一致\n\n他の端末は、再読み込みすると反映されます。"); }catch(e){ let rb="\n（データは変更していません）"; if(saved&&orig){ try{ const o2=Object.assign({},orig); delete o2.records; await sbSaveRaw(o2,new Date().toISOString()); rb="\n（元の状態に自動で戻しました）"; }catch(e2){ rb="\n⚠️ 自動で戻せませんでした。管理者パネルの「データ復旧」から「写真移行の直前」のバックアップを戻してください。"; } } setMigMsg(""); alert("写真の移行を中止しました："+String((e&&e.message)||e)+rb); } finally{ migBusyRef.current=false; } };
+  actRef.current={recoOpen,runExtMig};
+  useEffect(()=>{ const a=()=>{ try{ actRef.current.recoOpen(); }catch(e){} }; const b=()=>{ try{ actRef.current.runExtMig(); }catch(e){} }; window.addEventListener("mizuho-reco",a); window.addEventListener("mizuho-extmig",b); return ()=>{ window.removeEventListener("mizuho-reco",a); window.removeEventListener("mizuho-extmig",b); }; },[]);
   const audioRef=useRef(null); const firedRef=useRef({});
   const playChime=()=>{ try{ const ac=audioRef.current; if(!ac) return; if(ac.state==="suspended") ac.resume(); const t0=ac.currentTime; [880,1108.73,1318.51].forEach((f,i)=>{ const o=ac.createOscillator(),g=ac.createGain(); o.type="sine"; o.frequency.value=f; o.connect(g); g.connect(ac.destination); const t=t0+i*0.18; g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(0.25,t+0.02); g.gain.exponentialRampToValueAtTime(0.0001,t+0.9); o.start(t); o.stop(t+0.95); }); }catch(e){} };
   useEffect(()=>{ const unlock=()=>{ try{ if(!audioRef.current){ const AC=window.AudioContext||window.webkitAudioContext; if(AC) audioRef.current=new AC(); } if(audioRef.current&&audioRef.current.state==="suspended") audioRef.current.resume(); }catch(e){} }; window.addEventListener("pointerdown",unlock); window.addEventListener("touchstart",unlock); return ()=>{ window.removeEventListener("pointerdown",unlock); window.removeEventListener("touchstart",unlock); }; },[]);
@@ -1972,27 +2003,55 @@ function App(){
           {id:uid(),date:today(),title:"意思決定支援ガイドラインの要点",category:"意思決定支援",source:"厚労省ガイドライン",body:"意思決定支援は「意思形成→意思表明→意思実現」の3段階。支援者が代理で決めるのではなく、ご本人の希望を中心に据える。"},
           {id:uid(),date:today(),title:"虐待の5類型と通報義務",category:"虐待防止",source:"障害者虐待防止法",body:"身体的・性的・心理的・放棄放置・経済的の5類型。施設従事者は早期発見の努力義務と通報義務があり、確証がなくても『疑い』の段階で市町村へ通報する。"},
         ]};
-      save(d);
+      if(!SB_ON) save(d);
     }
     // 旧データの補完
     d.shifts=d.shifts||[]; d.philosophy=d.philosophy||""; d.materials=d.materials||[]; d.news=d.news||[]; d.hotaruUrl=d.hotaruUrl||""; d.timeline=d.timeline||[]; d.records=d.records||[]; d.recordItems=d.recordItems||REC_DEFAULT; d.dayPlans=d.dayPlans||{}; d.userList=d.userList||[]; d.handovers=d.handovers||[]; d.supplyItems=d.supplyItems||[]; d.supplyNote=d.supplyNote||""; d.supplyNotePhotos=d.supplyNotePhotos||[];
     if(localStorage.getItem("mizuho_staff_seeded")!=="1"){
       const have=new Set(d.accounts.map(a=>a.name));
       SEED_STAFF.forEach(s=>{ if(!have.has(s.name)) d.accounts.push({id:uid(),name:s.name,hash:s.hash,isAdmin:false}); });
-      localStorage.setItem("mizuho_staff_seeded","1"); save(d);
+      if(!SB_ON){ localStorage.setItem("mizuho_staff_seeded","1"); save(d); }
     }
-    setData(d);
+    if(!SB_ON) setData(d);
     const standalone=(window.matchMedia&&window.matchMedia("(display-mode: standalone)").matches)||window.navigator.standalone===true;
     if(!standalone && !localStorage.getItem("mizuho_install_done")) setShowInstall(true);
-    if(SB_ON){ try{ const row=await sbGet(); if(row&&row.data&&Object.keys(row.data).length>0){ let rd=row.data; if(!rd.recMigrated && (rd.records||[]).length){ try{ for(const rc of rd.records){ await recAdd(rc); } }catch(e){} rd=Object.assign({},rd,{recMigrated:true}); try{ await sbSave(rd,new Date().toISOString()); }catch(e){} } tsRef.current=row.updated_at||null; setData(rd); } else { const ts=new Date().toISOString(); tsRef.current=ts; await sbSave(d,ts); } await refreshRecords(); }catch(e){console.error("sb init",e);} }
+    if(SB_ON){ /* ver.160: サーバーから正しく読み込めるまで画面を出さず、保存もさせない（読み込み失敗時に初期データで上書きする事故を防ぐ） */
+      let loaded=false, lastErr=null, emptySeen=0;
+      for(let a=0;a<5&&!loaded;a++){
+        try{
+          const got=await sbGetWithLite(); const row=got.row;
+          if(row&&row.data&&Object.keys(row.data).length>0){
+            let rd=row.data;
+            if(!rd.recMigrated && (rd.records||[]).length){ try{ for(const rc of rd.records){ await recAdd(rc); } }catch(e){} rd=Object.assign({},rd,{recMigrated:true}); try{ await sbSave(rd,new Date().toISOString()); }catch(e){} }
+            tsRef.current=row.updated_at||null; const st=statOf(rd); srvStatRef.current=st; setData(rd); srvOkRef.current=true; setSrvOk(true); setSrvErr(""); loaded=true;
+            try{ bkLocalDaily(got.lite); }catch(e){} bkServerDaily(got.lite,st);
+          } else {
+            emptySeen++;
+            if(emptySeen<2){ await new Promise(r=>setTimeout(r,1500)); continue; }
+            const ts=new Date().toISOString(); await sbSave(d,ts); tsRef.current=ts; srvStatRef.current=statOf(d); setData(d); srvOkRef.current=true; setSrvOk(true); setSrvErr(""); loaded=true;
+          }
+        }catch(e){ lastErr=e; console.error("sb init",e); await new Promise(r=>setTimeout(r,1200*(a+1))); }
+      }
+      if(loaded){ try{ await refreshRecords(); }catch(e){} } else { setSrvErr(String((lastErr&&lastErr.message)||"読み込みに失敗しました").slice(0,120)); }
+    }
   })();},[sbAuthed]);
   useEffect(()=>{ if(me||!data) return; try{ const ses=JSON.parse(localStorage.getItem("mizuho_session")||"null"); if(ses&&ses.exp>Date.now()){ const acc=(data.accounts||[]).find(a=>a.id===ses.id); if(acc){ localStorage.setItem("mizuho_session",JSON.stringify({id:acc.id,exp:Date.now()+86400000})); setMe(acc); setLogin(null); setPw(""); setErr(""); if(SB_ON&&!sessTried){ setSessTried(true); logAccess(acc.name,"開いた"); } } } }catch(e){} setSessChecked(true); },[data,me]);
-  useEffect(()=>{ if(!SB_ON||!sbAuthed) return; const iv=setInterval(async()=>{ if(!saveFailRef.current){ try{ const row=await sbGet(); if(row&&row.updated_at&&row.updated_at!==tsRef.current){ tsRef.current=row.updated_at; if(row.data&&Object.keys(row.data).length>0) setData(prev=>Object.assign({},row.data,{records:(prev&&prev.records)||[]})); } }catch(e){} } try{ await refreshRecords(); }catch(e){} },12000); return ()=>clearInterval(iv); },[sbAuthed]);
+  useEffect(()=>{ if(!SB_ON||!sbAuthed) return; const iv=setInterval(async()=>{ if(srvOkRef.current&&!saveFailRef.current&&!conflictRef.current&&!migBusyRef.current){ try{ const ts=await sbGetTs(); if(ts&&ts!==tsRef.current){ const row=await sbGet(); if(row&&row.updated_at&&row.updated_at!==tsRef.current&&row.data&&Object.keys(row.data).length>0){ const st=statOf(row.data); const risk=wipeRisk(srvStatRef.current,st); if(risk){ conflictRef.current=true; setSaveErr("⚠️ サーバー側のデータが大きく減っています（"+risk+"）。安全のため、この端末の同期と保存を停止しました。操作をやめて、管理者（松田）へ連絡してください。"); } else { tsRef.current=row.updated_at; srvStatRef.current=st; setData(prev=>Object.assign({},row.data,{records:(prev&&prev.records)||[]})); } } } }catch(e){} } if(srvOkRef.current){ try{ await refreshRecords(); }catch(e){} } },12000); return ()=>clearInterval(iv); },[sbAuthed]);
   /* ver.149: 軽量化は「サーバーの最新データ」を取得してから写真だけ縮小して保存する（端末のローカル=古い可能性 を上書きに使わない）。アカウントは欠落時のみ補い、既存ハッシュは変更しない。 */
   const shrunkRef=useRef(false);
   /* ver.157: 緊急措置で自動移行（軽量化・外部化の自動保存）を停止。データ復旧を優先する。 */
 
-  const persist=(next)=>{ setData(next); save(next); if(SB_ON){ const ts=new Date().toISOString(); saveFailRef.current=true; (async()=>{ let ok=false,lastErr=null; for(let a=0;a<3&&!ok;a++){ try{ await sbSave(next,ts); ok=true; }catch(e){ lastErr=e; await new Promise(r=>setTimeout(r,800)); } } if(ok){ tsRef.current=ts; saveFailRef.current=false; setSaveErr(""); } else { saveFailRef.current=true; let mb="?"; try{ mb=(JSON.stringify(next).length/1048576).toFixed(1); }catch(e){} let detail=""; try{ detail=String((lastErr&&lastErr.message)||"").replace(/\s+/g," ").slice(0,70); }catch(e){} setSaveErr("⚠️ サーバーに保存できていません。【データ量 約"+mb+"MB ／ エラー："+(detail||"不明")+"】この表示内容を松田さんへお伝えください。入力はこの端末に残っています。"); console.error("persist save failed",lastErr,mb+"MB"); } })(); } };
+  const persist=(next)=>{
+    if(SB_ON){
+      if(!srvOkRef.current){ alert("サーバーからデータを読み込めていないため、保存を中止しました。画面を再読み込みしてください。"); return; }
+      if(conflictRef.current){ alert("サーバー側のデータが大きく減っているため、保存を停止しています。管理者（松田）へ連絡してください。"); return; }
+      if(migBusyRef.current){ alert("写真の移行中です。完了するまでお待ちください。"); return; }
+      const risk=wipeRisk(srvStatRef.current,statOf(next));
+      if(risk && !window.confirm("⚠️ この保存を行うと、"+risk+"。\n\n意図した操作でなければ「キャンセル」を押してください。\n本当に保存しますか？")) return;
+    }
+    setData(next); if(!(SB_ON&&next&&next.photoExt)) save(next);
+    if(SB_ON){ const ts=new Date().toISOString(); saveFailRef.current=true; (async()=>{ let ok=false,lastErr=null,d2=null; for(let a=0;a<3&&!ok;a++){ try{ d2=await sbSave(next,ts); ok=true; }catch(e){ lastErr=e; await new Promise(r=>setTimeout(r,800)); } } if(ok){ tsRef.current=ts; srvStatRef.current=statOf(next); saveFailRef.current=false; setSaveErr(""); if(next&&next.photoExt&&d2) save(d2); } else { saveFailRef.current=true; if(next&&next.photoExt) save(next); let mb="?"; try{ mb=(JSON.stringify(next).length/1048576).toFixed(1); }catch(e){} let detail=""; try{ detail=String((lastErr&&lastErr.message)||"").replace(/\s+/g," ").slice(0,70); }catch(e){} setSaveErr("⚠️ サーバーに保存できていません。【データ量 約"+mb+"MB ／ エラー："+(detail||"不明")+"】この表示内容を松田さんへお伝えください。入力はこの端末に残っています。"); console.error("persist save failed",lastErr,mb+"MB"); } })(); }
+  };
   const logout=()=>{localStorage.removeItem("mizuho_session");setMe(null);};
   const doLogin=async()=>{const h=await sha256(pw);
     if(login&&(h===login.hash||(data&&data.master&&h===data.master))){localStorage.setItem("mizuho_session",JSON.stringify({id:login.id,exp:Date.now()+86400000}));if(SB_ON)logAccess(login.name,"ログイン");setMe(login);setLogin(null);setPw("");setErr("");setTab("schedule");}
@@ -2000,38 +2059,38 @@ function App(){
   const dismissInstall=(never)=>{if(never)localStorage.setItem("mizuho_install_done","1");setShowInstall(false);};
 
   const recoUI = <React.Fragment>
-    <div style={{position:"fixed",bottom:"calc(env(safe-area-inset-bottom, 0px) + 10px)",right:10,zIndex:9998}}><button onClick={()=>{setReco(null);recoCheck();}} style={{background:"#C0392B",color:"#fff",border:"none",borderRadius:999,padding:"10px 16px",fontSize:13,fontWeight:700,fontFamily:"sans-serif",boxShadow:"0 4px 14px rgba(0,0,0,.3)"}}>🆘 データ復旧</button></div>
-    {reco && <div style={{position:"fixed",inset:0,zIndex:10000,background:"rgba(0,0,0,.5)",display:"flex",alignItems:"center",justifyContent:"center",padding:16,fontFamily:"sans-serif"}} onClick={()=>!recoBusy&&setReco(null)}><div onClick={e=>e.stopPropagation()} style={{background:"#fff",borderRadius:14,maxWidth:440,width:"100%",padding:18,boxSizing:"border-box",maxHeight:"85vh",overflow:"auto"}}>
-      <h3 style={{margin:"0 0 10px",color:"#C0392B"}}>🆘 この端末のデータ復旧</h3>
-      {reco.none?<p style={{color:"#8A6B74",lineHeight:1.6}}>この端末のブラウザには、復元できるデータが見つかりませんでした。別の端末（特に最近このアプリで保存した端末）で同じボタンをお試しください。</p>
-      :reco.err?<p style={{color:"#C0392B"}}>読み取りエラー：{reco.err}</p>
-      :<React.Fragment>
-        <p style={{lineHeight:1.6,color:"#5A4A50",margin:"0 0 8px"}}>この端末の中に、以下のデータが残っています：</p>
-        <ul style={{lineHeight:1.9,color:"#5A4A50",margin:"0 0 8px",paddingLeft:20}}>
-          <li>補充品の品目：<b>{reco.supply}</b> 件</li>
-          <li>申し送り：<b>{reco.handovers}</b> 件</li>
-          <li>食事記録：<b>{reco.meal}</b> 日分</li>
-          <li>利用者：<b>{reco.users}</b> 名</li>
-          <li>アカウント：<b>{reco.accounts}</b> 件／イベント：<b>{reco.events}</b> 件（データ量 約{reco.kb}KB）</li>
-        </ul>
-        {(reco.supply+reco.handovers+reco.meal>0)
-          ?(sbAuthed
-            ?<React.Fragment><p style={{lineHeight:1.6,color:"#B25E77",fontWeight:700,margin:"6px 0"}}>このデータでサーバーを復元できます。復元すると、他の端末にも反映されます。</p>
-              <div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:10}}><button disabled={recoBusy} onClick={()=>setReco(null)} style={{background:"#eee",border:"none",borderRadius:10,padding:"10px 16px"}}>閉じる</button><button disabled={recoBusy} onClick={recoRestore} style={{background:"#C0392B",color:"#fff",border:"none",borderRadius:10,padding:"10px 18px",fontWeight:700}}>{recoBusy?"復元中…":"このデータで復元する"}</button></div></React.Fragment>
-            :<React.Fragment><p style={{lineHeight:1.6,color:"#1E7A3D",fontWeight:700,margin:"6px 0"}}>✅ この端末に大切なデータが残っています！<br/>この画面を閉じて<b>職員ログイン（メール・パスワード）</b>をしてから、もう一度右下の🆘を押すと「復元」できます。</p>
-              <div style={{display:"flex",justifyContent:"flex-end",marginTop:10}}><button onClick={()=>setReco(null)} style={{background:"#C0392B",color:"#fff",border:"none",borderRadius:10,padding:"10px 18px",fontWeight:700}}>閉じてログインへ</button></div></React.Fragment>)
-          :<React.Fragment><p style={{lineHeight:1.6,color:"#8A6B74",margin:"6px 0"}}>この端末には、補充品・申し送り・食事記録のデータがほとんど残っていません。別の端末でお試しください。</p>
-            <div style={{display:"flex",justifyContent:"flex-end",marginTop:10}}><button onClick={()=>setReco(null)} style={{background:"#eee",border:"none",borderRadius:10,padding:"10px 16px"}}>閉じる</button></div></React.Fragment>}
-      </React.Fragment>}
+    {migMsg && <div style={{position:"fixed",left:8,right:8,bottom:"calc(env(safe-area-inset-bottom, 0px) + 12px)",zIndex:10001,background:"#3B2F33",color:"#fff",padding:"12px 14px",borderRadius:12,fontSize:13.5,lineHeight:1.5,fontFamily:"sans-serif",boxSizing:"border-box",boxShadow:"0 4px 14px rgba(0,0,0,.35)"}}>📦 {migMsg}<br/><span style={{fontSize:11.5,opacity:.85}}>完了の表示が出るまで、画面を閉じないでください。</span></div>}
+    {reco && <div style={{position:"fixed",inset:0,zIndex:10000,background:"rgba(0,0,0,.5)",display:"flex",alignItems:"center",justifyContent:"center",padding:14,fontFamily:"sans-serif"}} onClick={()=>!recoBusy&&setReco(null)}><div onClick={e=>e.stopPropagation()} style={{background:"#fff",borderRadius:14,maxWidth:460,width:"100%",padding:16,boxSizing:"border-box",maxHeight:"86vh",overflow:"auto"}}>
+      <h3 style={{margin:"0 0 6px",color:"#C0392B",fontSize:17}}>🆘 データ復旧（バックアップから戻す）</h3>
+      <p style={{margin:"0 0 10px",fontSize:12.5,lineHeight:1.6,color:"#8A6B74"}}>選んだ時点の内容で、サーバーのデータを置き換えます。実行前に確認画面が出ます。利用者ごとの記録・日誌・写真記録は別の場所にあり、この操作では変わりません。</p>
+      {reco.mem&&reco.mem.conflict&&<div style={{border:"2px solid #C0392B",borderRadius:10,padding:"9px 11px",marginBottom:8,background:"#FFF6F4"}}>
+        <div style={{fontWeight:700,color:"#C0392B",fontSize:13.5}}>いまこの画面に表示中のデータ（写真も含む・おすすめ）</div>
+        <div style={{fontSize:12.5,color:"#5A4A50",lineHeight:1.6,margin:"3px 0 6px"}}>{statLine(reco.mem.stat)}<br/>サーバー側が減る前の内容が、この画面に残っています。画面を閉じたり再読み込みする前に戻してください。</div>
+        <div style={{textAlign:"right"}}><button disabled={recoBusy} onClick={recoFromMem} style={{background:"#C0392B",color:"#fff",border:"none",borderRadius:9,padding:"8px 13px",fontSize:13,fontWeight:700}}>この内容に戻す</button></div>
+      </div>}
+      <div style={{border:"1px solid #F0D3DB",borderRadius:10,padding:"9px 11px",marginBottom:8}}>
+        <div style={{fontWeight:700,color:"#5A4A50",fontSize:13.5}}>この端末に残っているデータ</div>
+        {reco.local?<React.Fragment><div style={{fontSize:12.5,color:"#5A4A50",lineHeight:1.6,margin:"3px 0 6px"}}>{statLine(reco.local.stat)}（約{reco.local.kb}KB）</div><div style={{textAlign:"right"}}><button disabled={recoBusy} onClick={recoFromLocal} style={{background:"#fff",color:"#C0392B",border:"1px solid #C0392B",borderRadius:9,padding:"7px 12px",fontSize:13,fontWeight:700}}>この内容に戻す</button></div></React.Fragment>:<div style={{fontSize:12.5,color:"#8A6B74"}}>（この端末には保存データがありません）</div>}
+      </div>
+      <div style={{fontWeight:700,color:"#5A4A50",fontSize:13.5,margin:"10px 0 4px"}}>自動バックアップ（1日1回・文字データ）</div>
+      {reco.loading&&<div style={{fontSize:12.5,color:"#8A6B74"}}>サーバーのバックアップを確認中…</div>}
+      {!reco.loading&&reco.list.length===0&&<div style={{fontSize:12.5,color:"#8A6B74"}}>まだ自動バックアップがありません（明日以降、日ごとに増えていきます）。</div>}
+      {reco.list.map((it,i)=><div key={i} style={{border:"1px solid #EEE3E6",borderRadius:10,padding:"8px 11px",marginBottom:6}}>
+        <div style={{fontSize:13,fontWeight:700,color:"#5A4A50"}}>{(it.day==="premig"||it.pre)?"写真移行の直前":it.day} <span style={{fontWeight:400,color:"#8A6B74",fontSize:12}}>（{it.src}）</span></div>
+        <div style={{fontSize:12.5,color:"#5A4A50",lineHeight:1.6,margin:"2px 0 6px"}}>{statLine(it.stat)}</div>
+        <div style={{textAlign:"right"}}><button disabled={recoBusy} onClick={()=>recoFromItem(it)} style={{background:"#fff",color:"#C0392B",border:"1px solid #C0392B",borderRadius:9,padding:"7px 12px",fontSize:13,fontWeight:700}}>この時点に戻す</button></div>
+      </div>)}
+      <div style={{display:"flex",justifyContent:"flex-end",marginTop:10}}><button disabled={recoBusy} onClick={()=>setReco(null)} style={{background:"#eee",border:"none",borderRadius:10,padding:"10px 16px",fontSize:14}}>{recoBusy?"処理中…":"閉じる"}</button></div>
     </div></div>}
   </React.Fragment>;
-  if(SB_ON && !sbAuthed) return <div>{recoUI}<AppAuthGate onDone={()=>setSbAuthed(true)}/></div>;
+  if(SB_ON && !sbAuthed) return <AppAuthGate onDone={()=>setSbAuthed(true)}/>;
+  if(SB_ON && !srvOk) return <div style={{padding:"60px 24px",color:"#B25E77",fontFamily:"sans-serif",textAlign:"center",lineHeight:1.8}}>{srvErr?<React.Fragment><div style={{fontSize:17,fontWeight:700}}>⚠️ サーバーからデータを読み込めませんでした</div><div style={{fontSize:13.5,color:"#8A6B74",margin:"10px 0 18px"}}>通信状況を確認して、もう一度お試しください。<br/>（データを守るため、読み込めるまで画面を開きません）</div><button onClick={()=>window.location.reload()} style={{background:"#C9788F",color:"#fff",border:"none",borderRadius:999,padding:"12px 26px",fontSize:15,fontWeight:700}}>もう一度読み込む</button><div style={{fontSize:11,color:"#B9A5AB",marginTop:16,wordBreak:"break-all"}}>{srvErr}</div></React.Fragment>:<div style={{fontSize:15}}>サーバーからデータを読み込んでいます…</div>}</div>;
   if(!data) return <div style={{padding:40,color:"#C9788F"}}>読み込み中…</div>;
   if(!me && !sessChecked) return <div style={{padding:40,color:"#C9788F"}}>読み込み中…</div>;
 
   return <div>
     {recoUI}
-    {saveErr &&<div style={{position:"fixed",top:"calc(env(safe-area-inset-top, 0px) + 8px)",left:8,right:8,maxWidth:"calc(100vw - 16px)",zIndex:9999,background:"#C0392B",color:"#fff",padding:"10px 12px",fontSize:12.5,lineHeight:1.5,fontFamily:"sans-serif",boxSizing:"border-box",overflowWrap:"break-word",wordBreak:"break-word",borderRadius:10,boxShadow:"0 4px 14px rgba(0,0,0,.3)"}}>{(typeof saveErr==="string"&&saveErr.length>16)?saveErr:"⚠️ サーバーに保存できていません。入力はこの端末に残っていますが、他の端末には反映されていません。数分待っても消えない場合は管理者（松田）へご連絡ください。"}</div>}
+    {saveErr &&<div style={{position:"fixed",top:"calc(env(safe-area-inset-top, 0px) + 8px)",left:8,right:8,maxWidth:"calc(100vw - 16px)",zIndex:9999,background:"#C0392B",color:"#fff",padding:"10px 12px",fontSize:12.5,lineHeight:1.5,fontFamily:"sans-serif",boxSizing:"border-box",overflowWrap:"break-word",wordBreak:"break-word",borderRadius:10,boxShadow:"0 4px 14px rgba(0,0,0,.3)"}}>{(typeof saveErr==="string"&&saveErr.length>16)?saveErr:"⚠️ サーバーに保存できていません。入力はこの端末に残っていますが、他の端末には反映されていません。数分待っても消えない場合は管理者（松田）へご連絡ください。"}{conflictRef.current&&<div style={{textAlign:"right",marginTop:6}}><button onClick={()=>recoOpen()} style={{background:"#fff",color:"#C0392B",border:"none",borderRadius:8,padding:"6px 11px",fontSize:12.5,fontWeight:700}}>🆘 管理者用：復旧画面を開く</button></div>}</div>}
     {showInstall && <InstallPrompt onNever={()=>dismissInstall(true)} onLater={()=>dismissInstall(false)}/>}
       {alarm && <AlarmPopup type={alarm.type} onClose={()=>setAlarm(null)}/>}
     {me
@@ -2100,7 +2159,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.159〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.160〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
@@ -3232,6 +3291,14 @@ function AdminPanel({data,persist}){
     <p className="tiny"><b>軽量</b>＝写真・計画ファイルの画像は含めず（小さい）。<b>フル</b>＝写真・個別訓練計画の画像も全部含める（大きく時間がかかります）。</p>
     <div className="row-end" style={{gap:"8px",flexWrap:"wrap"}}><Btn kind="ghost2" onClick={()=>doBackup(false)} disabled={bkBusy}>{bkBusy?"書き出し中…":"⬇ 軽量バックアップ"}</Btn><Btn onClick={()=>doBackup(true)} disabled={bkBusy}>{bkBusy?"書き出し中…":"⬇ フルバックアップ（画像込み）"}</Btn></div>
     {bkProg&&<p className="tiny" style={{color:"#B25E77"}}>{bkProg}</p>}
+    <h3 className="blk">🛡 データ保護</h3>
+    <p className="tiny">毎日1回、文字のデータ（補充品・申し送り・食事記録・利用者一覧・アカウントなど）を自動でバックアップしています（この端末に直近4日分、サーバーに直近約2週間分）。万一のときは、下のボタンから日付を選んで戻せます。</p>
+    <div className="row-end"><Btn kind="ghost2" onClick={()=>window.dispatchEvent(new Event("mizuho-reco"))}>🆘 データ復旧（バックアップから戻す）</Btn></div>
+    <h3 className="blk">📦 写真の外部保管</h3>
+    {data.photoExt
+      ? <p className="tiny">✅ 写真は外部保管に移行済みです。写真が増えても、共有データの保存は重くなりません。新しく撮った写真も自動で外部保管に入ります。</p>
+      : <React.Fragment><p className="tiny">補充品・食事などの写真は、いま共有データの中に直接入っており、枚数が増えると保存に失敗しやすくなります。下のボタンで、写真だけを別の保管場所へ移せます（文字データはそのまま）。<b>実行前に自動バックアップ・実行後に自動検証を行い、問題があれば自動で元に戻します。</b>先に上の「フルバックアップ」を1回書き出してから、他の職員が入力していない時間帯に実行してください。</p>
+        <div className="row-end"><Btn onClick={()=>window.dispatchEvent(new Event("mizuho-extmig"))}>📦 写真を外部保管へ移す（1回だけ実行）</Btn></div></React.Fragment>}
     <h3 className="blk">📋 アクセスログ（誰がいつ開いたか）</h3>
     <p className="tiny">職員が名前を選んで開くたびに記録が残ります（削除されず蓄積されます）。</p>
     {!alShow?<div className="row-end"><Btn kind="ghost2" onClick={()=>{setAlShow(true); if(alog===null) loadAlog();}}>ログを表示</Btn></div>:<>
