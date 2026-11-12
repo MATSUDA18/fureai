@@ -551,7 +551,7 @@ const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 const SB_ON = SUPABASE_URL.length>10 && SUPABASE_KEY.length>10;
 const sbHead = ()=>({ "apikey":SUPABASE_KEY, "Authorization":"Bearer "+SUPABASE_KEY, "Content-Type":"application/json" });
 async function sbGet(){ const r=await authFetch(`${SUPABASE_URL}/rest/v1/app_state?id=eq.1&select=data,updated_at`); if(!r.ok) throw new Error("sbGet "+r.status); const j=await r.json(); return (j&&j[0])?j[0]:null; }
-async function sbSave(data,ts){ const d2=Object.assign({},data); delete d2.records; const body=JSON.stringify({id:1,data:d2,updated_at:ts||new Date().toISOString()}); await authFetch(`${SUPABASE_URL}/rest/v1/app_state`,{method:"POST",headers:{"Prefer":"resolution=merge-duplicates,return=minimal"},body}); }
+async function sbSave(data,ts){ const d2=Object.assign({},data); delete d2.records; const body=JSON.stringify({id:1,data:d2,updated_at:ts||new Date().toISOString()}); const r=await authFetch(`${SUPABASE_URL}/rest/v1/app_state`,{method:"POST",headers:{"Prefer":"resolution=merge-duplicates,return=minimal"},body}); if(!r.ok){ let t=""; try{ t=await r.text(); }catch(e){} throw new Error("sbSave "+r.status+" "+t); } }
 async function recFetch(){ const r=await authFetch(`${SUPABASE_URL}/rest/v1/records?select=rec&order=ts.desc&limit=3000`); if(!r.ok) throw new Error("rec list "+r.status); const j=await r.json(); return j.map(x=>x.rec).filter(Boolean); }
 async function recAdd(rec){ const r=await authFetch(`${SUPABASE_URL}/rest/v1/records`,{method:"POST",headers:{"Prefer":"resolution=merge-duplicates,return=minimal"},body:JSON.stringify({id:rec.id,ts:rec.ts,rec})}); if(!r.ok) throw new Error("rec add "+r.status); }
 async function recUpdate(id,rec){ const r=await authFetch(`${SUPABASE_URL}/rest/v1/records?id=eq.${id}`,{method:"PATCH",headers:{"Prefer":"return=minimal"},body:JSON.stringify({ts:rec.ts,rec})}); if(!r.ok) throw new Error("rec upd "+r.status); }
@@ -1932,6 +1932,7 @@ function App(){
   const [sbAuthed,setSbAuthed]=useState(()=>!SB_ON||!!authLoad());
   const refreshRecords=async()=>{ if(!SB_ON) return; try{ const rows=await recFetch(); setData(prev=>prev?Object.assign({},prev,{records:rows}):prev); }catch(e){} };
   const [alarm,setAlarm]=useState(null);
+  const [saveErr,setSaveErr]=useState(""); const saveFailRef=useRef(false);
   const audioRef=useRef(null); const firedRef=useRef({});
   const playChime=()=>{ try{ const ac=audioRef.current; if(!ac) return; if(ac.state==="suspended") ac.resume(); const t0=ac.currentTime; [880,1108.73,1318.51].forEach((f,i)=>{ const o=ac.createOscillator(),g=ac.createGain(); o.type="sine"; o.frequency.value=f; o.connect(g); g.connect(ac.destination); const t=t0+i*0.18; g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(0.25,t+0.02); g.gain.exponentialRampToValueAtTime(0.0001,t+0.9); o.start(t); o.stop(t+0.95); }); }catch(e){} };
   useEffect(()=>{ const unlock=()=>{ try{ if(!audioRef.current){ const AC=window.AudioContext||window.webkitAudioContext; if(AC) audioRef.current=new AC(); } if(audioRef.current&&audioRef.current.state==="suspended") audioRef.current.resume(); }catch(e){} }; window.addEventListener("pointerdown",unlock); window.addEventListener("touchstart",unlock); return ()=>{ window.removeEventListener("pointerdown",unlock); window.removeEventListener("touchstart",unlock); }; },[]);
@@ -1965,9 +1966,9 @@ function App(){
     if(SB_ON){ try{ const row=await sbGet(); if(row&&row.data&&Object.keys(row.data).length>0){ let rd=row.data; if(!rd.recMigrated && (rd.records||[]).length){ try{ for(const rc of rd.records){ await recAdd(rc); } }catch(e){} rd=Object.assign({},rd,{recMigrated:true}); try{ await sbSave(rd,new Date().toISOString()); }catch(e){} } tsRef.current=row.updated_at||null; setData(rd); } else { const ts=new Date().toISOString(); tsRef.current=ts; await sbSave(d,ts); } await refreshRecords(); }catch(e){console.error("sb init",e);} }
   })();},[sbAuthed]);
   useEffect(()=>{ if(me||!data) return; try{ const ses=JSON.parse(localStorage.getItem("mizuho_session")||"null"); if(ses&&ses.exp>Date.now()){ const acc=(data.accounts||[]).find(a=>a.id===ses.id); if(acc){ localStorage.setItem("mizuho_session",JSON.stringify({id:acc.id,exp:Date.now()+86400000})); setMe(acc); if(SB_ON&&!sessTried){ setSessTried(true); logAccess(acc.name,"開いた"); } } } }catch(e){} setSessChecked(true); },[data,me]);
-  useEffect(()=>{ if(!SB_ON||!sbAuthed) return; const iv=setInterval(async()=>{ try{ const row=await sbGet(); if(row&&row.updated_at&&row.updated_at!==tsRef.current){ tsRef.current=row.updated_at; if(row.data&&Object.keys(row.data).length>0) setData(prev=>Object.assign({},row.data,{records:(prev&&prev.records)||[]})); } }catch(e){} try{ await refreshRecords(); }catch(e){} },12000); return ()=>clearInterval(iv); },[sbAuthed]);
+  useEffect(()=>{ if(!SB_ON||!sbAuthed) return; const iv=setInterval(async()=>{ if(!saveFailRef.current){ try{ const row=await sbGet(); if(row&&row.updated_at&&row.updated_at!==tsRef.current){ tsRef.current=row.updated_at; if(row.data&&Object.keys(row.data).length>0) setData(prev=>Object.assign({},row.data,{records:(prev&&prev.records)||[]})); } }catch(e){} } try{ await refreshRecords(); }catch(e){} },12000); return ()=>clearInterval(iv); },[sbAuthed]);
 
-  const persist=(next)=>{ setData(next); save(next); if(SB_ON){ const ts=new Date().toISOString(); tsRef.current=ts; sbSave(next,ts).catch(()=>{}); } };
+  const persist=(next)=>{ setData(next); save(next); if(SB_ON){ const ts=new Date().toISOString(); saveFailRef.current=true; (async()=>{ let ok=false,lastErr=null; for(let a=0;a<3&&!ok;a++){ try{ await sbSave(next,ts); ok=true; }catch(e){ lastErr=e; await new Promise(r=>setTimeout(r,800)); } } if(ok){ tsRef.current=ts; saveFailRef.current=false; setSaveErr(""); } else { saveFailRef.current=true; setSaveErr("save-failed"); console.error("persist save failed",lastErr); } })(); } };
   const logout=()=>{localStorage.removeItem("mizuho_session");setMe(null);};
   const doLogin=async()=>{const h=await sha256(pw);
     if(login&&h===login.hash){localStorage.setItem("mizuho_session",JSON.stringify({id:login.id,exp:Date.now()+86400000}));if(SB_ON)logAccess(login.name,"ログイン");setMe(login);setLogin(null);setPw("");setErr("");setTab("schedule");}
@@ -1979,6 +1980,7 @@ function App(){
   if(!me && !sessChecked) return <div style={{padding:40,color:"#C9788F"}}>読み込み中…</div>;
 
   return <div>
+    {saveErr && <div style={{position:"sticky",top:0,zIndex:60,background:"#C0392B",color:"#fff",padding:"9px 14px",fontSize:13,lineHeight:1.55,fontFamily:"sans-serif"}}>⚠️ サーバーに保存できていません。入力内容はこの端末には残っていますが、他の端末には反映されていません。通信状況をご確認のうえ、改善しない場合は管理者（松田）へご連絡ください。</div>}
     {showInstall && <InstallPrompt onNever={()=>dismissInstall(true)} onLater={()=>dismissInstall(false)}/>}
       {alarm && <AlarmPopup type={alarm.type} onClose={()=>setAlarm(null)}/>}
     {me
@@ -2048,7 +2050,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.146〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.147〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
