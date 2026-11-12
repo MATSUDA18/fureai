@@ -1999,17 +1999,13 @@ function App(){
     else setErr("パスワードが違います。");};
   const dismissInstall=(never)=>{if(never)localStorage.setItem("mizuho_install_done","1");setShowInstall(false);};
 
-  if(SB_ON && !sbAuthed) return <AppAuthGate onDone={()=>setSbAuthed(true)}/>;
-  if(!data) return <div style={{padding:40,color:"#C9788F"}}>読み込み中…</div>;
-  if(!me && !sessChecked) return <div style={{padding:40,color:"#C9788F"}}>読み込み中…</div>;
-
-  return <div>
+  const recoUI = <React.Fragment>
     <div style={{position:"fixed",bottom:"calc(env(safe-area-inset-bottom, 0px) + 10px)",right:10,zIndex:9998}}><button onClick={()=>{setReco(null);recoCheck();}} style={{background:"#C0392B",color:"#fff",border:"none",borderRadius:999,padding:"10px 16px",fontSize:13,fontWeight:700,fontFamily:"sans-serif",boxShadow:"0 4px 14px rgba(0,0,0,.3)"}}>🆘 データ復旧</button></div>
     {reco && <div style={{position:"fixed",inset:0,zIndex:10000,background:"rgba(0,0,0,.5)",display:"flex",alignItems:"center",justifyContent:"center",padding:16,fontFamily:"sans-serif"}} onClick={()=>!recoBusy&&setReco(null)}><div onClick={e=>e.stopPropagation()} style={{background:"#fff",borderRadius:14,maxWidth:440,width:"100%",padding:18,boxSizing:"border-box",maxHeight:"85vh",overflow:"auto"}}>
       <h3 style={{margin:"0 0 10px",color:"#C0392B"}}>🆘 この端末のデータ復旧</h3>
       {reco.none?<p style={{color:"#8A6B74",lineHeight:1.6}}>この端末のブラウザには、復元できるデータが見つかりませんでした。別の端末（特に最近このアプリで保存した端末）で同じボタンをお試しください。</p>
       :reco.err?<p style={{color:"#C0392B"}}>読み取りエラー：{reco.err}</p>
-      :<>
+      :<React.Fragment>
         <p style={{lineHeight:1.6,color:"#5A4A50",margin:"0 0 8px"}}>この端末の中に、以下のデータが残っています：</p>
         <ul style={{lineHeight:1.9,color:"#5A4A50",margin:"0 0 8px",paddingLeft:20}}>
           <li>補充品の品目：<b>{reco.supply}</b> 件</li>
@@ -2019,13 +2015,23 @@ function App(){
           <li>アカウント：<b>{reco.accounts}</b> 件／イベント：<b>{reco.events}</b> 件（データ量 約{reco.kb}KB）</li>
         </ul>
         {(reco.supply+reco.handovers+reco.meal>0)
-          ?<><p style={{lineHeight:1.6,color:"#B25E77",fontWeight:700,margin:"6px 0"}}>このデータでサーバーを復元できます。復元すると、他の端末にも反映されます。</p>
-            <div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:10}}><button disabled={recoBusy} onClick={()=>setReco(null)} style={{background:"#eee",border:"none",borderRadius:10,padding:"10px 16px"}}>閉じる</button><button disabled={recoBusy} onClick={recoRestore} style={{background:"#C0392B",color:"#fff",border:"none",borderRadius:10,padding:"10px 18px",fontWeight:700}}>{recoBusy?"復元中…":"このデータで復元する"}</button></div></>
-          :<><p style={{lineHeight:1.6,color:"#8A6B74",margin:"6px 0"}}>この端末には、補充品・申し送り・食事記録のデータがほとんど残っていません。別の端末でお試しください。</p>
-            <div style={{display:"flex",justifyContent:"flex-end",marginTop:10}}><button onClick={()=>setReco(null)} style={{background:"#eee",border:"none",borderRadius:10,padding:"10px 16px"}}>閉じる</button></div></>}
-      </>}
+          ?(sbAuthed
+            ?<React.Fragment><p style={{lineHeight:1.6,color:"#B25E77",fontWeight:700,margin:"6px 0"}}>このデータでサーバーを復元できます。復元すると、他の端末にも反映されます。</p>
+              <div style={{display:"flex",gap:8,justifyContent:"flex-end",marginTop:10}}><button disabled={recoBusy} onClick={()=>setReco(null)} style={{background:"#eee",border:"none",borderRadius:10,padding:"10px 16px"}}>閉じる</button><button disabled={recoBusy} onClick={recoRestore} style={{background:"#C0392B",color:"#fff",border:"none",borderRadius:10,padding:"10px 18px",fontWeight:700}}>{recoBusy?"復元中…":"このデータで復元する"}</button></div></React.Fragment>
+            :<React.Fragment><p style={{lineHeight:1.6,color:"#1E7A3D",fontWeight:700,margin:"6px 0"}}>✅ この端末に大切なデータが残っています！<br/>この画面を閉じて<b>職員ログイン（メール・パスワード）</b>をしてから、もう一度右下の🆘を押すと「復元」できます。</p>
+              <div style={{display:"flex",justifyContent:"flex-end",marginTop:10}}><button onClick={()=>setReco(null)} style={{background:"#C0392B",color:"#fff",border:"none",borderRadius:10,padding:"10px 18px",fontWeight:700}}>閉じてログインへ</button></div></React.Fragment>)
+          :<React.Fragment><p style={{lineHeight:1.6,color:"#8A6B74",margin:"6px 0"}}>この端末には、補充品・申し送り・食事記録のデータがほとんど残っていません。別の端末でお試しください。</p>
+            <div style={{display:"flex",justifyContent:"flex-end",marginTop:10}}><button onClick={()=>setReco(null)} style={{background:"#eee",border:"none",borderRadius:10,padding:"10px 16px"}}>閉じる</button></div></React.Fragment>}
+      </React.Fragment>}
     </div></div>}
-    {saveErr && <div style={{position:"fixed",top:"calc(env(safe-area-inset-top, 0px) + 8px)",left:8,right:8,maxWidth:"calc(100vw - 16px)",zIndex:9999,background:"#C0392B",color:"#fff",padding:"10px 12px",fontSize:12.5,lineHeight:1.5,fontFamily:"sans-serif",boxSizing:"border-box",overflowWrap:"break-word",wordBreak:"break-word",borderRadius:10,boxShadow:"0 4px 14px rgba(0,0,0,.3)"}}>{(typeof saveErr==="string"&&saveErr.length>16)?saveErr:"⚠️ サーバーに保存できていません。入力はこの端末に残っていますが、他の端末には反映されていません。数分待っても消えない場合は管理者（松田）へご連絡ください。"}</div>}
+  </React.Fragment>;
+  if(SB_ON && !sbAuthed) return <div>{recoUI}<AppAuthGate onDone={()=>setSbAuthed(true)}/></div>;
+  if(!data) return <div style={{padding:40,color:"#C9788F"}}>読み込み中…</div>;
+  if(!me && !sessChecked) return <div style={{padding:40,color:"#C9788F"}}>読み込み中…</div>;
+
+  return <div>
+    {recoUI}
+    {saveErr &&<div style={{position:"fixed",top:"calc(env(safe-area-inset-top, 0px) + 8px)",left:8,right:8,maxWidth:"calc(100vw - 16px)",zIndex:9999,background:"#C0392B",color:"#fff",padding:"10px 12px",fontSize:12.5,lineHeight:1.5,fontFamily:"sans-serif",boxSizing:"border-box",overflowWrap:"break-word",wordBreak:"break-word",borderRadius:10,boxShadow:"0 4px 14px rgba(0,0,0,.3)"}}>{(typeof saveErr==="string"&&saveErr.length>16)?saveErr:"⚠️ サーバーに保存できていません。入力はこの端末に残っていますが、他の端末には反映されていません。数分待っても消えない場合は管理者（松田）へご連絡ください。"}</div>}
     {showInstall && <InstallPrompt onNever={()=>dismissInstall(true)} onLater={()=>dismissInstall(false)}/>}
       {alarm && <AlarmPopup type={alarm.type} onClose={()=>setAlarm(null)}/>}
     {me
@@ -2094,7 +2100,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.158〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.159〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
