@@ -187,6 +187,20 @@
   .pu-label{font-size:11.5px;font-weight:800;color:#B07A2E;flex:none;}
   .pu-chip{font-size:12.5px;font-weight:700;color:#8A5A2E;background:#fff;border:1px solid #F0D7B8;border-radius:999px;padding:2px 9px;}
   .pu-none{font-size:12px;color:#B0895A;}
+  .pu-chip.pu-cancel{background:#E4E1E2;border-color:#C9C3C5;color:#7A7074;text-decoration:line-through;text-decoration-thickness:2px;text-decoration-color:#C0392B;}
+  .pu-ctag{font-size:10.5px;font-weight:800;color:#fff;background:#C0392B;border-radius:5px;padding:1px 5px;margin-left:-2px;}
+  .pu-cnote{flex-basis:100%;font-size:11.5px;line-height:1.5;color:#7A5560;background:#F3EEEF;border-radius:7px;padding:3px 8px;}
+  .cx-box{border:1px solid #E3C9CF;background:#FBF4F5;border-radius:12px;padding:10px 11px;margin-top:8px;}
+  .cx-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:6px 0;border-bottom:1px dashed #EAD6DD;}
+  .cx-row:last-child{border-bottom:none;}
+  .cx-name{font-weight:700;color:#5A4A50;font-size:14px;}
+  .cx-name.off{text-decoration:line-through;text-decoration-color:#C0392B;text-decoration-thickness:2px;color:#7A7074;background:#E4E1E2;border-radius:6px;padding:1px 7px;}
+  .cx-btn{margin-left:auto;background:#fff;color:#C0392B;border:1px solid #C0392B;border-radius:9px;padding:6px 10px;font-size:12.5px;font-weight:700;}
+  .cx-btn.sub{color:#8A6B74;border-color:#D9C3CA;margin-left:0;}
+  .cx-pick{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 8px;}
+  .cx-opt{background:#fff;border:1px solid #E3C9CF;border-radius:999px;padding:7px 12px;font-size:13px;color:#5A4A50;font-weight:600;}
+  .cx-opt.on{background:#C9788F;border-color:#C9788F;color:#fff;}
+  .cx-lab{font-size:12.5px;font-weight:800;color:#8A5A66;margin-top:6px;}
   .pu-edit{margin-left:auto;color:#C9A94A;font-size:13px;flex:none;}
   .ev-badge{font-size:11.5px;font-weight:800;border-radius:999px;padding:3px 10px;flex:none;}
   .ev-meta{font-size:13px;color:#6A5A60;margin-bottom:4px;}
@@ -695,6 +709,10 @@ const iso=(d)=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${S
 function mondayOf(d){ const x=new Date(d); const day=(x.getDay()+6)%7; x.setDate(x.getDate()-day); x.setHours(0,0,0,0); return x; }
 function addDays(d,n){ const x=new Date(d); x.setDate(x.getDate()+n); return x; }
 const toMin=(t)=>{const p=(t||"0:0").split(":");return (+p[0])*60+(+p[1]);};
+const toTop=()=>{ const go=()=>{ try{ window.scrollTo(0,0); if(document.scrollingElement) document.scrollingElement.scrollTop=0; }catch(e){} }; go(); setTimeout(go,0); setTimeout(go,80); };
+const CANCEL_REASONS=["体調不良","忘れていた","他の予定が入った"]; const CANCEL_BY=["お母様","お父様","その他ご家族","ご本人"];
+const cancelReasonText=(c)=>{ if(!c) return ""; const a=(c.reasons||[]).slice(); if((c.other||"").trim()) a.push("その他："+c.other.trim()); return a.length?a.join("・"):"理由未記入"; };
+const cancelContactText=(c)=>{ if(!c) return ""; let t=""; if(c.at){ const m=String(c.at).match(/^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2}))?/); if(m) t=Number(m[2])+"/"+Number(m[3])+(m[4]?(" "+Number(m[4])+":"+m[5]):""); } const by=c.by||""; if(!by&&!t) return ""; return (by?by+"より":"")+(t?(by?" ":"")+t+" 連絡":" 連絡"); };
 const fmtDate=(s)=>{const d=new Date(s+"T00:00:00");return `${d.getMonth()+1}月${d.getDate()}日（${WD[d.getDay()]}）`;};
 
 /* ============ 花びら ============ */
@@ -1239,7 +1257,7 @@ function DayPlanModal({data,persist,date,onClose}){
     ns1=resolve("A",ns1); ns2=resolve("B",ns2); const ns4=s4.trim();
     shifts=shifts.filter(s=>!(s.date===date&&s.role==="eve"));
     [ns3,ns4].filter(Boolean).forEach(nm=>{ shifts.push({id:uid(),date,name:nm,role:"eve",start:"15:30",end:"21:30",note:""}); });
-    persist(Object.assign({},data,{dayPlans:Object.assign({},data.dayPlans||{},{[date]:{users,s1:ns1,s2:ns2,s3:ns3,s4:ns4}}),shifts})); onClose(); };
+    const base=Object.assign({},(data.dayPlans||{})[date]||{}); if(base.cancels){ const cc=Object.assign({},base.cancels); users.forEach(n=>{ delete cc[n]; }); base.cancels=cc; } persist(Object.assign({},data,{dayPlans:Object.assign({},data.dayPlans||{},{[date]:Object.assign(base,{users,s1:ns1,s2:ns2,s3:ns3,s4:ns4})}),shifts})); onClose(); };
   return <Modal title={fmtDate(date)+" の利用者・支援員"} tint="#C9788F" onClose={onClose}>
     <div className="sync-note">
       <b>💡 ここで設定すると、下の4か所へ自動で反映されます</b>
@@ -1353,8 +1371,8 @@ function Handover({me,data,persist}){
   const saveNote=()=>{ persist(Object.assign({},data,{supplyNote:note})); flash("備考を保存しました"); };
   return <Section title="申し送り・補充品" note="">
     <div className="tl-modes" style={{marginBottom:12}}>
-      <button className={"seg "+(sub==="ho"?"on":"")} onClick={()=>setSub("ho")}>申し送り</button>
-      <button className={"seg "+(sub==="sup"?"on":"")} onClick={()=>setSub("sup")}>補充品</button>
+      <button className={"seg "+(sub==="ho"?"on":"")} onClick={()=>{setSub("ho");toTop();}}>申し送り</button>
+      <button className={"seg "+(sub==="sup"?"on":"")} onClick={()=>{setSub("sup");toTop();}}>補充品</button>
     </div>
     {sub==="ho"&&<>
       {list.filter(needConfirm).length>0&&<div className="notice-box"><b>📌 未確認の申し送り（本部）</b>{list.filter(needConfirm).map(h=>(<div key={h.id} className="notice-item"><span>{hoDate(h.ts)}・本部{h.scope==="day"?"（本日担当）":"（全員）"}</span><p>{h.text}</p><div className="row-end"><Btn onClick={()=>confirmHo(h)}>確認済みにする</Btn></div></div>))}</div>}
@@ -2166,7 +2184,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.162〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.163〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
@@ -2960,10 +2978,15 @@ function Shifts({me,data,persist}){
   useEffect(()=>{ (async()=>{ if(!SB_ON) return; try{ const rows=await resList(); setResNames(rows.map(r=>r.data&&r.data.name).filter(Boolean)); }catch(e){} })(); },[]);
   const allUsers=Array.from(new Set([].concat(resNames,(data.userList||[])).filter(Boolean)));
   const [upOpen,setUpOpen]=useState(false); const [upDate,setUpDate]=useState(todayShift()); const [upUsers,setUpUsers]=useState([]); const [newU,setNewU]=useState("");
-  const openUserPlan=(dk)=>{ const cur=(data.dayPlans||{})[dk]||{}; setUpDate(dk); setUpUsers((cur.users||[]).slice()); setUpOpen(true); };
+  const [cx,setCx]=useState(null);
+  const openUserPlan=(dk)=>{ const cur=(data.dayPlans||{})[dk]||{}; setUpDate(dk); setUpUsers((cur.users||[]).slice()); setCx(null); setUpOpen(true); };
+  const upCancels=((data.dayPlans||{})[upDate]||{}).cancels||{};
+  const cxStart=(name)=>{ const c=upCancels[name]; const n=new Date(); const p2=(x)=>String(x).padStart(2,"0"); const at=(c&&c.at)||""; setCx({name:name,reasons:(c&&c.reasons||[]).slice(),other:(c&&c.other)||"",by:(c&&c.by)||"",date:at?at.slice(0,10):iso(n),time:at&&at.length>=16?at.slice(11,16):(p2(n.getHours())+":"+p2(n.getMinutes()))}); };
+  const cxSave=()=>{ if(!cx)return; if(!cx.by){ alert("ご連絡をくださった方を選んでください。"); return; } const dp=Object.assign({},data.dayPlans||{}); const cur=Object.assign({},dp[upDate]||{}); cur.users=(cur.users||[]).filter(x=>x!==cx.name); const prev=(cur.cancels||{})[cx.name]; cur.cancels=Object.assign({},cur.cancels||{},{[cx.name]:{reasons:CANCEL_REASONS.filter(r=>cx.reasons.includes(r)),other:(cx.other||"").trim(),by:cx.by,at:(cx.date||iso(new Date()))+(cx.time?("T"+cx.time):""),recBy:(prev&&prev.recBy)||me.name,recAt:(prev&&prev.recAt)||new Date().toISOString()}}); dp[upDate]=cur; persist(Object.assign({},data,{dayPlans:dp})); setUpUsers(p=>p.filter(x=>x!==cx.name)); setCx(null); };
+  const cxUndo=(name)=>{ if(!confirm("「"+name+"」さんのキャンセルを取り消して、予定に戻しますか？\n（キャンセルの記録は消えます）"))return; const dp=Object.assign({},data.dayPlans||{}); const cur=Object.assign({},dp[upDate]||{}); const cc=Object.assign({},cur.cancels||{}); delete cc[name]; cur.cancels=cc; if(!(cur.users||[]).includes(name)) cur.users=(cur.users||[]).concat([name]); dp[upDate]=cur; persist(Object.assign({},data,{dayPlans:dp})); setUpUsers(p=>p.includes(name)?p:p.concat([name])); if(cx&&cx.name===name) setCx(null); };
   const toggleUpUser=(n)=>setUpUsers(p=>p.includes(n)?p.filter(x=>x!==n):p.concat([n]));
   const addNewU=()=>{ const n=newU.trim(); if(!n)return; if(!(data.userList||[]).includes(n)) persist(Object.assign({},data,{userList:[...(data.userList||[]),n]})); setUpUsers(p=>p.includes(n)?p:p.concat([n])); setNewU(""); };
-  const saveUserPlan=()=>{ const users=upUsers.map(x=>x.trim()).filter(Boolean); const dp=Object.assign({},data.dayPlans||{}); const cur=Object.assign({},dp[upDate]||{}); cur.users=users; dp[upDate]=cur; persist(Object.assign({},data,{dayPlans:dp})); setUpOpen(false); };
+  const saveUserPlan=()=>{ const users=upUsers.map(x=>x.trim()).filter(Boolean); const dp=Object.assign({},data.dayPlans||{}); const cur=Object.assign({},dp[upDate]||{}); cur.users=users; if(cur.cancels){ const cc=Object.assign({},cur.cancels); users.forEach(n=>{ delete cc[n]; }); cur.cancels=cc; } dp[upDate]=cur; persist(Object.assign({},data,{dayPlans:dp})); setUpOpen(false); };
   const days=Array.from({length:7}).map((_,i)=>addDays(weekStart,i));
   const label=`${weekStart.getMonth()+1}/${weekStart.getDate()} 〜 ${addDays(weekStart,6).getMonth()+1}/${addDays(weekStart,6).getDate()}`;
   const add=()=>{
@@ -2994,11 +3017,11 @@ function Shifts({me,data,persist}){
     </div>
     {days.map(d=>{
       const key=iso(d); const list=data.shifts.filter(s=>s.date===key).sort((a,b)=>a.start.localeCompare(b.start));
-      const pUsers=((data.dayPlans||{})[key]||{}).users||[];
+      const pUsers=((data.dayPlans||{})[key]||{}).users||[]; const pCan=((data.dayPlans||{})[key]||{}).cancels||{}; const pCanNames=Object.keys(pCan).filter(n=>!pUsers.includes(n));
       const wd=d.getDay(); const cls=wd===0?"day-date sun":wd===6?"day-date sat":"day-date";
       return <div key={key} className="day-row">
         <div className="day-head"><span className={cls}>{d.getMonth()+1}/{d.getDate()}（{WD[wd]}）</span></div>
-        <div className="plan-users" onClick={()=>openUserPlan(key)} title="利用者予定を編集"><span className="pu-label">👤利用者</span>{pUsers.length?pUsers.map((u,i)=><span key={i} className="pu-chip">{u}</span>):<span className="pu-none">未設定（タップで追加）</span>}<span className="pu-edit">✎</span></div>
+        <div className="plan-users" onClick={()=>openUserPlan(key)} title="利用者予定を編集"><span className="pu-label">👤利用者</span>{(pUsers.length||pCanNames.length)?pUsers.map((u,i)=><span key={i} className="pu-chip">{u}</span>):<span className="pu-none">未設定（タップで追加）</span>}{pCanNames.map(n=><span key={"c_"+n} style={{display:"inline-flex",alignItems:"center",gap:4,whiteSpace:"nowrap"}}><span className="pu-chip pu-cancel">{n}</span><span className="pu-ctag" style={{marginLeft:0}}>キャンセル</span></span>)}<span className="pu-edit">✎</span>{pCanNames.map(n=><div key={"n_"+n} className="pu-cnote">✕ {n}：{cancelReasonText(pCan[n])}{cancelContactText(pCan[n])?("（"+cancelContactText(pCan[n])+"）"):""}</div>)}</div>
         {list.length===0?<div className="noshift">勤務予定なし</div>:list.map(s=>(
           <div key={s.id} className="shift-item">
             <span className="shift-time">{s.start}–{s.end}</span>{s.role&&<span className="chip">{({A:"夜勤A",B:"夜勤B",nightonly:"夜勤のみ",eve:"夕勤",event:"イベント",day:"日勤",other:"その他"})[s.role]||""}</span>}<span>{s.name}</span>{s.help&&<span className="proxy-tag">ヘルプ</span>}
@@ -3033,6 +3056,22 @@ function Shifts({me,data,persist}){
       {allUsers.length>0?<div className="chk-grid" style={{gridTemplateColumns:"repeat(2,1fr)",gap:6}}>{allUsers.map(n=><label className="chk" key={n}><input type="checkbox" checked={upUsers.includes(n)} onChange={()=>toggleUpUser(n)}/>{n}</label>)}</div>:<p className="empty">利用者が未登録です。下で追加できます。</p>}
       <div className="composer" style={{marginTop:6}}><textarea rows={1} value={newU} placeholder="リストに無い利用者名を追加" onChange={e=>setNewU(e.target.value)}/><button className="send" onClick={addNewU} title="利用者名を追加">＋</button></div>
       <p className="tiny" style={{marginTop:4}}>選択中：{upUsers.length?upUsers.join("・"):"なし"}</p>
+      {(upUsers.length>0||Object.keys(upCancels).length>0)&&<div className="cx-box">
+        <div className="cx-lab" style={{marginTop:0}}>予定のキャンセル（予定は消さずに「キャンセル」と残します）</div>
+        {upUsers.filter(n=>!upCancels[n]).map(n=><div key={n} className="cx-row"><span className="cx-name">{n}</span><button className="cx-btn" onClick={()=>cxStart(n)}>キャンセルにする</button></div>)}
+        {Object.keys(upCancels).filter(n=>!upUsers.includes(n)).map(n=><div key={"c"+n} className="cx-row"><span className="cx-name off">{n}</span><span className="pu-ctag" style={{marginLeft:0}}>キャンセル</span><div style={{flexBasis:"100%",fontSize:12.5,lineHeight:1.6,color:"#5A4A50"}}>理由：{cancelReasonText(upCancels[n])}<br/>ご連絡：{cancelContactText(upCancels[n])||"未記入"}{upCancels[n].recBy?<span style={{color:"#8A6B74"}}>　／記録：{upCancels[n].recBy}</span>:null}</div><button className="cx-btn sub" onClick={()=>cxStart(n)}>内容を修正</button><button className="cx-btn sub" onClick={()=>cxUndo(n)}>取り消して予定に戻す</button></div>)}
+        {cx&&<div style={{borderTop:"2px solid #C9788F",marginTop:8,paddingTop:8}}>
+          <div style={{fontWeight:800,color:"#C0392B",fontSize:14}}>「{cx.name}」さんのキャンセル</div>
+          <div className="cx-lab">キャンセルの理由（複数選べます）</div>
+          <div className="cx-pick">{CANCEL_REASONS.map(r=><button key={r} className={"cx-opt"+(cx.reasons.includes(r)?" on":"")} onClick={()=>setCx(Object.assign({},cx,{reasons:cx.reasons.includes(r)?cx.reasons.filter(x=>x!==r):cx.reasons.concat([r])}))}>{cx.reasons.includes(r)?"✓ ":""}{r}</button>)}</div>
+          <label className="field"><span>その他の理由（任意）</span><input value={cx.other} onChange={e=>setCx(Object.assign({},cx,{other:e.target.value}))} placeholder="例：ご家族の都合"/></label>
+          <div className="cx-lab">ご連絡をくださった方</div>
+          <div className="cx-pick">{CANCEL_BY.map(b=><button key={b} className={"cx-opt"+(cx.by===b?" on":"")} onClick={()=>setCx(Object.assign({},cx,{by:b}))}>{b}</button>)}</div>
+          <div className="cx-lab">ご連絡があった日時</div>
+          <div className="row-between"><label className="field" style={{flex:1}}><span>日付</span><input type="date" value={cx.date} onChange={e=>setCx(Object.assign({},cx,{date:e.target.value}))}/></label><label className="field" style={{flex:1}}><span>時刻</span><input type="time" value={cx.time} onChange={e=>setCx(Object.assign({},cx,{time:e.target.value}))}/></label></div>
+          <div className="row-end"><Btn kind="ghost2" onClick={()=>setCx(null)}>やめる</Btn><Btn onClick={cxSave}>キャンセルとして記録</Btn></div>
+        </div>}
+      </div>}
       <div className="row-end"><Btn kind="ghost2" onClick={()=>setUpOpen(false)}>閉じる</Btn><Btn onClick={saveUserPlan}>保存</Btn></div>
     </Modal>}
   </Section>;
