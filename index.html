@@ -160,6 +160,11 @@
   .bk-remind{background:#FFF4D6;border:1px solid #EBCB74;color:#8A5A00;border-radius:12px;padding:10px 12px;font-size:13px;line-height:1.7;margin:4px 0 10px;}
   .bk-banner{background:linear-gradient(180deg,#FFF0D6,#FCE3B4);border:1px solid #F0C982;color:#8A5A00;border-radius:12px;padding:10px 14px;font-weight:700;font-size:13px;margin:0 0 10px;cursor:pointer;box-shadow:0 4px 12px rgba(200,150,40,.15);}
   .starter:hover{background:#F6D4DD;}
+  .ailog{background:#fff;border:1px solid #F0D3DB;border-radius:12px;padding:9px 11px;margin-bottom:8px;}
+  .ailog.guide{background:#FFFBF2;border-color:#EBD9A8;}
+  .ailog-h{display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-size:12px;color:#8A6B74;margin-bottom:4px;}
+  .ailog-q{font-size:13.5px;font-weight:700;color:#5A4A50;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere;}
+  .ailog-a{font-size:13px;color:#5A4A50;line-height:1.7;white-space:pre-wrap;overflow-wrap:anywhere;background:#FCF4F5;border-radius:9px;padding:8px 10px;margin-top:6px;}
   .ai-pick{background:#fff;border:1px solid #F0D3DB;border-radius:14px;padding:10px 12px;margin-bottom:10px;}
   .ai-pick-t{font-size:12.5px;font-weight:800;color:#C9788F;margin-bottom:6px;}
   .ai-chips{display:flex;flex-wrap:wrap;gap:6px;}
@@ -655,7 +660,11 @@ async function tcListMonth(m){ const r=await authFetch(`${SUPABASE_URL}/rest/v1/
 async function tcDelete(id){ await authFetch(`${SUPABASE_URL}/rest/v1/timecard?id=eq.${id}`,{method:"DELETE"}); }
 function bizDate(){ const n=new Date(); return (n.getHours()*60+n.getMinutes())<(15*60)?iso(addDays(n,-1)):iso(n); }
 async function logAccess(name,event){ try{ await authFetch(`${SUPABASE_URL}/rest/v1/access_log`,{method:"POST",headers:{"Prefer":"return=minimal"},body:JSON.stringify({id:uid()+"_"+Date.now(),name:name||"",event:event||"open",ts:new Date().toISOString()})}); }catch(e){} }
-async function alFetch(){ const r=await authFetch(`${SUPABASE_URL}/rest/v1/access_log?select=name,event,ts&order=ts.desc&limit=500`); if(!r.ok) throw new Error("al"); return await r.json(); }
+async function alFetch(){ let r=await authFetch(`${SUPABASE_URL}/rest/v1/access_log?select=name,event,ts&order=ts.desc&limit=500&event=not.like.AIQ*`); if(!r.ok) r=await authFetch(`${SUPABASE_URL}/rest/v1/access_log?select=name,event,ts&order=ts.desc&limit=500`); if(!r.ok) throw new Error("al"); const j=await r.json(); return (j||[]).filter(x=>String(x.event||"").indexOf("AIQ")!==0); }
+// AI相談の履歴（管理者が確認する用）。access_log に「AIQ」＋内容で保存する
+async function aiLogAdd(name,obj){ try{ const ev="AIQ"+JSON.stringify({u:String(obj.u||""),q:String(obj.q||"").slice(0,2000),a:String(obj.a||"").slice(0,6000)}); await authFetch(`${SUPABASE_URL}/rest/v1/access_log`,{method:"POST",headers:{"Prefer":"return=minimal"},body:JSON.stringify({id:"ai_"+uid()+"_"+Date.now(),name:name||"",event:ev,ts:new Date().toISOString()})}); }catch(e){} }
+async function aiLogFetch(){ const r=await authFetch(`${SUPABASE_URL}/rest/v1/access_log?event=like.AIQ*&select=id,name,event,ts&order=ts.desc&limit=300`); if(!r.ok) throw new Error("ai log "+r.status); const j=await r.json(); return (j||[]).map(x=>{ let o=null; try{ o=JSON.parse(String(x.event||"").slice(3)); }catch(e){} return o?{id:x.id,name:x.name||"",ts:x.ts,u:o.u||"",q:o.q||"",a:o.a||""}:null; }).filter(Boolean); }
+function aiGuideText(data,target){ const g=((data&&data.aiGuides)||[]).filter(x=>x&&x.q&&x.a&&(!x.user||x.user===target)); if(!g.length) return ""; let out="", n=0; for(const x of g){ const t="■質問の例："+String(x.q).replace(/\s+/g," ").slice(0,400)+(x.user?("（"+x.user+"さんについて）"):"")+"\n参考回答："+String(x.a).slice(0,1500)+"\n"; if(out.length+t.length>10000) break; out+=t; n++; } return "\n\n【管理者が定めた参考回答（"+n+"件）】次の「質問の例」と同じ内容・似た内容を聞かれたときは、その参考回答の内容を最優先で踏まえて答えてください（言い回しは質問に合わせて構いません。参考回答と記録が食い違う場合は、その旨も伝えてください）。\n"+out; }
 const nendoOf=(d)=>{ d=d||new Date(); return (d.getMonth()+1>=4)?d.getFullYear():d.getFullYear()-1; };
 function compressImage(file,max,q){ max=max||800; q=q||0.55; return new Promise((res,rej)=>{ const fr=new FileReader(); fr.onload=()=>{ const img=new Image(); img.onload=()=>{ let w=img.width,h=img.height; if(w>h&&w>max){h=Math.round(h*max/w);w=max;} else if(h>max){w=Math.round(w*max/h);h=max;} const c=document.createElement("canvas"); c.width=w;c.height=h; c.getContext("2d").drawImage(img,0,0,w,h); res(c.toDataURL("image/jpeg",q)); }; img.onerror=rej; img.src=fr.result; }; fr.onerror=rej; fr.readAsDataURL(file); }); }
 function resizeDataUrl(src,max,q){ max=max||240;q=q||0.6; return new Promise((res,rej)=>{ const img=new Image(); img.onload=()=>{ let w=img.width,h=img.height; if(w>h&&w>max){h=Math.round(h*max/w);w=max;} else if(h>max){w=Math.round(w*max/h);h=max;} const c=document.createElement("canvas");c.width=w;c.height=h;c.getContext("2d").drawImage(img,0,0,w,h); res(c.toDataURL("image/jpeg",q)); }; img.onerror=rej; img.src=src; }); }
@@ -2220,7 +2229,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.168〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.169〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
@@ -2529,7 +2538,7 @@ function Inside({me,data,tab,setTab,onLogout,persist,reload}){
       {tab==="work"&&<Work me={me} data={data} persist={persist}/>}
       {tab==="traits"&&<Traits/>}
       {tab==="materials"&&<Materials me={me} data={data} persist={persist}/>}
-      {tab==="consult"&&<Consult data={data}/>}
+      {tab==="consult"&&<Consult data={data} me={me}/>}
       {tab==="history"&&<HistoryView/>}
       {tab==="events"&&<Events me={me} data={data} persist={persist}/>}
       {tab==="users"&&<UsersView me={me}/>}
@@ -3197,7 +3206,7 @@ function aiRecordContext(records,user,code,days){ const mine=(records||[]).filte
   return "【"+code+"さんの来所・帰宅（全期間。利用日ごと。帰宅は翌朝のことが多い）】\n"+(vis||"来所・帰宅の記録はありません。")+"\n\n【"+code+"さんの記録の明細（"+(days?("直近"+days+"日"):"全期間")+"・新しい順・日付 時刻 内容）"+(cut?"※量が多いため古い分は省略":"")+"】\n"+(lines.join("\n")||"この期間の記録はありません。"); }
 
 /* ============================ AI相談 ============================ */
-function Consult({data}){
+function Consult({data,me}){
   const [messages,setMessages]=useState([]);
   const [input,setInput]=useState(""); const [loading,setLoading]=useState(false); const [error,setError]=useState("");
   const [apiKey,setApiKey]=useState(()=>localStorage.getItem("mizuho_api_key")||"");
@@ -3230,13 +3239,13 @@ function Consult({data}){
       const res=await fetch("https://api.anthropic.com/v1/messages",{
         method:"POST",
         headers:{"content-type":"application/json","x-api-key":apiKey,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
-        body:JSON.stringify({model:"claude-sonnet-5",max_tokens:3000,system:aiMask(buildSystem(data),nameMap)+"\n\n【名前の扱い】個人情報保護のため、利用者と職員の名前は「利用者AB12」「職員CD34」のような番号に置き換えてあります。回答では、その番号をそのまま（変えずに）使ってください。番号から本名を推測したり尋ねたりしないでください。"+((target&&codeOf(target))?("\n\n【記録の参照】職員は「"+codeOf(target)+"」さんについて質問しています。以下はアプリに記録された事実です。日時や回数を聞かれたら、必ずこの記録だけを根拠に正確に答え、記録に無いことは「記録にありません」と伝えてください。推測で時刻を補わないでください。時刻は日本時間です。\n\n"+aiMask((aiResidentText(resInfoOf(target),codeOf(target))||("【"+codeOf(target)+"さんの利用者情報】登録がありません。"))+"\n\n"+aiPlanText(data,target,codeOf(target))+"\n\n"+aiNisshiText(nsr,codeOf(target),span)+"\n\n"+aiRecordContext(data.records,target,codeOf(target),span),nameMap)):""),messages:history.map(m=>({role:m.role,content:aiMask(m.content,nameMap)}))}),
+        body:JSON.stringify({model:"claude-sonnet-5",max_tokens:3000,system:aiMask(buildSystem(data)+aiGuideText(data,target),nameMap)+"\n\n【名前の扱い】個人情報保護のため、利用者と職員の名前は「利用者AB12」「職員CD34」のような番号に置き換えてあります。回答では、その番号をそのまま（変えずに）使ってください。番号から本名を推測したり尋ねたりしないでください。"+((target&&codeOf(target))?("\n\n【記録の参照】職員は「"+codeOf(target)+"」さんについて質問しています。以下はアプリに記録された事実です。日時や回数を聞かれたら、必ずこの記録だけを根拠に正確に答え、記録に無いことは「記録にありません」と伝えてください。推測で時刻を補わないでください。時刻は日本時間です。\n\n"+aiMask((aiResidentText(resInfoOf(target),codeOf(target))||("【"+codeOf(target)+"さんの利用者情報】登録がありません。"))+"\n\n"+aiPlanText(data,target,codeOf(target))+"\n\n"+aiNisshiText(nsr,codeOf(target),span)+"\n\n"+aiRecordContext(data.records,target,codeOf(target),span),nameMap)):""),messages:history.map(m=>({role:m.role,content:aiMask(m.content,nameMap)}))}),
       });
       const d=await res.json();
       if(d.error){setError("AIからの応答でエラーが出ました："+(d.error.message||"")); setMessages(history); }
       else{ let txt=aiUnmask((d.content||[]).filter(b=>b.type==="text").map(b=>b.text).join("\n").trim(),nameMap);
         if(d.stop_reason==="max_tokens"&&txt){ txt+="\n\n……（回答が長くなったため、ここで止まりました。続きが必要なときは「続きを教えて」と送ってください）"; }
-        setMessages([...history,{role:"assistant",content:txt||"うまく答えられませんでした。もう一度お試しください。"}]); }
+        setMessages([...history,{role:"assistant",content:txt||"うまく答えられませんでした。もう一度お試しください。"}]); if(txt&&SB_ON) aiLogAdd((me&&me.name)||"",{u:target||"",q:content,a:txt}); }
     }catch(e){ setError("AI相談に接続できませんでした。通信状況やAPIキーをご確認ください。"); setMessages(history); }
     finally{ setLoading(false); }
   };
@@ -3244,6 +3253,7 @@ function Consult({data}){
   return <Section title="AI相談" note="支援の対応に迷ったとき、一緒に考えます。研修資料・ほたる理念・障害特性と支援・業務の詳細を参考にします。利用者を選ぶと、その方の利用者情報・個別訓練計画・過去の日誌まとめ・記録も参考にします。">
     <div className="ai-warn">🔒 登録されている<b>利用者・職員のお名前は、送信前に自動で番号に置き換わります</b>（画面にはお名前のまま表示されます）。あだ名や登録と違う書き方、ご家族のお名前、<b>住所・電話番号は置き換わりません</b>ので入力しないでください。
       {" "}<button className="link-btn" onClick={()=>{setKeyInput(apiKey);setSetup(true);}}>AIの設定</button></div>
+    <div className="tiny" style={{margin:"-4px 2px 8px",color:"#8A6B74"}}>📝 ここでの質問と回答は、支援の質を高めるために管理者が確認できます。</div>
     <div className="ai-pick">
       <div className="ai-pick-t">この方の記録について質問する（任意）</div>
       <div className="ai-chips">{aiUsers.map(u=><button key={u} className={"ai-chip"+(target===u?" on":"")} onClick={()=>setTarget(target===u?"":u)}>{target===u?"✓ ":""}{u}</button>)}{aiUsers.length===0&&<span className="tiny">利用者が登録されていません。</span>}</div>
@@ -3278,6 +3288,49 @@ function Consult({data}){
 }
 
 /* ============================ 管理者パネル ============================ */
+
+/* ============ 管理者：AI相談の履歴と参考回答 ============ */
+function AiLogAdmin({data,persist}){
+  const [rows,setRows]=useState(null); const [busy,setBusy]=useState(false); const [err,setErr]=useState(""); const [openId,setOpenId]=useState(""); const [ed,setEd]=useState(null); const [fUser,setFUser]=useState("");
+  const guides=(data.aiGuides||[]);
+  const load=async()=>{ setBusy(true); setErr(""); try{ setRows(await aiLogFetch()); }catch(e){ setErr("履歴を読み込めませんでした。"); setRows([]); } setBusy(false); };
+  const dt=(ts)=>{ const d=new Date(ts); return isNaN(d)?"":((d.getMonth()+1)+"/"+d.getDate()+" "+_p2(d.getHours())+":"+_p2(d.getMinutes())); };
+  const users=Array.from(new Set([].concat(data.userList||[],guides.map(g=>g.user),(rows||[]).map(r=>r.u)).filter(Boolean)));
+  const saveGuide=()=>{ const e=ed; if(!(e.q||"").trim()||!(e.a||"").trim()){ alert("「質問の例」と「参考回答」の両方を入力してください。"); return; } const g={id:e.id||uid(),q:e.q.trim(),a:e.a.trim(),user:e.user||"",date:iso(new Date())}; const next=e.id?guides.map(x=>x.id===e.id?g:x):[g].concat(guides); persist(Object.assign({},data,{aiGuides:next})); setEd(null); };
+  const delGuide=(id)=>{ if(!confirm("この参考回答を削除しますか？"))return; persist(Object.assign({},data,{aiGuides:guides.filter(x=>x.id!==id)})); };
+  const shown=(rows||[]).filter(r=>!fUser||r.u===fUser);
+  return <React.Fragment>
+    <h3 className="blk">🤖 AI相談の履歴と参考回答</h3>
+    <p className="tiny">職員が AI相談で質問した内容と AI の回答を確認できます。「参考回答を作る」で、同じような質問が来たときに AI が最優先で踏まえる回答を登録できます。</p>
+    <div className="row-end" style={{flexWrap:"wrap"}}><Btn kind="ghost2" onClick={()=>setEd({id:"",q:"",a:"",user:""})}>＋ 参考回答を新しく作る</Btn><Btn onClick={load} disabled={busy}>{busy?"読み込み中…":(rows===null?"履歴を表示":"履歴を更新")}</Btn></div>
+    {err&&<p className="err">{err}</p>}
+    {rows!==null&&<div style={{marginTop:8}}>
+      <label className="field"><span>利用者で絞り込み</span><select value={fUser} onChange={e=>setFUser(e.target.value)}><option value="">すべて</option>{users.map(u=><option key={u} value={u}>{u}</option>)}</select></label>
+      {shown.length===0&&<p className="empty">履歴はまだありません。</p>}
+      {shown.map(r=><div key={r.id} className="ailog">
+        <div className="ailog-h"><span>{dt(r.ts)}</span><b>{r.name||"（不明）"}</b>{r.u?<span className="chip">{r.u}</span>:<span className="tiny">利用者の選択なし</span>}</div>
+        <div className="ailog-q">Q. {r.q}</div>
+        {openId===r.id&&<div className="ailog-a">{r.a}</div>}
+        <div className="row-end" style={{marginTop:6,flexWrap:"wrap"}}><button className="link-btn" onClick={()=>setOpenId(openId===r.id?"":r.id)}>{openId===r.id?"回答を閉じる":"AIの回答を見る"}</button><Btn kind="ghost2" onClick={()=>setEd({id:"",q:r.q,a:r.a,user:r.u||""})}>参考回答を作る</Btn></div>
+      </div>)}
+    </div>}
+    <div className="rec-sub" style={{marginTop:14}}>登録済みの参考回答（{guides.length}件）</div>
+    {guides.length===0&&<p className="empty">まだ登録がありません。</p>}
+    {guides.map(g=><div key={g.id} className="ailog guide">
+      <div className="ailog-h"><span>{g.date||""}</span>{g.user?<span className="chip">{g.user} のみ</span>:<span className="chip">全員共通</span>}</div>
+      <div className="ailog-q">Q. {g.q}</div>
+      <div className="ailog-a">{g.a}</div>
+      <div className="row-end" style={{marginTop:6}}><Btn kind="ghost2" onClick={()=>setEd({id:g.id,q:g.q,a:g.a,user:g.user||""})}>編集</Btn><button className="mini-del" style={{marginLeft:0}} onClick={()=>delGuide(g.id)}>🗑 削除</button></div>
+    </div>)}
+    {ed&&<Modal title={ed.id?"参考回答を編集":"参考回答を作る"} tint="#C9788F" onClose={()=>setEd(null)}>
+      <p className="tiny" style={{marginTop:0}}>ここに登録した内容は、同じ・似た質問が来たときに AI が最優先で踏まえます。AI の回答をそのまま使わず、事業所としての正しい対応に書き直してください。</p>
+      <label className="field"><span>質問の例（どんな質問のときに使うか）</span><textarea rows={3} value={ed.q} onChange={e=>setEd(Object.assign({},ed,{q:e.target.value}))}/></label>
+      <label className="field"><span>参考回答（事業所としての答え）</span><textarea rows={9} value={ed.a} onChange={e=>setEd(Object.assign({},ed,{a:e.target.value}))}/></label>
+      <label className="field"><span>使う範囲</span><select value={ed.user} onChange={e=>setEd(Object.assign({},ed,{user:e.target.value}))}><option value="">全員共通（どの質問でも使う）</option>{users.map(u=><option key={u} value={u}>{u} について質問されたときだけ</option>)}</select></label>
+      <div className="row-end"><Btn kind="ghost2" onClick={()=>setEd(null)}>やめる</Btn><Btn onClick={saveGuide}>保存</Btn></div>
+    </Modal>}
+  </React.Fragment>;
+}
 function AdminPanel({data,persist}){
   const [manOpen,setManOpen]=useState(false);
   const [name,setName]=useState(""); const [p1,setP1]=useState(""); const [p2,setP2]=useState("");
@@ -3444,6 +3497,7 @@ function AdminPanel({data,persist}){
     <p className="tiny"><b>軽量</b>＝写真・計画ファイルの画像は含めず（小さい）。<b>フル</b>＝写真・個別訓練計画の画像も全部含める（大きく時間がかかります）。</p>
     <div className="row-end" style={{gap:"8px",flexWrap:"wrap"}}><Btn kind="ghost2" onClick={()=>doBackup(false)} disabled={bkBusy}>{bkBusy?"書き出し中…":"⬇ 軽量バックアップ"}</Btn><Btn onClick={()=>doBackup(true)} disabled={bkBusy}>{bkBusy?"書き出し中…":"⬇ フルバックアップ（画像込み）"}</Btn></div>
     {bkProg&&<p className="tiny" style={{color:"#B25E77"}}>{bkProg}</p>}
+    <AiLogAdmin data={data} persist={persist}/>
     <h3 className="blk">🛡 データ保護</h3>
     <p className="tiny">毎日1回、文字のデータ（補充品・申し送り・食事記録・利用者一覧・アカウントなど）を自動でバックアップしています（この端末に直近4日分、サーバーに直近約2週間分）。万一のときは、下のボタンから日付を選んで戻せます。</p>
     <div className="row-end"><Btn kind="ghost2" onClick={()=>window.dispatchEvent(new Event("mizuho-reco"))}>🆘 データ復旧（バックアップから戻す）</Btn></div>
