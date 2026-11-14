@@ -2229,7 +2229,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.170〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.171〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
@@ -3293,6 +3293,13 @@ function Consult({data,me}){
 function AiLogAdmin({data,persist}){
   const [rows,setRows]=useState(null); const [busy,setBusy]=useState(false); const [err,setErr]=useState(""); const [openId,setOpenId]=useState(""); const [ed,setEd]=useState(null); const [fUser,setFUser]=useState("");
   const guides=(data.aiGuides||[]);
+  const [regNames,setRegNames]=useState(null);
+  useEffect(()=>{ (async()=>{ if(!SB_ON){ setRegNames([]); return; } try{ const rows=await resList(); setRegNames((rows||[]).map(r=>r.data&&r.data.name).filter(Boolean).map(x=>String(x).trim())); }catch(e){ setRegNames(null); } })(); },[]);
+  const isGone=(g)=>!!(g&&g.user&&regNames!==null&&!regNames.includes(String(g.user).trim())&&!(data.userList||[]).map(x=>String(x).trim()).includes(String(g.user).trim()));
+  const gone=guides.filter(isGone);
+  const togglePin=(g)=>{ persist(Object.assign({},data,{aiGuides:guides.map(x=>x.id===g.id?Object.assign({},x,{pin:!x.pin}):x)})); };
+  const delGone=()=>{ if(!gone.length) return; const names=Array.from(new Set(gone.map(g=>g.user))).join("・"); if(!confirm("登録から削除された利用者（"+names+"）専用の参考回答 "+gone.length+"件を削除します。よろしいですか？"))return; const ids=new Set(gone.map(g=>g.id)); persist(Object.assign({},data,{aiGuides:guides.filter(x=>!ids.has(x.id))})); };
+  const unpinGone=()=>{ const ids=new Set(gone.map(g=>g.id)); persist(Object.assign({},data,{aiGuides:guides.map(x=>ids.has(x.id)?Object.assign({},x,{pin:false}):x)})); };
   const load=async()=>{ setBusy(true); setErr(""); try{ setRows(await aiLogFetch()); }catch(e){ setErr("履歴を読み込めませんでした。"); setRows([]); } setBusy(false); };
   const dt=(ts)=>{ const d=new Date(ts); return isNaN(d)?"":((d.getMonth()+1)+"/"+d.getDate()+" "+_p2(d.getHours())+":"+_p2(d.getMinutes())); };
   const users=Array.from(new Set([].concat(data.userList||[],guides.map(g=>g.user),(rows||[]).map(r=>r.u)).filter(Boolean)));
@@ -3317,11 +3324,12 @@ function AiLogAdmin({data,persist}){
     <div className="rec-sub" style={{marginTop:14}}>登録済みの参考回答（{guides.length}件・うち📌 {guides.filter(g=>g.pin).length}件）</div>
     {guides.filter(g=>g.pin).reduce((n,g)=>n+String(g.a||"").length,0)>40000&&<p className="err">📌 の参考回答の合計がとても長くなっています。AIの利用料が増え、回答が遅くなるため、不要なもののチェックを外すか、内容を短くしてください。</p>}
     {guides.length===0&&<p className="empty">まだ登録がありません。</p>}
+    {gone.length>0&&<div className="notice-box" style={{marginBottom:8}}><b>⚠ 登録から削除された利用者の参考回答が {gone.length}件あります</b><p className="tiny" style={{margin:"4px 0 6px"}}>対象：{Array.from(new Set(gone.map(g=>g.user))).join("・")}。この方専用の参考回答は、もう AI には渡りません（その方を選べないため）。不要であれば削除してください。</p><div className="row-end" style={{flexWrap:"wrap"}}>{gone.some(g=>g.pin)&&<Btn kind="ghost2" onClick={unpinGone}>📌 だけ外す</Btn>}<Btn onClick={delGone}>まとめて削除</Btn></div></div>}
     {guides.map(g=><div key={g.id} className="ailog guide">
-      <div className="ailog-h"><span>{g.date||""}</span>{g.user?<span className="chip">{g.user} のみ</span>:<span className="chip">全員共通</span>}{g.pin&&<span className="chip" style={{background:"#C9788F",color:"#fff",borderColor:"#C9788F"}}>📌 ずっと参考にする</span>}</div>
+      <div className="ailog-h"><span>{g.date||""}</span>{g.user?<span className="chip">{g.user} のみ</span>:<span className="chip">全員共通</span>}{g.pin&&<span className="chip" style={{background:"#C9788F",color:"#fff",borderColor:"#C9788F"}}>📌 ずっと参考にする</span>}{isGone(g)&&<span className="chip" style={{background:"#C0392B",color:"#fff",borderColor:"#C0392B"}}>⚠ 登録から削除された利用者</span>}</div>
       <div className="ailog-q">Q. {g.q}</div>
       <div className="ailog-a">{g.a}</div>
-      <div className="row-end" style={{marginTop:6}}><Btn kind="ghost2" onClick={()=>setEd({id:g.id,q:g.q,a:g.a,user:g.user||"",pin:!!g.pin})}>編集</Btn><button className="mini-del" style={{marginLeft:0}} onClick={()=>delGuide(g.id)}>🗑 削除</button></div>
+      <div className="row-end" style={{marginTop:6,flexWrap:"wrap"}}><Btn kind="ghost2" onClick={()=>togglePin(g)}>{g.pin?"📌 を外す":"📌 を付ける"}</Btn><Btn kind="ghost2" onClick={()=>setEd({id:g.id,q:g.q,a:g.a,user:g.user||"",pin:!!g.pin})}>編集</Btn><button className="mini-del" style={{marginLeft:0}} onClick={()=>delGuide(g.id)}>🗑 削除</button></div>
     </div>)}
     {ed&&<Modal title={ed.id?"参考回答を編集":"参考回答を作る"} tint="#C9788F" onClose={()=>setEd(null)}>
       <p className="tiny" style={{marginTop:0}}>ここに登録した内容は、同じ・似た質問が来たときに AI が最優先で踏まえます。AI の回答をそのまま使わず、事業所としての正しい対応に書き直してください。</p>
