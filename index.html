@@ -812,8 +812,26 @@ function buildSystem(data){
 
 【回答のしかた】やさしく、現場ですぐ使える具体的な提案を短くまとめる。必要なら箇条書き。個人が特定される情報が含まれても記録に残さない前提で、一般的な対応として答える。
 ${phil?`\n【ふれあいホームみずほ／ほたる理念】\n${phil}\n`:""}
-【登録されている研修資料】\n${ctx||"（まだ登録された資料はありません）"}`;
+【登録されている研修資料】\n${ctx||"（まだ登録された資料はありません）"}
+
+【障害特性と支援（アプリの「障害特性と支援」ページの内容）】\n${aiTraitsText()}
+
+【業務の詳細（アプリの「業務の詳細」ページの内容）】\n${aiWorkText(data)}`;
 }
+function aiTraitsText(){ try{ return TRAITS.map(t=>"■"+t.t+"："+(t.b||"")+"\n"+((t.p||[]).map(x=>"・"+x).join("\n"))).join("\n").slice(0,5000); }catch(e){ return ""; } }
+function aiWorkText(data){ const base=["意思決定支援：意思形成→意思表明→意思実現の3段階で、ご本人の希望を中心に置く","生活訓練プログラム：調理・掃除・金銭管理・公共機関の利用など、地域で暮らす力の維持・向上","個別支援計画：アセスメント→計画→実施→モニタリングのサイクルで見直す","虐待防止・権利擁護：5類型を全員が理解し、疑いの段階でも速やかに通報","記録・申し送り：その日の様子・体調・できごとを記録しチームで共有"].map(x=>"・"+x).join("\n"); const w=((data&&data.workItems)||[]).slice().sort((a,b)=>(b.important?1:0)-(a.important?1:0)).map(x=>"・"+(x.important?"【重要】":"")+String(x.text||"").replace(/\s+/g," ").slice(0,500)+(x.date?("（"+x.date+"）"):"")).join("\n").slice(0,6000); return base+(w?("\n［事業所で追加された業務・決まりごと］\n"+w):""); }
+// 利用者情報（支援に必要な項目のみ。氏名・ふりがな・生年月日・顔写真・電話番号・家族や緊急連絡先の氏名は渡さない）
+function aiResidentText(d,code){ if(!d) return ""; const L=[]; const add=(k,v)=>{ const t=String(v==null?"":v).replace(/\s+/g," ").trim(); if(t) L.push(k+"："+t.slice(0,800)); };
+  try{ if(d.birth){ const b=new Date(d.birth); if(!isNaN(b)){ const n=new Date(); let a=n.getFullYear()-b.getFullYear(); if(n.getMonth()<b.getMonth()||(n.getMonth()===b.getMonth()&&n.getDate()<b.getDate())) a--; if(a>=0&&a<130) add("年齢",a+"歳"); } } else if(d.age) add("年齢",d.age); }catch(e){}
+  add("性別",d.sex); add("手帳",[d.techo,d.techoGrade].filter(Boolean).join(" ")); add("障害支援区分",d.kubun); add("障害名",d.disability); add("持病",d.illness);
+  if(d.allergy&&d.allergy.has) add("アレルギー","あり "+(d.allergy.detail||"")); else if(d.allergy&&d.allergy.has===false) add("アレルギー","なし");
+  const TL={cb:"朝食前",ca:"朝食中",caf:"朝食後",yb:"夕食前",ya:"夕食時",yaf:"夕食後",bs:"就寝前"};
+  (d.meds||[]).forEach((m,i)=>{ if(!m||!(m.name||m.content)) return; const tm=Object.keys(m.timing||{}).filter(k=>m.timing[k]).map(k=>TL[k]||k).join("・"); add("服薬"+(i+1),[m.name,tm&&("時間："+tm),m.content&&("対応："+m.content),m.forgetOk?"飲み忘れ時は後からでも可":""].filter(Boolean).join("／")); });
+  add("服薬の管理",d.medManage);
+  if(d.family&&typeof d.family==="object"){ const f=d.family; const fm=[f.father&&"父",f.mother&&"母",f.gfather&&"祖父",f.gmother&&"祖母",Number(f.bro)>0&&("兄"+f.bro+"人"),Number(f.ybro)>0&&("弟"+f.ybro+"人"),Number(f.sis)>0&&("姉"+f.sis+"人"),Number(f.ysis)>0&&("妹"+f.ysis+"人")].filter(Boolean).join("・"); add("家族構成",[fm,typeof f.other==="string"?f.other:""].filter(Boolean).join("／")); }
+  add("得意・好きなこと",d.strong); add("苦手",d.weak); add("家族の希望",d.familyHope); add("本人の将来ビジョン",d.vision); add("対応アドバイス",d.advice);
+  (d.notices||[]).slice(0,20).forEach(n=>{ if(n&&n.text) add("お知らせ・注意（"+(n.date||"")+"）",n.text); });
+  return L.length?("【"+code+"さんの利用者情報（アプリの「利用者情報」ページの内容）】\n"+L.join("\n")):""; }
 
 /* ============ 端末検出（ホーム画面案内） ============ */
 function detectDevice(){
@@ -2199,7 +2217,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.166〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.167〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
@@ -3183,8 +3201,9 @@ function Consult({data}){
   const [setup,setSetup]=useState(false); const [keyInput,setKeyInput]=useState("");
   const endRef=useRef(null);
   useEffect(()=>{ if(messages.length||loading){ endRef.current&&endRef.current.scrollIntoView({behavior:"smooth",block:"nearest"}); } },[messages,loading]);
-  const [resNames,setResNames]=useState([]);
-  useEffect(()=>{ (async()=>{ if(!SB_ON)return; try{ const rows=await resList(); setResNames(rows.map(r=>r.data&&r.data.name).filter(Boolean)); }catch(e){} })(); },[]);
+  const [resNames,setResNames]=useState([]); const [resRows,setResRows]=useState([]);
+  useEffect(()=>{ (async()=>{ if(!SB_ON)return; try{ const rows=await resList(); setResRows(rows||[]); setResNames(rows.map(r=>r.data&&r.data.name).filter(Boolean)); }catch(e){} })(); },[]);
+  const resInfoOf=(n)=>{ const r=resRows.find(x=>x.data&&String(x.data.name||"").trim()===String(n).trim()); return r?r.data:null; };
   const aiUsers=Array.from(new Set([].concat(resNames,(data.userList||[]),((data.records||[]).map(r=>r.user))))).filter(Boolean);
   const nameMap=useMemo(()=>aiNameMap(aiUsers,(data.accounts||[]).map(a=>a.name)),[aiUsers.join("|"),(data.accounts||[]).map(a=>a.name).join("|")]);
   const [target,setTarget]=useState(""); const [span,setSpan]=useState(90);
@@ -3203,7 +3222,7 @@ function Consult({data}){
       const res=await fetch("https://api.anthropic.com/v1/messages",{
         method:"POST",
         headers:{"content-type":"application/json","x-api-key":apiKey,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
-        body:JSON.stringify({model:"claude-sonnet-5",max_tokens:3000,system:aiMask(buildSystem(data),nameMap)+"\n\n【名前の扱い】個人情報保護のため、利用者と職員の名前は「利用者AB12」「職員CD34」のような番号に置き換えてあります。回答では、その番号をそのまま（変えずに）使ってください。番号から本名を推測したり尋ねたりしないでください。"+((target&&codeOf(target))?("\n\n【記録の参照】職員は「"+codeOf(target)+"」さんについて質問しています。以下はアプリに記録された事実です。日時や回数を聞かれたら、必ずこの記録だけを根拠に正確に答え、記録に無いことは「記録にありません」と伝えてください。推測で時刻を補わないでください。時刻は日本時間です。\n\n"+aiMask(aiRecordContext(data.records,target,codeOf(target),span),nameMap)):""),messages:history.map(m=>({role:m.role,content:aiMask(m.content,nameMap)}))}),
+        body:JSON.stringify({model:"claude-sonnet-5",max_tokens:3000,system:aiMask(buildSystem(data),nameMap)+"\n\n【名前の扱い】個人情報保護のため、利用者と職員の名前は「利用者AB12」「職員CD34」のような番号に置き換えてあります。回答では、その番号をそのまま（変えずに）使ってください。番号から本名を推測したり尋ねたりしないでください。"+((target&&codeOf(target))?("\n\n【記録の参照】職員は「"+codeOf(target)+"」さんについて質問しています。以下はアプリに記録された事実です。日時や回数を聞かれたら、必ずこの記録だけを根拠に正確に答え、記録に無いことは「記録にありません」と伝えてください。推測で時刻を補わないでください。時刻は日本時間です。\n\n"+aiMask((aiResidentText(resInfoOf(target),codeOf(target))||("【"+codeOf(target)+"さんの利用者情報】登録がありません。"))+"\n\n"+aiRecordContext(data.records,target,codeOf(target),span),nameMap)):""),messages:history.map(m=>({role:m.role,content:aiMask(m.content,nameMap)}))}),
       });
       const d=await res.json();
       if(d.error){setError("AIからの応答でエラーが出ました："+(d.error.message||"")); setMessages(history); }
@@ -3214,7 +3233,7 @@ function Consult({data}){
     finally{ setLoading(false); }
   };
 
-  return <Section title="AI相談" note="支援の対応に迷ったとき、一緒に考えます。研修資料・ほたる理念・意思決定支援・虐待防止・強度行動障害・身体介助の考え方も参考にします。">
+  return <Section title="AI相談" note="支援の対応に迷ったとき、一緒に考えます。研修資料・ほたる理念・障害特性と支援・業務の詳細を参考にします。利用者を選ぶと、その方の利用者情報と記録も参考にします。">
     <div className="ai-warn">🔒 登録されている<b>利用者・職員のお名前は、送信前に自動で番号に置き換わります</b>（画面にはお名前のまま表示されます）。あだ名や登録と違う書き方、ご家族のお名前、<b>住所・電話番号は置き換わりません</b>ので入力しないでください。
       {" "}<button className="link-btn" onClick={()=>{setKeyInput(apiKey);setSetup(true);}}>AIの設定</button></div>
     <div className="ai-pick">
@@ -3222,7 +3241,7 @@ function Consult({data}){
       <div className="ai-chips">{aiUsers.map(u=><button key={u} className={"ai-chip"+(target===u?" on":"")} onClick={()=>setTarget(target===u?"":u)}>{target===u?"✓ ":""}{u}</button>)}{aiUsers.length===0&&<span className="tiny">利用者が登録されていません。</span>}</div>
       {target&&<div className="ai-pick-n">「{target}」さんの記録（来所・帰宅は全期間、その他は
         <select value={span} onChange={e=>setSpan(Number(e.target.value))} style={{margin:"0 4px",padding:"3px 6px",borderRadius:8,border:"1px solid #E3C9CF",background:"#fff"}}><option value={30}>直近1か月</option><option value={90}>直近3か月</option><option value={365}>直近1年</option><option value={0}>全期間</option></select>
-        ）を、番号「{codeOf(target)}」として AI に渡します。例：「{target}さんの今月の来所時間を教えて」</div>}
+        ）と利用者情報（障害名・服薬・得意／苦手・対応アドバイスなど。{resInfoOf(target)?"登録あり":"未登録"}）を、番号「{codeOf(target)}」として AI に渡します。例：「{target}さんの今月の来所時間を教えて」</div>}
     </div>
     {!apiKey&&<div className="privacy" style={{marginBottom:12}}><span>🔑</span><div>
       <b>AI相談を使うには設定が必要です</b>
