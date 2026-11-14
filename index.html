@@ -716,6 +716,7 @@ function mondayOf(d){ const x=new Date(d); const day=(x.getDay()+6)%7; x.setDate
 function addDays(d,n){ const x=new Date(d); x.setDate(x.getDate()+n); return x; }
 const toMin=(t)=>{const p=(t||"0:0").split(":");return (+p[0])*60+(+p[1]);};
 const toTop=()=>{ const go=()=>{ try{ window.scrollTo(0,0); if(document.scrollingElement) document.scrollingElement.scrollTop=0; }catch(e){} }; go(); setTimeout(go,0); setTimeout(go,80); };
+const resetZoom=()=>{ try{ const vv=window.visualViewport; if(vv&&vv.scale&&vv.scale<=1.01) return; const m=document.querySelector('meta[name="viewport"]'); if(!m) return; const base="width=device-width, initial-scale=1, viewport-fit=cover"; m.setAttribute("content","width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, viewport-fit=cover"); setTimeout(()=>{ try{ m.setAttribute("content",base); }catch(e){} },350); }catch(e){} };
 const CANCEL_REASONS=["体調不良","忘れていた","他の予定が入った"]; const CANCEL_BY=["お母様","お父様","その他ご家族","ご本人"];
 const cancelReasonText=(c)=>{ if(!c) return ""; const a=(c.reasons||[]).slice(); if((c.other||"").trim()) a.push("その他："+c.other.trim()); return a.length?a.join("・"):"理由未記入"; };
 const cancelContactText=(c)=>{ if(!c) return ""; let t=""; if(c.at){ const m=String(c.at).match(/^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2}))?/); if(m) t=Number(m[2])+"/"+Number(m[3])+(m[4]?(" "+Number(m[4])+":"+m[5]):""); } const by=c.by||""; if(!by&&!t) return ""; return (by?by+"より":"")+(t?(by?" ":"")+t+" 連絡":" 連絡"); };
@@ -1993,7 +1994,7 @@ function App(){
   const [data,setData]=useState(null);
   const [me,setMe]=useState(null); const [sessTried,setSessTried]=useState(false); const [sessChecked,setSessChecked]=useState(false);
   const [tab,setTab]=useState("schedule");
-  useEffect(()=>{ toTop(); },[tab]);
+  useEffect(()=>{ resetZoom(); toTop(); },[tab]);
   const season=useMemo(seasonPalette,[]);
   const [login,setLogin]=useState(null);
   const [pw,setPw]=useState(""); const [err,setErr]=useState("");
@@ -2191,7 +2192,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.164〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.165〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
