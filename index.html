@@ -160,6 +160,13 @@
   .bk-remind{background:#FFF4D6;border:1px solid #EBCB74;color:#8A5A00;border-radius:12px;padding:10px 12px;font-size:13px;line-height:1.7;margin:4px 0 10px;}
   .bk-banner{background:linear-gradient(180deg,#FFF0D6,#FCE3B4);border:1px solid #F0C982;color:#8A5A00;border-radius:12px;padding:10px 14px;font-weight:700;font-size:13px;margin:0 0 10px;cursor:pointer;box-shadow:0 4px 12px rgba(200,150,40,.15);}
   .starter:hover{background:#F6D4DD;}
+  .ai-pick{background:#fff;border:1px solid #F0D3DB;border-radius:14px;padding:10px 12px;margin-bottom:10px;}
+  .ai-pick-t{font-size:12.5px;font-weight:800;color:#C9788F;margin-bottom:6px;}
+  .ai-chips{display:flex;flex-wrap:wrap;gap:6px;}
+  .ai-chip{background:#FCF4F5;border:1px solid #F0D3DB;color:#5A4A50;border-radius:999px;padding:7px 12px;font-size:13px;font-weight:600;cursor:pointer;}
+  .ai-chip.on{background:#C9788F;border-color:#C9788F;color:#fff;}
+  .ai-pick-n{font-size:12px;line-height:1.7;color:#7A5560;margin-top:8px;}
+  .ai-prev{font-size:12px;line-height:1.6;color:#7A5560;background:#F6F1F2;border-radius:10px;padding:7px 10px;margin-top:6px;overflow-wrap:anywhere;}
   .bubble{max-width:88%;padding:11px 14px;border-radius:16px;font-size:14px;line-height:1.75;white-space:pre-wrap;}
   .bubble.user{align-self:flex-end;background:#E79AB0;color:#fff;border-bottom-right-radius:4px;}
   .bubble.assistant{align-self:flex-start;background:#FCF4F5;color:#5A4A50;border:1px solid #F0D3DB;border-bottom-left-radius:4px;}
@@ -2192,7 +2199,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.165〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.166〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
@@ -2434,6 +2441,7 @@ const TABS=[
   {id:"consult",label:"AI相談"},
   {id:"nisshi",label:"日誌まとめ"},
   {id:"vitals",label:"バイタル一覧"},
+  {id:"visits",label:"来所・帰宅一覧"},
   {id:"work",label:"業務の詳細"},
   {id:"traits",label:"障害特性と支援"},
   {id:"materials",label:"研修資料"},
@@ -2493,6 +2501,7 @@ function Inside({me,data,tab,setTab,onLogout,persist,reload}){
       {tab==="timecard"&&<TimeCard me={me} data={data}/>}
       {tab==="records"&&<Records me={me} data={data} persist={persist} reload={reload}/>}
       {tab==="vitals"&&<VitalsView data={data} persist={persist} reload={reload}/>}
+      {tab==="visits"&&<VisitsView data={data}/>}
       {tab==="plans"&&<Plans me={me} data={data} persist={persist}/>}
       {tab==="album"&&<Album me={me} data={data}/>}
       {tab==="nisshi"&&<Nisshi me={me} data={data} persist={persist}/>}
@@ -3121,6 +3130,51 @@ function Materials({me,data,persist}){
   </Section>;
 }
 
+
+/* ============================ 来所・帰宅一覧 ============================ */
+function VisitsView({data}){
+  const [resNames,setResNames]=useState([]);
+  useEffect(()=>{ (async()=>{ if(!SB_ON)return; try{ const rows=await resList(); setResNames(rows.map(r=>r.data&&r.data.name).filter(Boolean)); }catch(e){} })(); },[]);
+  const users=Array.from(new Set([].concat(resNames,(data.userList||[]),((data.records||[]).map(r=>r.user))))).filter(Boolean);
+  const [user,setUser]=useState(""); const cur=user||users[0]||"";
+  const nowM=(()=>{ const n=new Date(); return n.getFullYear()+"-"+_p2(n.getMonth()+1); })();
+  const [month,setMonth]=useState(nowM);
+  const all=visitRows(data.records,cur);
+  const months=Array.from(new Set([nowM].concat(all.map(o=>o.day.slice(0,7))))).sort().reverse();
+  const rows=month==="all"?all:all.filter(o=>o.day.slice(0,7)===month);
+  const tm=(arr)=>arr.length?arr.map(recHM).join("・"):"";
+  return <Section title="来所・帰宅一覧" note="記録タブで「来所」「帰宅」を押した時刻の一覧です。夕方に来所して翌朝に帰宅するまでを、1つの利用日としてまとめています。">
+    <label className="field"><span>利用者</span><select value={cur} onChange={e=>setUser(e.target.value)}>{users.map(u=><option key={u} value={u}>{u}</option>)}</select></label>
+    <label className="field"><span>期間</span><select value={month} onChange={e=>setMonth(e.target.value)}>{months.map(m=><option key={m} value={m}>{m.slice(0,4)}年{Number(m.slice(5))}月</option>)}<option value="all">全期間</option></select></label>
+    <p className="tiny" style={{marginTop:0}}>{rows.length}日分{month==="all"?"（全期間）":""}。「—」は、その時刻の記録（ボタンの押下）が無いことを示します。</p>
+    {rows.length===0&&<p className="empty">この期間に「来所」「帰宅」の記録はありません。</p>}
+    {rows.length>0&&<table className="tbl" style={{marginTop:6}}><tbody>
+      <tr><th style={{width:"34%"}}>利用日</th><th style={{width:"33%"}}>来所</th><th style={{width:"33%"}}>帰宅</th></tr>
+      {rows.map(o=><tr key={o.day}><th style={{fontSize:13}}>{month==="all"?(o.day.slice(0,4)+"/"):""}{dayLabel(o.day)}</th><td style={{textAlign:"center",fontWeight:700,padding:"10px 6px"}}>{tm(o.ins)||<span style={{color:"#B9A7AD",fontWeight:400}}>—</span>}</td><td style={{textAlign:"center",fontWeight:700,padding:"10px 6px"}}>{tm(o.outs)?(tm(o.outs)+((o.outs[0]&&recBizDay(o.outs[0])===o.day&&new Date(o.outs[0]).getHours()<15)?"（翌朝）":"")):<span style={{color:"#B9A7AD",fontWeight:400}}>—</span>}</td></tr>)}
+    </tbody></table>}
+    <p className="tiny" style={{marginTop:10}}>※ 一覧に出るのは、アプリに読み込まれている直近の記録（最大3000件）の範囲です。</p>
+  </Section>;
+}
+
+/* ===== 来所・帰宅／AI相談の共通処理 ===== */
+const _p2=(x)=>String(x).padStart(2,"0");
+// 利用日：15時より前の記録は「前日の利用日」に含める（夕方来所〜翌朝帰宅を1日として扱う）
+const recBizDay=(ts)=>{ const d=new Date(ts); if(isNaN(d)) return ""; if(d.getHours()<15) d.setDate(d.getDate()-1); return d.getFullYear()+"-"+_p2(d.getMonth()+1)+"-"+_p2(d.getDate()); };
+const recHM=(ts)=>{ const d=new Date(ts); return isNaN(d)?"":(_p2(d.getHours())+":"+_p2(d.getMinutes())); };
+const recIsIn=(r)=>/^来所/.test(String(r.item||"")); const recIsOut=(r)=>/^帰宅/.test(String(r.item||""));
+function visitRows(records,user){ const m={}; (records||[]).forEach(r=>{ if(r.user!==user||!r.ts) return; const a=recIsIn(r), b=recIsOut(r); if(!a&&!b) return; const k=recBizDay(r.ts); if(!k) return; const o=m[k]||(m[k]={day:k,ins:[],outs:[]}); (a?o.ins:o.outs).push(r.ts); }); return Object.keys(m).map(k=>m[k]).map(o=>{ o.ins.sort(); o.outs.sort(); return o; }).sort((a,b)=>b.day.localeCompare(a.day)); }
+const dayLabel=(k)=>{ const d=new Date(k+"T00:00:00"); return (d.getMonth()+1)+"/"+d.getDate()+"（"+WD[d.getDay()]+"）"; };
+const _aiHash=(str)=>{ let h=2166136261; for(let i=0;i<str.length;i++){ h^=str.charCodeAt(i); h=Math.imul(h,16777619); } return h>>>0; };
+// 名前 → 固定の番号（同じ名前はどの端末でも同じ番号）。番号から名前は逆算できない。
+function aiNameMap(users,staff){ const used=new Set(); const L="ABCDEFGHJKLMNPQRSTUVWXYZ"; const mk=(prefix,name)=>{ let h=_aiHash(prefix+"|"+name); for(let t=0;t<500;t++){ const code=L[h%L.length]+L[Math.floor(h/L.length)%L.length]+_p2(Math.floor(h/(L.length*L.length))%100); if(!used.has(code)){ used.add(code); return prefix+code; } h=(h+7919)>>>0; } return prefix+"ZZ"+used.size; };
+  const pairs=[]; const back=[]; const add=(prefix,name)=>{ const nm=String(name||"").trim(); if(nm.length<2) return; const code=mk(prefix,nm); back.push([code,nm]); const vs=new Set([nm,nm.replace(/[\s　]+/g,"")]); nm.split(/[\s　]+/).forEach(x=>{ if(x.length>=2) vs.add(x); }); vs.forEach(v=>{ if(v.length>=2) pairs.push([v,code]); }); };
+  Array.from(new Set((users||[]).filter(Boolean))).sort().forEach(n=>add("利用者",n)); Array.from(new Set((staff||[]).filter(Boolean))).sort().forEach(n=>add("職員",n));
+  pairs.sort((a,b)=>b[0].length-a[0].length); return {pairs,back}; }
+function aiMask(text,map){ let t=String(text||""); if(!map) return t; const hold=[]; map.pairs.forEach(pr=>{ if(t.indexOf(pr[0])>=0){ const tok="\u0001"+hold.length+"\u0002"; hold.push(pr[1]); t=t.split(pr[0]).join(tok); } }); return t.replace(/\u0001(\d+)\u0002/g,(m0,i)=>hold[Number(i)]); }
+function aiUnmask(text,map){ let t=String(text||""); if(!map) return t; map.back.forEach(b=>{ t=t.split(b[0]).join(b[1]); }); map.back.forEach(b=>{ const bare=b[0].replace(/^(利用者|職員)/,""); t=t.replace(new RegExp("(^|[^A-Za-z0-9])"+bare+"(?![A-Za-z0-9])","g"),(m0,a)=>a+b[1]); }); return t; }
+function aiRecordContext(records,user,code,days){ const mine=(records||[]).filter(r=>r.user===user&&r.ts).slice().sort((a,b)=>String(b.ts).localeCompare(String(a.ts))); if(!mine.length) return "【"+code+"さんの記録】記録はありません。"; const vr=visitRows(mine,user).slice(0,800); const vis=vr.map(o=>o.day+"("+WD[new Date(o.day+"T00:00:00").getDay()]+") 来所 "+(o.ins.map(recHM).join("・")||"記録なし")+" ／ 帰宅 "+(o.outs.map(recHM).join("・")||"記録なし")).join("\n"); const lim=days?Date.now()-days*86400000:0; let cut=false; const lines=[]; let size=0; for(const r of mine){ if(lim&&new Date(r.ts).getTime()<lim) break; const d=new Date(r.ts); const item=String(r.item||"").replace(/\s+/g," ").slice(0,300); const ln=d.getFullYear()+"-"+_p2(d.getMonth()+1)+"-"+_p2(d.getDate())+" "+recHM(r.ts)+" "+item+(r.abn?"【要注意の値】":""); if(size+ln.length>45000){ cut=true; break; } lines.push(ln); size+=ln.length+1; }
+  return "【"+code+"さんの来所・帰宅（全期間。利用日ごと。帰宅は翌朝のことが多い）】\n"+(vis||"来所・帰宅の記録はありません。")+"\n\n【"+code+"さんの記録の明細（"+(days?("直近"+days+"日"):"全期間")+"・新しい順・日付 時刻 内容）"+(cut?"※量が多いため古い分は省略":"")+"】\n"+(lines.join("\n")||"この期間の記録はありません。"); }
+
 /* ============================ AI相談 ============================ */
 function Consult({data}){
   const [messages,setMessages]=useState([]);
@@ -3128,7 +3182,14 @@ function Consult({data}){
   const [apiKey,setApiKey]=useState(()=>localStorage.getItem("mizuho_api_key")||"");
   const [setup,setSetup]=useState(false); const [keyInput,setKeyInput]=useState("");
   const endRef=useRef(null);
-  useEffect(()=>{endRef.current&&endRef.current.scrollIntoView({behavior:"smooth"});},[messages,loading]);
+  useEffect(()=>{ if(messages.length||loading){ endRef.current&&endRef.current.scrollIntoView({behavior:"smooth",block:"nearest"}); } },[messages,loading]);
+  const [resNames,setResNames]=useState([]);
+  useEffect(()=>{ (async()=>{ if(!SB_ON)return; try{ const rows=await resList(); setResNames(rows.map(r=>r.data&&r.data.name).filter(Boolean)); }catch(e){} })(); },[]);
+  const aiUsers=Array.from(new Set([].concat(resNames,(data.userList||[]),((data.records||[]).map(r=>r.user))))).filter(Boolean);
+  const nameMap=useMemo(()=>aiNameMap(aiUsers,(data.accounts||[]).map(a=>a.name)),[aiUsers.join("|"),(data.accounts||[]).map(a=>a.name).join("|")]);
+  const [target,setTarget]=useState(""); const [span,setSpan]=useState(90);
+  const codeOf=(n)=>{ const b=nameMap.back.find(x=>x[1]===String(n).trim()); return b?b[0]:""; };
+  const maskedInput=aiMask(input,nameMap);
   const starters=["感覚過敏があり、集団活動が苦手な方への配慮は？","予定変更でパニックになったときの落ち着き方は？","本人の「やりたい」を引き出す関わり方を知りたい"];
   const saveKey=()=>{localStorage.setItem("mizuho_api_key",keyInput.trim());setApiKey(keyInput.trim());setSetup(false);};
   const renderMsg=(txt)=>{ const clean=String(txt||"").replace(/^#{1,6}[ \t]+/gm,"").replace(/^[ \t]*[-*][ \t]+/gm,"・"); const parts=clean.split(/(\*\*[^*\n]+\*\*)/g); return parts.map((p,j)=> /^\*\*[^*\n]+\*\*$/.test(p)? <strong key={j}>{p.slice(2,-2)}</strong> : p ); };
@@ -3142,11 +3203,11 @@ function Consult({data}){
       const res=await fetch("https://api.anthropic.com/v1/messages",{
         method:"POST",
         headers:{"content-type":"application/json","x-api-key":apiKey,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
-        body:JSON.stringify({model:"claude-sonnet-5",max_tokens:3000,system:buildSystem(data),messages:history.map(m=>({role:m.role,content:m.content}))}),
+        body:JSON.stringify({model:"claude-sonnet-5",max_tokens:3000,system:aiMask(buildSystem(data),nameMap)+"\n\n【名前の扱い】個人情報保護のため、利用者と職員の名前は「利用者AB12」「職員CD34」のような番号に置き換えてあります。回答では、その番号をそのまま（変えずに）使ってください。番号から本名を推測したり尋ねたりしないでください。"+((target&&codeOf(target))?("\n\n【記録の参照】職員は「"+codeOf(target)+"」さんについて質問しています。以下はアプリに記録された事実です。日時や回数を聞かれたら、必ずこの記録だけを根拠に正確に答え、記録に無いことは「記録にありません」と伝えてください。推測で時刻を補わないでください。時刻は日本時間です。\n\n"+aiMask(aiRecordContext(data.records,target,codeOf(target),span),nameMap)):""),messages:history.map(m=>({role:m.role,content:aiMask(m.content,nameMap)}))}),
       });
       const d=await res.json();
       if(d.error){setError("AIからの応答でエラーが出ました："+(d.error.message||"")); setMessages(history); }
-      else{ let txt=(d.content||[]).filter(b=>b.type==="text").map(b=>b.text).join("\n").trim();
+      else{ let txt=aiUnmask((d.content||[]).filter(b=>b.type==="text").map(b=>b.text).join("\n").trim(),nameMap);
         if(d.stop_reason==="max_tokens"&&txt){ txt+="\n\n……（回答が長くなったため、ここで止まりました。続きが必要なときは「続きを教えて」と送ってください）"; }
         setMessages([...history,{role:"assistant",content:txt||"うまく答えられませんでした。もう一度お試しください。"}]); }
     }catch(e){ setError("AI相談に接続できませんでした。通信状況やAPIキーをご確認ください。"); setMessages(history); }
@@ -3154,9 +3215,15 @@ function Consult({data}){
   };
 
   return <Section title="AI相談" note="支援の対応に迷ったとき、一緒に考えます。研修資料・ほたる理念・意思決定支援・虐待防止・強度行動障害・身体介助の考え方も参考にします。">
-    <div className="ai-warn">⚠️ 個人情報の保護のため、利用者の<b>実名・住所・電話番号などは入力しないでください</b>。「Aさん」「利用者本人」などに置き換えてご相談ください（入力内容は外部のAIに送信されます）。</div>
-    <div className="ai-note"><span>💛</span><div>ご本人が特定される情報（氏名など）は書かず、状況として相談してください。回答は参考です。最終判断はチームとご本人の意思で。
-      {" "}<button className="link-btn" onClick={()=>{setKeyInput(apiKey);setSetup(true);}}>AIの設定</button></div></div>
+    <div className="ai-warn">🔒 登録されている<b>利用者・職員のお名前は、送信前に自動で番号に置き換わります</b>（画面にはお名前のまま表示されます）。あだ名や登録と違う書き方、ご家族のお名前、<b>住所・電話番号は置き換わりません</b>ので入力しないでください。
+      {" "}<button className="link-btn" onClick={()=>{setKeyInput(apiKey);setSetup(true);}}>AIの設定</button></div>
+    <div className="ai-pick">
+      <div className="ai-pick-t">この方の記録について質問する（任意）</div>
+      <div className="ai-chips">{aiUsers.map(u=><button key={u} className={"ai-chip"+(target===u?" on":"")} onClick={()=>setTarget(target===u?"":u)}>{target===u?"✓ ":""}{u}</button>)}{aiUsers.length===0&&<span className="tiny">利用者が登録されていません。</span>}</div>
+      {target&&<div className="ai-pick-n">「{target}」さんの記録（来所・帰宅は全期間、その他は
+        <select value={span} onChange={e=>setSpan(Number(e.target.value))} style={{margin:"0 4px",padding:"3px 6px",borderRadius:8,border:"1px solid #E3C9CF",background:"#fff"}}><option value={30}>直近1か月</option><option value={90}>直近3か月</option><option value={365}>直近1年</option><option value={0}>全期間</option></select>
+        ）を、番号「{codeOf(target)}」として AI に渡します。例：「{target}さんの今月の来所時間を教えて」</div>}
+    </div>
     {!apiKey&&<div className="privacy" style={{marginBottom:12}}><span>🔑</span><div>
       <b>AI相談を使うには設定が必要です</b>
       <p>この公開版では、AI相談にAnthropicのAPIキーが必要です（この端末にのみ保存されます）。「AIの設定」から入力してください。共用端末では設定しないなど、取り扱いにご注意ください。</p></div></div>}
@@ -3173,6 +3240,7 @@ function Consult({data}){
         onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();send();}}}/>
       <button className="send" onClick={()=>send()} disabled={loading} aria-label="送信">➤</button>
     </div>
+    {input.trim()&&maskedInput!==input&&<div className="ai-prev"><b>AIへ送られる文：</b>{maskedInput}</div>}
     {setup&&<Modal title="AIの設定" tint="#C9788F" onClose={()=>setSetup(false)}>
       <p className="hint">🔑 AnthropicのAPIキーを入力してください。この端末のブラウザにのみ保存されます。</p>
       <Field label="APIキー" type="password" value={keyInput} onChange={e=>setKeyInput(e.target.value)} placeholder="sk-ant-..."/>
