@@ -664,7 +664,7 @@ async function alFetch(){ let r=await authFetch(`${SUPABASE_URL}/rest/v1/access_
 // AI相談の履歴（管理者が確認する用）。access_log に「AIQ」＋内容で保存する
 async function aiLogAdd(name,obj){ try{ const ev="AIQ"+JSON.stringify({u:String(obj.u||""),q:String(obj.q||"").slice(0,2000),a:String(obj.a||"").slice(0,6000)}); await authFetch(`${SUPABASE_URL}/rest/v1/access_log`,{method:"POST",headers:{"Prefer":"return=minimal"},body:JSON.stringify({id:"ai_"+uid()+"_"+Date.now(),name:name||"",event:ev,ts:new Date().toISOString()})}); }catch(e){} }
 async function aiLogFetch(){ const r=await authFetch(`${SUPABASE_URL}/rest/v1/access_log?event=like.AIQ*&select=id,name,event,ts&order=ts.desc&limit=300`); if(!r.ok) throw new Error("ai log "+r.status); const j=await r.json(); return (j||[]).map(x=>{ let o=null; try{ o=JSON.parse(String(x.event||"").slice(3)); }catch(e){} return o?{id:x.id,name:x.name||"",ts:x.ts,u:o.u||"",q:o.q||"",a:o.a||""}:null; }).filter(Boolean); }
-function aiGuideText(data,target){ const g=((data&&data.aiGuides)||[]).filter(x=>x&&x.q&&x.a&&(!x.user||x.user===target)); if(!g.length) return ""; let out="", n=0; for(const x of g){ const t="■質問の例："+String(x.q).replace(/\s+/g," ").slice(0,400)+(x.user?("（"+x.user+"さんについて）"):"")+"\n参考回答："+String(x.a).slice(0,1500)+"\n"; if(out.length+t.length>10000) break; out+=t; n++; } return "\n\n【管理者が定めた参考回答（"+n+"件）】次の「質問の例」と同じ内容・似た内容を聞かれたときは、その参考回答の内容を最優先で踏まえて答えてください（言い回しは質問に合わせて構いません。参考回答と記録が食い違う場合は、その旨も伝えてください）。\n"+out; }
+function aiGuideText(data,target){ const g=((data&&data.aiGuides)||[]).filter(x=>x&&x.q&&x.a&&(!x.user||x.user===target)); if(!g.length) return ""; let out="", n=0, rest=0; const fmt=(x)=>"■質問の例："+String(x.q).replace(/\s+/g," ").slice(0,400)+(x.user?("（"+x.user+"さんについて）"):"")+(x.pin?"【常に参考にする】":"")+"\n参考回答："+String(x.a).slice(0,x.pin?3000:1500)+"\n"; g.filter(x=>x.pin).forEach(x=>{ out+=fmt(x); n++; }); for(const x of g.filter(x=>!x.pin)){ const t=fmt(x); if(rest+t.length>10000) break; out+=t; rest+=t.length; n++; } return "\n\n【管理者が定めた参考回答（"+n+"件）】次の「質問の例」と同じ内容・似た内容を聞かれたときは、その参考回答の内容を最優先で踏まえて答えてください（言い回しは質問に合わせて構いません。参考回答と記録が食い違う場合は、その旨も伝えてください）。\n"+out; }
 const nendoOf=(d)=>{ d=d||new Date(); return (d.getMonth()+1>=4)?d.getFullYear():d.getFullYear()-1; };
 function compressImage(file,max,q){ max=max||800; q=q||0.55; return new Promise((res,rej)=>{ const fr=new FileReader(); fr.onload=()=>{ const img=new Image(); img.onload=()=>{ let w=img.width,h=img.height; if(w>h&&w>max){h=Math.round(h*max/w);w=max;} else if(h>max){w=Math.round(w*max/h);h=max;} const c=document.createElement("canvas"); c.width=w;c.height=h; c.getContext("2d").drawImage(img,0,0,w,h); res(c.toDataURL("image/jpeg",q)); }; img.onerror=rej; img.src=fr.result; }; fr.onerror=rej; fr.readAsDataURL(file); }); }
 function resizeDataUrl(src,max,q){ max=max||240;q=q||0.6; return new Promise((res,rej)=>{ const img=new Image(); img.onload=()=>{ let w=img.width,h=img.height; if(w>h&&w>max){h=Math.round(h*max/w);w=max;} else if(h>max){w=Math.round(w*max/h);h=max;} const c=document.createElement("canvas");c.width=w;c.height=h;c.getContext("2d").drawImage(img,0,0,w,h); res(c.toDataURL("image/jpeg",q)); }; img.onerror=rej; img.src=src; }); }
@@ -2229,7 +2229,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.169〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.170〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
@@ -3296,13 +3296,13 @@ function AiLogAdmin({data,persist}){
   const load=async()=>{ setBusy(true); setErr(""); try{ setRows(await aiLogFetch()); }catch(e){ setErr("履歴を読み込めませんでした。"); setRows([]); } setBusy(false); };
   const dt=(ts)=>{ const d=new Date(ts); return isNaN(d)?"":((d.getMonth()+1)+"/"+d.getDate()+" "+_p2(d.getHours())+":"+_p2(d.getMinutes())); };
   const users=Array.from(new Set([].concat(data.userList||[],guides.map(g=>g.user),(rows||[]).map(r=>r.u)).filter(Boolean)));
-  const saveGuide=()=>{ const e=ed; if(!(e.q||"").trim()||!(e.a||"").trim()){ alert("「質問の例」と「参考回答」の両方を入力してください。"); return; } const g={id:e.id||uid(),q:e.q.trim(),a:e.a.trim(),user:e.user||"",date:iso(new Date())}; const next=e.id?guides.map(x=>x.id===e.id?g:x):[g].concat(guides); persist(Object.assign({},data,{aiGuides:next})); setEd(null); };
+  const saveGuide=()=>{ const e=ed; if(!(e.q||"").trim()||!(e.a||"").trim()){ alert("「質問の例」と「参考回答」の両方を入力してください。"); return; } const g={id:e.id||uid(),q:e.q.trim(),a:e.a.trim(),user:e.user||"",pin:!!e.pin,date:iso(new Date())}; const next=(e.id?guides.map(x=>x.id===e.id?g:x):[g].concat(guides)); persist(Object.assign({},data,{aiGuides:next})); setEd(null); };
   const delGuide=(id)=>{ if(!confirm("この参考回答を削除しますか？"))return; persist(Object.assign({},data,{aiGuides:guides.filter(x=>x.id!==id)})); };
   const shown=(rows||[]).filter(r=>!fUser||r.u===fUser);
   return <React.Fragment>
     <h3 className="blk">🤖 AI相談の履歴と参考回答</h3>
     <p className="tiny">職員が AI相談で質問した内容と AI の回答を確認できます。「参考回答を作る」で、同じような質問が来たときに AI が最優先で踏まえる回答を登録できます。</p>
-    <div className="row-end" style={{flexWrap:"wrap"}}><Btn kind="ghost2" onClick={()=>setEd({id:"",q:"",a:"",user:""})}>＋ 参考回答を新しく作る</Btn><Btn onClick={load} disabled={busy}>{busy?"読み込み中…":(rows===null?"履歴を表示":"履歴を更新")}</Btn></div>
+    <div className="row-end" style={{flexWrap:"wrap"}}><Btn kind="ghost2" onClick={()=>setEd({id:"",q:"",a:"",user:"",pin:false})}>＋ 参考回答を新しく作る</Btn><Btn onClick={load} disabled={busy}>{busy?"読み込み中…":(rows===null?"履歴を表示":"履歴を更新")}</Btn></div>
     {err&&<p className="err">{err}</p>}
     {rows!==null&&<div style={{marginTop:8}}>
       <label className="field"><span>利用者で絞り込み</span><select value={fUser} onChange={e=>setFUser(e.target.value)}><option value="">すべて</option>{users.map(u=><option key={u} value={u}>{u}</option>)}</select></label>
@@ -3311,22 +3311,25 @@ function AiLogAdmin({data,persist}){
         <div className="ailog-h"><span>{dt(r.ts)}</span><b>{r.name||"（不明）"}</b>{r.u?<span className="chip">{r.u}</span>:<span className="tiny">利用者の選択なし</span>}</div>
         <div className="ailog-q">Q. {r.q}</div>
         {openId===r.id&&<div className="ailog-a">{r.a}</div>}
-        <div className="row-end" style={{marginTop:6,flexWrap:"wrap"}}><button className="link-btn" onClick={()=>setOpenId(openId===r.id?"":r.id)}>{openId===r.id?"回答を閉じる":"AIの回答を見る"}</button><Btn kind="ghost2" onClick={()=>setEd({id:"",q:r.q,a:r.a,user:r.u||""})}>参考回答を作る</Btn></div>
+        <div className="row-end" style={{marginTop:6,flexWrap:"wrap"}}><button className="link-btn" onClick={()=>setOpenId(openId===r.id?"":r.id)}>{openId===r.id?"回答を閉じる":"AIの回答を見る"}</button><Btn kind="ghost2" onClick={()=>setEd({id:"",q:r.q,a:r.a,user:r.u||"",pin:false})}>参考回答を作る</Btn></div>
       </div>)}
     </div>}
-    <div className="rec-sub" style={{marginTop:14}}>登録済みの参考回答（{guides.length}件）</div>
+    <div className="rec-sub" style={{marginTop:14}}>登録済みの参考回答（{guides.length}件・うち📌 {guides.filter(g=>g.pin).length}件）</div>
+    {guides.filter(g=>g.pin).reduce((n,g)=>n+String(g.a||"").length,0)>40000&&<p className="err">📌 の参考回答の合計がとても長くなっています。AIの利用料が増え、回答が遅くなるため、不要なもののチェックを外すか、内容を短くしてください。</p>}
     {guides.length===0&&<p className="empty">まだ登録がありません。</p>}
     {guides.map(g=><div key={g.id} className="ailog guide">
-      <div className="ailog-h"><span>{g.date||""}</span>{g.user?<span className="chip">{g.user} のみ</span>:<span className="chip">全員共通</span>}</div>
+      <div className="ailog-h"><span>{g.date||""}</span>{g.user?<span className="chip">{g.user} のみ</span>:<span className="chip">全員共通</span>}{g.pin&&<span className="chip" style={{background:"#C9788F",color:"#fff",borderColor:"#C9788F"}}>📌 ずっと参考にする</span>}</div>
       <div className="ailog-q">Q. {g.q}</div>
       <div className="ailog-a">{g.a}</div>
-      <div className="row-end" style={{marginTop:6}}><Btn kind="ghost2" onClick={()=>setEd({id:g.id,q:g.q,a:g.a,user:g.user||""})}>編集</Btn><button className="mini-del" style={{marginLeft:0}} onClick={()=>delGuide(g.id)}>🗑 削除</button></div>
+      <div className="row-end" style={{marginTop:6}}><Btn kind="ghost2" onClick={()=>setEd({id:g.id,q:g.q,a:g.a,user:g.user||"",pin:!!g.pin})}>編集</Btn><button className="mini-del" style={{marginLeft:0}} onClick={()=>delGuide(g.id)}>🗑 削除</button></div>
     </div>)}
     {ed&&<Modal title={ed.id?"参考回答を編集":"参考回答を作る"} tint="#C9788F" onClose={()=>setEd(null)}>
       <p className="tiny" style={{marginTop:0}}>ここに登録した内容は、同じ・似た質問が来たときに AI が最優先で踏まえます。AI の回答をそのまま使わず、事業所としての正しい対応に書き直してください。</p>
       <label className="field"><span>質問の例（どんな質問のときに使うか）</span><textarea rows={3} value={ed.q} onChange={e=>setEd(Object.assign({},ed,{q:e.target.value}))}/></label>
       <label className="field"><span>参考回答（事業所としての答え）</span><textarea rows={9} value={ed.a} onChange={e=>setEd(Object.assign({},ed,{a:e.target.value}))}/></label>
       <label className="field"><span>使う範囲</span><select value={ed.user} onChange={e=>setEd(Object.assign({},ed,{user:e.target.value}))}><option value="">全員共通（どの質問でも使う）</option>{users.map(u=><option key={u} value={u}>{u} について質問されたときだけ</option>)}</select></label>
+      <label className="chk" style={{background:"#FFF6F8",borderRadius:10,padding:"10px 12px",border:"1px solid #F0D3DB",marginBottom:10}}><input type="checkbox" checked={!!ed.pin} onChange={e=>setEd(Object.assign({},ed,{pin:e.target.checked}))}/>📌 これから先もずっと参考にする</label>
+      <p className="tiny" style={{marginTop:-4}}>チェックを入れた参考回答は、件数が増えても必ず AI に渡します。チェックなしのものは、増えすぎると古いものから渡らなくなります。</p>
       <div className="row-end"><Btn kind="ghost2" onClick={()=>setEd(null)}>やめる</Btn><Btn onClick={saveGuide}>保存</Btn></div>
     </Modal>}
   </React.Fragment>;
