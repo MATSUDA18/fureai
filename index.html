@@ -337,6 +337,57 @@
   .recbtn.cam{background:#EAF3E6;border-color:#CFE3C6;color:#5B8A45;}
   .rec-log{display:flex;flex-direction:column;gap:6px;margin-top:6px;}
   .xpv-warn{background:#FFF4E5;border:1px solid #F0C98A;color:#7A5418;border-radius:10px;padding:9px 11px;font-size:12.5px;line-height:1.65;margin-bottom:10px;}
+  .fc-up{background:#FFF8EC;border:1px solid #F0D9A8;border-radius:12px;padding:8px 10px;margin:10px 0;}
+  .fc-up-h{font-size:13px;font-weight:800;color:#A6812F;margin-bottom:4px;}
+  .fc-up-r{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:13px;padding:4px 0;border-top:1px dashed #EADFBF;color:#5A4A50;}
+  .fc-up-r:first-of-type{border-top:none;}
+  .fc-up-r em{font-style:normal;font-weight:700;margin-left:auto;font-size:12px;}
+  .fc-up-r.fu-ok em{color:#2E7D46;} .fc-up-r.fu-ng em{color:#B33A2B;}
+  .fc-filt{display:flex;gap:6px;margin:8px 0 4px;}
+  .fc-filt select{flex:1;min-width:0;padding:8px;border:1px solid #F0D3DB;border-radius:10px;background:#fff;}
+  .fc-card{background:#fff;border:1px solid #F0D3DB;border-left:5px solid #C9788F;border-radius:12px;padding:9px 11px;margin-bottom:8px;}
+  .fc-card.claim{border-left-color:#C0392B;}
+  .fc-h{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:14px;color:#5A4A50;}
+  .fc-h span{font-size:12.5px;color:#8A6B74;}
+  .fc-st{margin-left:auto;border:none;border-radius:999px;padding:4px 10px;font-size:12px;font-weight:800;cursor:pointer;}
+  .fc-st.s0{background:#FBE3E0;color:#A1301F;} .fc-st.s1{background:#FFF1DC;color:#8A5A12;} .fc-st.s2{background:#EEF7F0;color:#2E6B42;}
+  .fc-m{display:flex;flex-wrap:wrap;gap:5px;align-items:center;font-size:12px;color:#8A6B74;margin-top:3px;}
+  .fc-k{background:#FBEAEE;color:#8A4A5C;border-radius:6px;padding:1px 7px;font-weight:700;}
+  .fc-k.claim{background:#C0392B;color:#fff;}
+  .fc-t{font-size:13.5px;line-height:1.65;color:#3F3237;white-space:pre-wrap;overflow-wrap:anywhere;margin-top:5px;}
+  .fc-d{display:flex;flex-wrap:wrap;gap:5px;margin-top:5px;}
+  .fc-dd{font-size:12px;font-weight:700;border-radius:7px;padding:2px 8px;}
+  .fc-dd.use{background:#E6F4EA;color:#2E6B42;} .fc-dd.off{background:#FBE3E0;color:#A1301F;}
+  .fc-r{font-size:12.5px;line-height:1.6;color:#5A4A50;background:#F6F1F2;border-radius:8px;padding:5px 8px;margin-top:6px;white-space:pre-wrap;}
+  .fc-f{display:flex;align-items:center;margin-top:6px;}
+  .fc-drow{display:flex;gap:6px;align-items:center;margin-bottom:6px;}
+  .fc-drow input{flex:1;min-width:0;padding:8px;border:1px solid #F0D3DB;border-radius:9px;}
+  .fc-drow select{flex:1;min-width:0;padding:8px;border:1px solid #F0D3DB;border-radius:9px;background:#fff;}
+  .up-box{background:#FFF8FA;border:1px solid #F0D3DB;border-radius:12px;padding:10px 11px;}
+  .up-days{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;}
+  .up-day{min-width:0;display:flex;flex-direction:column;align-items:center;border:1px solid #E3C9CF;background:#fff;border-radius:10px;padding:6px 0;font-weight:800;color:#5A4A50;font-size:14px;cursor:pointer;}
+  .up-day small{font-size:10.5px;font-weight:700;margin-top:2px;color:#A8959B;}
+  .up-day.ud-want{background:#2E7D46;border-color:#2E7D46;color:#fff;} .up-day.ud-want small{color:#DFF2E4;}
+  .up-day.ud-ok{background:#E6F2FF;border-color:#9CC4EE;color:#2D5F93;} .up-day.ud-ok small{color:#2D5F93;}
+  .up-day.ud-ng{background:#FBE3E0;border-color:#E6A39A;color:#B33A2B;} .up-day.ud-ng small{color:#B33A2B;}
+  .up-av{display:flex;gap:6px;align-items:center;margin-bottom:6px;flex-wrap:wrap;}
+  .up-av select{flex:1 1 40%;min-width:120px;padding:8px;border:1px solid #F0D3DB;border-radius:9px;background:#fff;}
+  .up-av input{flex:1 1 55%;min-width:160px;padding:8px;border:1px solid #F0D3DB;border-radius:9px;}
+  .pw-box{margin-top:5px;display:flex;flex-direction:column;gap:3px;cursor:pointer;}
+  .pw{font-size:11.5px;line-height:1.45;border-radius:7px;padding:3px 8px;}
+  .pw.pw-ng{background:#FBE3E0;color:#A1301F;font-weight:700;}
+  .pw.pw-warn{background:#FFF1DC;color:#8A5A12;font-weight:700;}
+  .pw.pw-info{background:#EEF3FB;color:#3A5A86;}
+  .pw.pw-ok{background:#EEF7F0;color:#2E6B42;}
+  .vis-t td b{font-size:14px;}
+  .vis-rec{display:flex;align-items:center;gap:8px;border-bottom:1px dashed #F0D3DB;padding:6px 0;font-size:13.5px;}
+  .vis-rec span{color:#5A4A50;font-variant-numeric:tabular-nums;}
+  .vis-rec .mini-del{margin-left:auto;}
+  .vis-add{background:#FFF8FA;border:1px solid #F0D3DB;border-radius:12px;padding:9px 11px;margin-top:10px;}
+  .xpv-info{background:#EEF7F0;border:1px solid #BFE0C6;color:#2E5E3C;border-radius:10px;padding:9px 11px;font-size:12.5px;line-height:1.65;margin-bottom:10px;}
+  table.xr-t{border-collapse:collapse;table-layout:fixed;font-family:"Yu Gothic","游ゴシック","YuGothic","Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP","Noto Sans CJK JP",sans-serif;font-size:14.67px;color:#000;}
+  table.xr-t td{padding:0;overflow:visible;}
+  .xr-c{padding:0 3px;line-height:1.3;box-sizing:border-box;overflow-wrap:anywhere;}
   .xpv-wrap{background:#EDE7E9;border-radius:10px;padding:8px;}
   .xpv-paper{background:#fff;box-shadow:0 2px 10px rgba(0,0,0,.15);padding:14px 10px;}
   table.xpv{border-collapse:collapse;table-layout:fixed;font-family:"Hiragino Sans","Yu Gothic","Meiryo",sans-serif;font-size:12px;color:#222;}
@@ -346,8 +397,8 @@
   table.xpv td.xt{font-size:20px;font-weight:700;text-align:center;}
   .plan-one{background:#FFF8FA;border:1px solid #F0D3DB;border-radius:12px;padding:10px 11px;margin-top:10px;}
   .plan-one-t{font-size:13px;font-weight:800;color:#C9788F;}
-  .plan-row{border-top:1px dashed #F0D3DB;padding:7px 0;}
-  .plan-row:first-of-type{border-top:none;}
+  .tp-row{border-top:1px dashed #F0D3DB;padding:7px 0;}
+  .tp-row:first-of-type{border-top:none;}
   .plan-txt{font-size:12.5px;line-height:1.6;color:#5A4A50;background:#FCF4F5;border-radius:8px;padding:7px 9px;margin-top:5px;white-space:pre-wrap;overflow-wrap:anywhere;max-height:240px;overflow:auto;}
   .vavg{background:#fff;border:1px solid #F0D3DB;border-radius:14px;padding:9px 10px;margin-top:10px;}
   .vavg-h{display:flex;justify-content:space-between;align-items:center;font-size:13px;font-weight:800;color:#C9788F;margin-bottom:6px;}
@@ -388,7 +439,7 @@
   .canSave{-webkit-touch-callout:default;-webkit-user-select:auto;user-select:auto;}
   .pshare{margin:10px 0 4px;}
   .pshare-b{display:flex;gap:8px;flex-wrap:wrap;}
-  .pshare-b>*{flex:1 1 140px;}
+  .pshare-b>*{flex:1 1 30%;min-width:96px;padding-left:6px;padding-right:6px;}
   .pshare-m{font-size:12.5px;line-height:1.6;color:#2E6B42;background:#EEF7F0;border-radius:9px;padding:7px 10px;margin:8px 0 0;}
   .pshare-m.warn{color:#7A5418;background:#FFF4E5;}
   .noSave{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;pointer-events:auto;}
@@ -897,7 +948,7 @@ function aiResidentText(d,code){ if(!d) return ""; const L=[]; const add=(k,v)=>
   (d.meds||[]).forEach((m,i)=>{ if(!m||!(m.name||m.content)) return; const tm=Object.keys(m.timing||{}).filter(k=>m.timing[k]).map(k=>TL[k]||k).join("・"); add("服薬"+(i+1),[m.name,tm&&("時間："+tm),m.content&&("対応："+m.content),m.forgetOk?"飲み忘れ時は後からでも可":""].filter(Boolean).join("／")); });
   add("服薬の管理",d.medManage);
   if(d.family&&typeof d.family==="object"){ const f=d.family; const fm=[f.father&&"父",f.mother&&"母",f.gfather&&"祖父",f.gmother&&"祖母",Number(f.bro)>0&&("兄"+f.bro+"人"),Number(f.ybro)>0&&("弟"+f.ybro+"人"),Number(f.sis)>0&&("姉"+f.sis+"人"),Number(f.ysis)>0&&("妹"+f.ysis+"人")].filter(Boolean).join("・"); add("家族構成",[fm,typeof f.other==="string"?f.other:""].filter(Boolean).join("／")); }
-  add("得意・好きなこと",d.strong); add("苦手",d.weak); add("家族の希望",d.familyHope); add("本人の将来ビジョン",d.vision); add("対応アドバイス",d.advice);
+  add("利用日の希望・注意",usePrefText(d.usePref)); add("得意・好きなこと",d.strong); add("苦手",d.weak); add("家族の希望",d.familyHope); add("本人の将来ビジョン",d.vision); add("対応アドバイス",d.advice);
   (d.notices||[]).slice(0,20).forEach(n=>{ if(n&&n.text) add("お知らせ・注意（"+(n.date||"")+"）",n.text); });
   return L.length?("【"+code+"さんの利用者情報（アプリの「利用者情報」ページの内容）】\n"+L.join("\n")):""; }
 
@@ -1118,12 +1169,15 @@ function Nisshi({me,data,persist}){
     setLoading(false);
   };
   const dlXlsx=(blob,name)=>{ try{ if(navigator.msSaveBlob){ navigator.msSaveBlob(blob,name); return; } }catch(e){} const url=URL.createObjectURL(blob); const a=document.createElement("a"); a.href=url; a.download=name; a.rel="noopener"; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),4000); };
+  const fetchNisshiBuf=async()=>{
+    const _next=[f.nextRequest,...activeNotices(date)].filter(x=>x&&String(x).trim()).join("\n");
+    const res=await authFetch(SUPABASE_URL+"/functions/v1/nisshi-excel",{method:"POST",body:JSON.stringify(Object.assign({},f,{date,nextRequest:_next}))});
+    if(!res.ok){ let m=""; try{ m=(await res.json()).error||""; }catch(e){} throw new Error("func "+res.status+" "+m); }
+    return await res.arrayBuffer();
+  };
   const toExcel=async()=>{
     try{
-      const _next=[f.nextRequest,...activeNotices(date)].filter(x=>x&&String(x).trim()).join("\n");
-      const res=await authFetch(SUPABASE_URL+"/functions/v1/nisshi-excel",{method:"POST",body:JSON.stringify(Object.assign({},f,{date,nextRequest:_next}))});
-      if(!res.ok){ let m=""; try{ m=(await res.json()).error||""; }catch(e){} throw new Error("func "+res.status+" "+m); }
-      const buf=await res.arrayBuffer();
+      const buf=await fetchNisshiBuf();
       const blob=new Blob([buf],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
       dlXlsx(blob,"利用日誌_"+(f.name||"")+"_"+date+".xlsx");
     }catch(e){ setErr("サーバー出力に失敗しました（"+String(e&&e.message||e)+"）。簡易版で出力します。"); toExcelLocal(); }
@@ -1281,7 +1335,7 @@ function Nisshi({me,data,persist}){
       {(()=>{ const yr=String(planYear); const ym=(data.trainingPlans||{})[yr]||{}; const mm=(data.trainingPlansMeta||{})[yr]||{}; const keys=Object.keys(ym); const missing=allResidents.filter(u=>!ym[normName(u)]); return <div className="plan-one" style={{background:"#fff"}}>
         <div className="plan-one-t">③ {yr}年度に登録済みの計画（{keys.length}名）</div>
         {keys.length===0&&<p className="tiny">まだ登録がありません。</p>}
-        {keys.map(k=>{ const m=mm[k]||{}; const label=m.name||(allResidents.find(u=>normName(u)===k))||k; return <div key={k} className="plan-row">
+        {keys.map(k=>{ const m=mm[k]||{}; const label=m.name||(allResidents.find(u=>normName(u)===k))||k; return <div key={k} className="tp-row">
           <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}><b style={{fontSize:13.5,color:"#5A4A50"}}>{label}</b><span className="tiny">{m.date?("更新 "+m.date+(m.by?("・"+m.by):"")):"年度取り込み"}</span><span style={{marginLeft:"auto",display:"flex",gap:6}}><button className="link-btn" onClick={()=>setPlanOpen(planOpen===k?"":k)}>{planOpen===k?"閉じる":"内容"}</button><button className="link-btn" onClick={()=>{ const u=allResidents.find(x=>normName(x)===k); if(u){ setPlanOneSel(u); } else { setPlanOneSel("__other"); setPlanOneName(label); } setPlanOneText(String(ym[k]||"")); setPlanMsg("「"+label+"」の内容を②に読み込みました。直して「この内容で登録・変更」を押してください。"); }}>変更</button><button className="mini-del" style={{marginLeft:0}} onClick={()=>delPlan(k,label)}>🗑</button></span></div>
           {planOpen===k&&<div className="plan-txt">{String(ym[k]||"")}</div>}
         </div>; })}
@@ -1345,8 +1399,7 @@ function Nisshi({me,data,persist}){
       </div>
     </div>}
     {xpv&&f&&<Modal title="👁 Excel出力のプレビュー" tint="#C9788F" onClose={()=>setXpv(false)}>
-      <div className="xpv-warn"><b>⚠ ご注意</b><br/>このプレビューは、升目の配置を画面上で再現した<b>おおよその見た目</b>です。実際のExcelファイルは事業所のひな形をもとにサーバーで作るため、<b>文字の大きさ・罫線の太さ・改行の位置・項目の位置</b>などが異なります。提出・印刷の前は、出力したExcelファイルでご確認ください。</div>
-      <XlPreview lay={nsLayout()}/>
+      <XlPreviewAuto getBuf={fetchNisshiBuf} simple={<XlPreview lay={nsLayout()}/>}/>
       <div className="row-end" style={{marginTop:10}}><Btn kind="ghost2" onClick={()=>setXpv(false)}>閉じる</Btn><Btn onClick={()=>{setXpv(false);toExcel();}}>⬇ このままExcel出力</Btn></div>
     </Modal>}
     </>}
@@ -2361,7 +2414,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.176〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.177〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
@@ -2601,6 +2654,7 @@ const TABS=[
   {id:"plans",label:"利用予定カレンダー"},
   {id:"album",label:"写真記録"},
   {id:"users",label:"利用者情報"},
+  {id:"family",label:"ご家族連絡"},
   {id:"consult",label:"AI相談"},
   {id:"nisshi",label:"日誌まとめ"},
   {id:"vitals",label:"バイタル一覧"},
@@ -2664,7 +2718,7 @@ function Inside({me,data,tab,setTab,onLogout,persist,reload}){
       {tab==="timecard"&&<TimeCard me={me} data={data}/>}
       {tab==="records"&&<Records me={me} data={data} persist={persist} reload={reload}/>}
       {tab==="vitals"&&<VitalsView data={data} persist={persist} reload={reload}/>}
-      {tab==="visits"&&<VisitsView data={data}/>}
+      {tab==="visits"&&<VisitsView me={me} data={data} reload={reload}/>}
       {tab==="plans"&&<Plans me={me} data={data} persist={persist}/>}
       {tab==="album"&&<Album me={me} data={data}/>}
       {tab==="nisshi"&&<Nisshi me={me} data={data} persist={persist}/>}
@@ -2675,6 +2729,7 @@ function Inside({me,data,tab,setTab,onLogout,persist,reload}){
       {tab==="history"&&<HistoryView/>}
       {tab==="events"&&<Events me={me} data={data} persist={persist}/>}
       {tab==="users"&&<UsersView me={me}/>}
+      {tab==="family"&&<FamilyContacts me={me} data={data} persist={persist}/>}
       {tab==="admin"&&me.isAdmin&&<AdminPanel data={data} persist={persist}/>}
     </main>
   </div>;
@@ -2927,7 +2982,7 @@ function Residents({me,onLogout}){
   useEffect(()=>{ load(); },[]);
   const save=async(id,data)=>{ try{ await resSave(id,data); await load(); setEdit(null); setSel({id,data}); flash("保存しました"); }catch(e){ flash("保存に失敗しました"); } };
   const del=async(id)=>{ if(!confirm("この利用者を削除しますか？"))return; try{ await resDelete(id); setSel(null); await load(); }catch(e){} };
-  if(edit) return <ResidentForm init={edit} onCancel={()=>setEdit(null)} onSave={save}/>;
+  if(edit) return <ResidentForm init={edit} onCancel={()=>setEdit(null)} onSave={save} others={(list||[]).map(r=>r.data&&r.data.name).filter(Boolean)}/>;
   if(sel){ const cur=(list||[]).find(x=>x.id===sel.id)||sel; return <ResidentDetail me={me} res={cur} onBack={()=>setSel(null)} onEdit={()=>setEdit(cur)} onDel={()=>del(cur.id)} onChange={save}/>; }
   const items=(list||[]).filter(r=>!q||(((r.data&&r.data.name)||"").includes(q)));
   return <Section title="利用者情報" note="認証済み。利用者を選ぶと詳細が見られます。">
@@ -2949,7 +3004,7 @@ const MED_TIMES=[["cb","朝食前"],["ca","朝食中"],["caf","朝食後"],["yb"
 const TECHO_OPTS=["","身体障害者手帳","精神障害者保健福祉手帳","療育手帳"];
 const KUBUN_OPTS=["","1","2","3","4","5","6"];
 const RELATIONS=["母","父","祖母","祖父","兄弟姉妹","親戚","その他"];
-function ResidentForm({init,onCancel,onSave}){
+function ResidentForm({init,onCancel,onSave,others}){
   const [d,setD]=useState(Object.assign({family:{},allergy:{},meds:[],emergency:[]}, init.data||{}));
   const set=(k,v)=>setD(p=>Object.assign({},p,{[k]:v}));
   const setFam=(k,v)=>setD(p=>Object.assign({},p,{family:Object.assign({},p.family,{[k]:v})}));
@@ -3019,6 +3074,18 @@ function ResidentForm({init,onCancel,onSave}){
       <div className="nf"><label>電話番号</label><input type="tel" value={c.phone||""} onChange={e=>setEmg(i,"phone",e.target.value)}/></div>
     </div>))}
     {(d.emergency||[]).length<3&&<button className="time-toggle" onClick={addEmg}>＋ 連絡先を追加</button>}
+    <div className="res-sec">利用日の希望・利用日決定の際の注意</div>
+    {(()=>{ const u=d.usePref||{}; const setU=(k,v)=>set("usePref",Object.assign({},u,{[k]:v})); const days=u.days||{}; const cyc={"":"want",want:"ok",ok:"ng",ng:""}; const av=u.avoid||[]; return <div className="up-box">
+      <div className="res-sec2" style={{marginTop:0}}>曜日（タップで「希望 → 可 → 不可 → 未設定」と切り替わります）</div>
+      <div className="up-days">{DOW_J.map((w,i)=>{ const v=days[i]||""; return <button type="button" key={i} className={"up-day ud-"+(v||"none")} onClick={()=>setU("days",Object.assign({},days,{[i]:cyc[v]}))}><span>{w}</span><small>{UP_DAY[v]||"—"}</small></button>; })}</div>
+      <div className="res-sec2">人数の希望</div>
+      <div className="cx-pick">{UP_GROUP.map(g=>{ const on=(u.group||[]).includes(g[0]); return <button type="button" key={g[0]} className={"cx-opt"+(on?" on":"")} onClick={()=>setU("group",on?(u.group||[]).filter(x=>x!==g[0]):(u.group||[]).concat([g[0]]))}>{on?"✓ ":""}{g[1]}</button>; })}</div>
+      <div className="res-sec2">一緒の利用を避けたい利用者</div>
+      {av.map((a,i)=><div key={i} className="up-av"><select value={a.name||""} onChange={e=>setU("avoid",av.map((x,j)=>j===i?Object.assign({},x,{name:e.target.value}):x))}><option value="">（選択）</option>{(others||[]).filter(n=>n!==d.name).map(n=><option key={n} value={n}>{n}</option>)}{a.name&&!(others||[]).includes(a.name)&&<option value={a.name}>{a.name}</option>}</select><input value={a.note||""} placeholder="例外・メモ（例：訓練のため何回かに1回は一緒にする）" onChange={e=>setU("avoid",av.map((x,j)=>j===i?Object.assign({},x,{note:e.target.value}):x))}/><button type="button" className="mini-del" onClick={()=>setU("avoid",av.filter((_,j)=>j!==i))}>🗑</button></div>)}
+      <button type="button" className="link-btn" onClick={()=>setU("avoid",av.concat([{name:"",note:""}]))}>＋ 避けたい利用者を追加</button>
+      <div className="nf" style={{marginTop:8}}><label>その他の希望・注意（自由記述）</label><textarea rows={2} value={u.note||""} onChange={e=>setU("note",e.target.value)} placeholder="例：月に2回まで／送迎の都合で金曜は18時以降の来所"/></div>
+      <p className="tiny" style={{margin:0}}>ここに入れた内容は、「利用者予定／職員シフト」で予定を組むときに注意として表示されます。</p>
+    </div>; })()}
     <div className="res-sec">その他</div>
     <div className="nf"><label>得意・好きなこと</label><textarea rows={2} value={d.strong||""} onChange={e=>set("strong",e.target.value)}/></div>
     <div className="nf"><label>苦手</label><textarea rows={2} value={d.weak||""} onChange={e=>set("weak",e.target.value)}/></div>
@@ -3076,6 +3143,8 @@ function ResidentDetail({me,res,onBack,onEdit,onDel,onChange}){
       </div>))}
       <div className="res-sec">緊急連絡先</div>
       {(d.emergency&&d.emergency.length)?(d.emergency||[]).map((c,i)=>(<div className="plan-row" key={i}><span>{c.relation}{c.name?"（"+c.name+"）":""}</span><a className="btn ghost2" href={"tel:"+(c.phone||"")}>📞 {c.phone||"—"}</a></div>)):<p className="tiny">未登録</p>}
+      <div className="res-sec">利用日の希望・利用日決定の際の注意</div>
+      {usePrefText(d.usePref)?<div className="res-advice">{usePrefText(d.usePref).split("／").map((t,i)=><div key={i}>・{t}</div>)}</div>:<p className="tiny">未登録（編集から登録できます）</p>}
       <div className="res-sec">得意・苦手・希望</div>
       <div className="res-table"><Row k="得意・好きなこと" v={d.strong}/><Row k="苦手" v={d.weak}/><Row k="家族の希望" v={d.familyHope}/><Row k="将来ビジョン" v={d.vision}/></div>
       <div className="res-sec">対応アドバイス</div>
@@ -3149,6 +3218,8 @@ function Events({me,data,persist}){
 }
 
 function Shifts({me,data,persist}){
+  const [rPrefs,setRPrefs]=useState({});
+  useEffect(()=>{ (async()=>{ if(!SB_ON) return; try{ const rows=await resList(); const m={}; (rows||[]).forEach(r=>{ if(r.data&&r.data.name&&r.data.usePref) m[String(r.data.name).trim()]=r.data.usePref; }); setRPrefs(m); }catch(e){} })(); },[]);
   const [weekStart,setWeekStart]=useState(()=>mondayOf(new Date()));
   const [jump,setJump]=useState(1);
   useEffect(()=>{ if(!jump) return; const go=()=>{ try{ const el=document.getElementById("shiftday-"+iso(new Date())); if(!el) return; const h=document.querySelector("header.ins-head"), nv=document.querySelector("nav.tabs"); const off=((h&&h.offsetHeight)||53)+((nv&&nv.offsetHeight)||64)+8; window.scrollTo(0,Math.max(0,el.getBoundingClientRect().top+window.scrollY-off)); }catch(e){} }; const t1=setTimeout(go,60), t2=setTimeout(go,350); return ()=>{ clearTimeout(t1); clearTimeout(t2); }; },[jump]);
@@ -3205,6 +3276,7 @@ function Shifts({me,data,persist}){
       return <div key={key} id={"shiftday-"+key} className={"day-row"+(isToday?" is-today":"")}>
         <div className="day-head"><span className={cls}>{d.getMonth()+1}/{d.getDate()}（{WD[wd]}）{isToday&&<span className="today-tag">今日</span>}</span></div>
         <div className="plan-users" onClick={()=>openUserPlan(key)} title="利用者予定を編集"><span className="pu-label">👤利用者</span>{(pUsers.length||pCanNames.length)?pUsers.map((u,i)=><span key={i} className="pu-chip">{u}</span>):<span className="pu-none">未設定（タップで追加）</span>}{pCanNames.map(n=><span key={"c_"+n} style={{display:"inline-flex",alignItems:"center",gap:4,whiteSpace:"nowrap"}}><span className="pu-chip pu-cancel">{n}</span><span className="pu-ctag" style={{marginLeft:0}}>キャンセル</span></span>)}<span className="pu-edit">✎</span>{pCanNames.map(n=><div key={"n_"+n} className="pu-cnote">✕ {n}：{cancelReasonText(pCan[n])}{cancelContactText(pCan[n])?("（"+cancelContactText(pCan[n])+"）"):""}</div>)}</div>
+        {(()=>{ const w=planWarnings(key,pUsers,rPrefs,data.familyContacts).filter(x=>x.lv!=="ok"); return w.length?<div className="pw-box" onClick={()=>openUserPlan(key)}>{w.map((x,i)=><div key={i} className={"pw pw-"+x.lv}>{x.lv==="ng"?"⛔ ":(x.lv==="warn"?"⚠ ":"ℹ ")}{x.t}</div>)}</div>:null; })()}
         {list.length===0?<div className="noshift">勤務予定なし</div>:list.map(s=>(
           <div key={s.id} className="shift-item">
             <span className="shift-time">{s.start}–{s.end}</span>{s.role&&<span className="chip">{({A:"夜勤A",B:"夜勤B",nightonly:"夜勤のみ",eve:"夕勤",event:"イベント",day:"日勤",other:"その他"})[s.role]||""}</span>}<span>{s.name}</span>{s.help&&<span className="proxy-tag">ヘルプ</span>}
@@ -3240,6 +3312,7 @@ function Shifts({me,data,persist}){
       {allUsers.length>0?<div className="chk-grid" style={{gridTemplateColumns:"repeat(2,1fr)",gap:6}}>{allUsers.map(n=><label className="chk" key={n}><input type="checkbox" checked={upUsers.includes(n)} onChange={()=>toggleUpUser(n)}/>{n}</label>)}</div>:<p className="empty">利用者が未登録です。下で追加できます。</p>}
       <div className="composer" style={{marginTop:6}}><textarea rows={1} value={newU} placeholder="リストに無い利用者名を追加" onChange={e=>setNewU(e.target.value)}/><button className="send" onClick={addNewU} title="利用者名を追加">＋</button></div>
       <p className="tiny" style={{marginTop:4}}>選択中：{upUsers.length?upUsers.join("・"):"なし"}</p>
+      {(()=>{ const w=planWarnings(upDate,upUsers,rPrefs,data.familyContacts); const notes=upUsers.map(u=>{ const pf=rPrefs[String(u).trim()]; return pf&&pf.note?{u,t:pf.note}:null; }).filter(Boolean); if(!w.length&&!notes.length) return null; return <div className="pw-box" style={{cursor:"default",margin:"6px 0"}}><div className="tiny" style={{fontWeight:800,color:"#8A5A12"}}>この日の注意（利用者情報の希望・ご家族からの連絡より）</div>{w.map((x,i)=><div key={i} className={"pw pw-"+x.lv}>{x.lv==="ng"?"⛔ ":(x.lv==="warn"?"⚠ ":(x.lv==="ok"?"✅ ":"ℹ "))}{x.t}</div>)}{notes.map((x,i)=><div key={"n"+i} className="pw pw-info">ℹ {x.u}さん：{x.t}</div>)}</div>; })()}
       {(upUsers.length>0||Object.keys(upCancels).length>0)&&<div className="cx-box">
         <div className="cx-lab" style={{marginTop:0}}>予定のキャンセル（予定は消さずに「キャンセル」と残します）</div>
         {upUsers.filter(n=>!upCancels[n]).map(n=><div key={n} className="cx-row"><span className="cx-name">{n}</span><button className="cx-btn" onClick={()=>cxStart(n)}>キャンセルにする</button></div>)}
@@ -3295,7 +3368,7 @@ function Materials({me,data,persist}){
 
 
 /* ============================ 来所・帰宅一覧 ============================ */
-function VisitsView({data}){
+function VisitsView({me,data,reload}){
   const [resNames,setResNames]=useState([]);
   useEffect(()=>{ (async()=>{ if(!SB_ON)return; try{ const rows=await resList(); setResNames(rows.map(r=>r.data&&r.data.name).filter(Boolean)); }catch(e){} })(); },[]);
   const users=Array.from(new Set([].concat(resNames,(data.userList||[]),((data.records||[]).map(r=>r.user))))).filter(Boolean);
@@ -3306,30 +3379,115 @@ function VisitsView({data}){
   const months=Array.from(new Set([nowM].concat(all.map(o=>o.day.slice(0,7))))).sort().reverse();
   const rows=month==="all"?all:all.filter(o=>o.day.slice(0,7)===month);
   const tm=(arr)=>arr.length?arr.map(recHM).join("・"):"";
-  return <Section title="来所・帰宅一覧" note="記録タブで「来所」「帰宅」を押した時刻の一覧です。夕方に来所して翌朝に帰宅するまでを、1つの利用日としてまとめています。">
+  const dash=<span style={{color:"#B9A7AD",fontWeight:400}}>—</span>;
+  const [ed,setEd]=useState(null); const [busy,setBusy]=useState(false); const [toast,setToast]=useState("");
+  const flash=(t)=>{ setToast(t); setTimeout(()=>setToast(""),1800); };
+  const defDay=()=>{ const n=new Date(); return (n.getHours()<15)?iso(addDays(n,-1)):iso(n); };
+  const openAdd=(day)=>setEd({day:day||defDay(),type:"来所",time:""});
+  const tsOf=(day,time)=>{ const m=String(time||"").match(/^(\d{1,2}):(\d{2})/); if(!m) return null; const h=+m[1], mi=+m[2]; const d=new Date(day+"T00:00:00"); if(h<15) d.setDate(d.getDate()+1); d.setHours(h,mi,0,0); return d.toISOString(); };
+  const addOne=async()=>{ const ts=tsOf(ed.day,ed.time); if(!ts){ flash("時刻を入力してください"); return; } if(!SB_ON){ flash("共有DBが必要です"); return; } setBusy(true); try{ await recAdd({id:uid(),ts,user:cur,item:ed.type,by:(me&&me.name)||"",manual:true}); await reload(); setEd(Object.assign({},ed,{time:""})); flash(ed.type+" "+ed.time+" を追加しました"); }catch(e){ flash("保存に失敗しました"); } setBusy(false); };
+  const delOne=async(r)=>{ if(!confirm(recHM(r.ts)+" の「"+r.item+"」を削除しますか？"))return; setBusy(true); try{ await recDelete(r.id); await reload(); flash("削除しました"); }catch(e){ flash("削除に失敗しました"); } setBusy(false); };
+  const dayRecs=ed?((all.find(o=>o.day===ed.day)||{}).recs||[]):[];
+  return <Section title="来所・帰宅一覧" note="記録タブで「来所」「起床」「帰宅」を押した時刻の一覧です。夕方に来所して翌朝に帰宅するまでを、1つの利用日としてまとめています。過去の時刻は、このページから追加できます。">
     <label className="field"><span>利用者</span><select value={cur} onChange={e=>setUser(e.target.value)}>{users.map(u=><option key={u} value={u}>{u}</option>)}</select></label>
     <label className="field"><span>期間</span><select value={month} onChange={e=>setMonth(e.target.value)}>{months.map(m=><option key={m} value={m}>{m.slice(0,4)}年{Number(m.slice(5))}月</option>)}<option value="all">全期間</option></select></label>
-    <p className="tiny" style={{marginTop:0}}>{rows.length}日分{month==="all"?"（全期間）":""}。「—」は、その時刻の記録（ボタンの押下）が無いことを示します。</p>
-    {rows.length===0&&<p className="empty">この期間に「来所」「帰宅」の記録はありません。</p>}
-    {rows.length>0&&<table className="tbl" style={{marginTop:6}}><tbody>
-      <tr><th style={{width:"34%"}}>利用日</th><th style={{width:"33%"}}>来所</th><th style={{width:"33%"}}>帰宅</th></tr>
-      {rows.map(o=><tr key={o.day}><th style={{fontSize:13}}>{month==="all"?(o.day.slice(0,4)+"/"):""}{dayLabel(o.day)}</th><td style={{textAlign:"center",fontWeight:700,padding:"10px 6px"}}>{tm(o.ins)||<span style={{color:"#B9A7AD",fontWeight:400}}>—</span>}</td><td style={{textAlign:"center",fontWeight:700,padding:"10px 6px"}}>{tm(o.outs)?(tm(o.outs)+((o.outs[0]&&recBizDay(o.outs[0])===o.day&&new Date(o.outs[0]).getHours()<15)?"（翌朝）":"")):<span style={{color:"#B9A7AD",fontWeight:400}}>—</span>}</td></tr>)}
+    <div className="row-end"><Btn onClick={()=>openAdd()}>＋ 過去の時刻を追加</Btn></div>
+    <p className="tiny" style={{marginTop:4}}>{rows.length}日分{month==="all"?"（全期間）":""}。「—」は記録が無いことを示します。行をタップすると、その日の時刻を追加・削除できます。</p>
+    {rows.length===0&&<p className="empty">この期間に「来所」「起床」「帰宅」の記録はありません。</p>}
+    {rows.length>0&&<table className="tbl vtbl vis-t" style={{marginTop:6}}><tbody>
+      <tr><th>利用日</th><th>来所</th><th>起床</th><th>帰宅</th></tr>
+      {rows.map(o=><tr key={o.day} onClick={()=>setEd({day:o.day,type:"来所",time:""})} style={{cursor:"pointer"}}><td style={{fontWeight:700,color:"#C9788F"}}>{month==="all"?(o.day.slice(2,4)+"/"):""}{dayLabel(o.day)}</td><td><b>{tm(o.ins)||dash}</b></td><td><b>{tm(o.wakes)||dash}</b></td><td><b>{tm(o.outs)||dash}</b></td></tr>)}
     </tbody></table>}
-    <p className="tiny" style={{marginTop:10}}>※ 一覧に出るのは、アプリに読み込まれている直近の記録（最大3000件）の範囲です。</p>
+    <p className="tiny" style={{marginTop:10}}>※ 起床・帰宅は翌朝の時刻です。一覧に出るのは、アプリに読み込まれている直近の記録（最大3000件）の範囲です。</p>
+    {ed&&<Modal title={"時刻の追加・削除（"+cur+"）"} tint="#C9788F" onClose={()=>setEd(null)}>
+      <label className="field"><span>利用日（来所した日）</span><input type="date" value={ed.day} onChange={e=>e.target.value&&setEd(Object.assign({},ed,{day:e.target.value}))}/></label>
+      <div className="tiny" style={{fontWeight:700,margin:"4px 0"}}>この日の記録</div>
+      {dayRecs.length===0&&<p className="tiny">まだ記録がありません。</p>}
+      {dayRecs.map(r=><div key={r.id} className="vis-rec"><b>{r.item}</b><span>{(()=>{ const d=new Date(r.ts); return (d.getMonth()+1)+"/"+d.getDate()+" "+recHM(r.ts); })()}</span><span className="tiny">{r.manual?"手入力":""}{r.by?("・"+r.by):""}</span><button className="mini-del" disabled={busy} onClick={()=>delOne(r)}>🗑</button></div>)}
+      <div className="vis-add">
+        <div className="tiny" style={{fontWeight:700}}>時刻を追加</div>
+        <div className="cx-pick">{["来所","起床","帰宅"].map(t=><button key={t} className={"cx-opt"+(ed.type===t?" on":"")} onClick={()=>setEd(Object.assign({},ed,{type:t}))}>{t}</button>)}</div>
+        <label className="field"><span>時刻（{ed.type==="来所"?"夕方":"翌朝"}の時刻。15時より前は翌日として記録します）</span><input type="time" value={ed.time} onChange={e=>setEd(Object.assign({},ed,{time:e.target.value}))}/></label>
+        <div className="row-end"><Btn kind="ghost2" onClick={()=>setEd(null)}>閉じる</Btn><Btn disabled={busy} onClick={addOne}>追加する</Btn></div>
+      </div>
+    </Modal>}
+    {toast&&<div className="toast">{toast}</div>}
   </Section>;
+}
+
+/* ===== 実際のExcelファイルを読み取って描くプレビュー ===== */
+let _exjsP=null;
+function loadExcelJS(){ if(window.ExcelJS) return Promise.resolve(window.ExcelJS); if(_exjsP) return _exjsP; const urls=["https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js","https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"]; _exjsP=new Promise((res,rej)=>{ let i=0; const next=()=>{ if(window.ExcelJS){ res(window.ExcelJS); return; } if(i>=urls.length){ _exjsP=null; rej(new Error("表示用の部品を読み込めませんでした")); return; } const sc=document.createElement("script"); sc.src=urls[i++]; sc.async=true; sc.onload=()=>{ if(window.ExcelJS) res(window.ExcelJS); else next(); }; sc.onerror=next; document.head.appendChild(sc); }; next(); }); return _exjsP; }
+const _argb=(c)=>{ if(!c||!c.argb) return ""; const a=String(c.argb); return a.length>=6?("#"+a.slice(-6)):""; };
+const _bd=(b)=>{ if(!b||!b.style) return ""; const col=_argb(b.color)||"#000"; const m={thin:"1px solid",hair:"1px solid",medium:"2px solid",thick:"3px solid",dotted:"1px dotted",dashed:"1px dashed",mediumDashed:"2px dashed",dashDot:"1px dashed",mediumDashDot:"2px dashed",dashDotDot:"1px dotted",slantDashDot:"2px dashed",double:"3px double"}; return (m[b.style]||"1px solid")+" "+(b.style==="hair"?"#999":col); };
+async function xlsxModel(buf){
+  const EX=await loadExcelJS(); const wb=new EX.Workbook(); await wb.xlsx.load(buf); const ws=wb.worksheets[0]; if(!ws) throw new Error("シートがありません");
+  let r1=1,c1=1,r2=ws.rowCount||ws.actualRowCount||1,c2=ws.columnCount||ws.actualColumnCount||1;
+  const pa=ws.pageSetup&&ws.pageSetup.printArea; if(pa){ const m=String(pa).split(",")[0].replace(/\$/g,"").replace(/^.*!/,"").match(/^([A-Z]+)(\d+):([A-Z]+)(\d+)$/); if(m){ c1=_colN(m[1]); r1=+m[2]; c2=_colN(m[3]); r2=+m[4]; } }
+  const dW=(ws.properties&&ws.properties.defaultColWidth)||8.43, dH=(ws.properties&&ws.properties.defaultRowHeight)||15;
+  const cols=[]; for(let c=c1;c<=c2;c++){ const col=ws.getColumn(c); cols.push(col&&col.hidden?0:Math.round(((col&&col.width)||dW)*7+5)); }
+  const rows=[]; for(let r=r1;r<=r2;r++){ const row=ws.getRow(r); rows.push(row&&row.hidden?0:Math.round(((row&&row.height)||dH)*4/3)); }
+  const merges=((ws.model&&ws.model.merges)||[]).map(x=>{ const [a,b]=String(x).split(":"); const A=_addr(a), B=_addr(b||a); return A&&B?{r1:A.r,c1:A.c,r2:B.r,c2:B.c}:null; }).filter(Boolean);
+  const cells={};
+  for(let r=r1;r<=r2;r++) for(let c=c1;c<=c2;c++){ const cell=ws.getCell(r,c); if(!cell) continue; const v=cell.value; let runs=null, text="";
+    if(v==null) text=""; else if(typeof v==="object"){ if(Array.isArray(v.richText)) runs=v.richText.map(t=>({text:String(t.text||""),font:t.font||{}})); else if(v.result!==undefined) text=String(v.result==null?"":v.result); else if(v.text!==undefined) text=String(v.text); else if(v instanceof Date) text=v.toLocaleDateString("ja-JP"); else text=""; } else text=String(v);
+    cells[r+"_"+c]={text,runs,font:cell.font||{},al:cell.alignment||{},bd:cell.border||{},fill:cell.fill||null}; }
+  return {r1,r2,c1,c2,cols,rows,merges,cells};
+}
+function XlRealView({m}){
+  const wrapRef=useRef(null); const [fit,setFit]=useState(true); const [wW,setWW]=useState(320);
+  useEffect(()=>{ const el=wrapRef.current; if(!el) return; const upd=()=>setWW(el.clientWidth||320); upd(); let ro=null; try{ ro=new ResizeObserver(upd); ro.observe(el); }catch(e){ window.addEventListener("resize",upd); } return ()=>{ try{ ro&&ro.disconnect(); }catch(e){} window.removeEventListener("resize",upd); }; },[]);
+  const span={}, skip={}; m.merges.forEach(g=>{ if(g.r2<m.r1||g.r1>m.r2||g.c2<m.c1||g.c1>m.c2) return; span[g.r1+"_"+g.c1]=g; for(let r=g.r1;r<=g.r2;r++) for(let c=g.c1;c<=g.c2;c++) if(r!==g.r1||c!==g.c1) skip[r+"_"+c]=1; });
+  const totW=m.cols.reduce((a,b)=>a+b,0)+16, totH=m.rows.reduce((a,b)=>a+b,0)+16; const sc=fit?Math.min(1,(wW-2)/totW):1;
+  const fstyle=(f)=>{ const o={}; if(f.size) o.fontSize=(f.size*4/3)+"px"; if(f.bold) o.fontWeight=700; if(f.italic) o.fontStyle="italic"; if(f.underline) o.textDecoration="underline"; const col=_argb(f.color); if(col) o.color=col; return o; };
+  const trs=[]; for(let r=m.r1;r<=m.r2;r++){ const h=m.rows[r-m.r1]; const tds=[]; for(let c=m.c1;c<=m.c2;c++){ const k=r+"_"+c; if(skip[k]) continue; const g=span[k]; const rs=g?Math.min(g.r2,m.r2)-r+1:1, cs=g?Math.min(g.c2,m.c2)-c+1:1; const ce=m.cells[k]||{text:"",font:{},al:{},bd:{}};
+      const br=g?((m.cells[r+"_"+Math.min(g.c2,m.c2)]||{}).bd||{}):ce.bd, bb=g?((m.cells[Math.min(g.r2,m.r2)+"_"+c]||{}).bd||{}):ce.bd;
+      let hh=0; for(let i=0;i<rs;i++) hh+=m.rows[r-m.r1+i]||0;
+      const al=ce.al||{}; const wrap=!!al.wrapText; const ha={left:"left",center:"center",right:"right",justify:"justify",distributed:"justify",centerContinuous:"center",fill:"left"}[al.horizontal]||"left"; const va={top:"top",middle:"middle",bottom:"bottom",justify:"top",distributed:"middle"}[al.vertical]||"bottom";
+      const st={borderTop:_bd(ce.bd.top)||undefined,borderLeft:_bd(ce.bd.left)||undefined,borderRight:_bd(br.right)||undefined,borderBottom:_bd(bb.bottom)||undefined,textAlign:ha,verticalAlign:va}; if(ce.fill&&ce.fill.type==="pattern"&&ce.fill.pattern==="solid"){ const bg=_argb(ce.fill.fgColor); if(bg) st.background=bg; }
+      const body=ce.runs?ce.runs.map((t,i)=><span key={i} style={fstyle(Object.assign({},ce.font,t.font))}>{t.text}</span>):ce.text;
+      tds.push(<td key={k} rowSpan={rs} colSpan={cs} style={st}><div className="xr-c" style={Object.assign({height:hh,whiteSpace:wrap?"pre-wrap":"pre",overflow:wrap?"hidden":"visible",display:"flex",flexDirection:"column",justifyContent:va==="top"?"flex-start":(va==="middle"?"center":"flex-end")},fstyle(ce.font))}><div>{body}</div></div></td>); }
+    trs.push(<tr key={r} style={{height:h}}>{tds}</tr>); }
+  return <div>
+    <div className="tl-modes" style={{marginBottom:8}}><button className={"seg "+(fit?"on":"")} onClick={()=>setFit(true)}>画面に合わせる</button><button className={"seg "+(!fit?"on":"")} onClick={()=>setFit(false)}>実際の大きさ（横にスクロール）</button></div>
+    <div ref={wrapRef} className="xpv-wrap" style={{overflow:fit?"hidden":"auto"}}>
+      <div style={{width:totW*sc,height:totH*sc,position:"relative"}}>
+        <div className="xpv-paper xr" style={{width:totW,position:"absolute",left:0,top:0,transform:"scale("+sc+")",transformOrigin:"top left",padding:8}}>
+          <table className="xr-t"><colgroup>{m.cols.map((w,i)=><col key={i} style={{width:w}}/>)}</colgroup><tbody>{trs}</tbody></table>
+        </div>
+      </div>
+    </div>
+    {fit&&sc<0.6&&<p className="tiny" style={{marginTop:6}}>文字が小さい場合は「実際の大きさ」に切り替えるか、ピンチで拡大してください。</p>}
+  </div>;
+}
+function XlPreviewAuto({getBuf,simple}){
+  const [st,setSt]=useState({mode:"loading"}); const [force,setForce]=useState(false);
+  useEffect(()=>{ let live=true; (async()=>{ try{ const buf=await getBuf(); const m=await xlsxModel(buf); if(live) setSt({mode:"real",m}); }catch(e){ if(live) setSt({mode:"fail",err:String(e&&e.message||e)}); } })(); return ()=>{ live=false; }; },[]);
+  if(st.mode==="loading") return <div><div className="xpv-info">実際のExcelファイルを作って読み込んでいます…（数秒かかります）</div><div className="xpv-wrap" style={{height:180,display:"flex",alignItems:"center",justifyContent:"center",color:"#8A6B74"}}>読み込み中…</div></div>;
+  if(st.mode==="real"&&!force) return <div>
+    <div className="xpv-info"><b>✅ 実際のExcelファイルの見た目です</b><br/>「⬇ Excel出力」と同じファイルを、サーバーで作って読み取って表示しています。違うのは2点だけです：①書体（iPhone・Androidには「游ゴシック」が無いため、似た書体で表示）、②印刷するときの1ページへの縮小。</div>
+    <XlRealView m={st.m}/>
+    <p className="tiny" style={{marginTop:6}}>表示がおかしい場合は <button className="link-btn" onClick={()=>setForce(true)}>簡易プレビューに切り替える</button></p>
+  </div>;
+  return <div>
+    <div className="xpv-warn"><b>⚠ ご注意（簡易プレビュー）</b><br/>{st.mode==="fail"?("実際のファイルを読み込めなかったため（"+st.err+"）、"):""}升目の配置を画面上で再現した<b>おおよその見た目</b>を表示しています。実際のExcelファイルとは<b>文字の大きさ・罫線の太さ・改行の位置・項目の位置</b>などが異なります。提出・印刷の前は、出力したExcelファイルでご確認ください。</div>
+    {simple}
+    {st.mode==="real"&&<p className="tiny" style={{marginTop:6}}><button className="link-btn" onClick={()=>setForce(false)}>実際のファイルの見た目に戻す</button></p>}
+  </div>;
 }
 
 /* ===== 写真のコピー・共有（LINEなど） ===== */
 function _imgBlob(src,type){ return new Promise((res,rej)=>{ const im=new Image(); im.onload=()=>{ try{ const c=document.createElement("canvas"); c.width=im.naturalWidth||im.width; c.height=im.naturalHeight||im.height; c.getContext("2d").drawImage(im,0,0); c.toBlob(b=>b?res(b):rej(new Error("blob")),type,0.92); }catch(e){ rej(e); } }; im.onerror=()=>rej(new Error("img")); im.src=src; }); }
 function PhotoShare({src,name}){
   const [msg,setMsg]=useState("");
-  const share=async()=>{ setMsg(""); try{ const b=await _imgBlob(src,"image/jpeg"); const file=new File([b],(name||"写真")+".jpg",{type:"image/jpeg"}); if(navigator.share&&(!navigator.canShare||navigator.canShare({files:[file]}))){ await navigator.share({files:[file]}); return; } setMsg("この端末では送るボタンが使えません。写真を長押しして「コピー」または「写真に保存」を選んでください。"); }catch(e){ if(e&&e.name==="AbortError") return; setMsg("送れませんでした。写真を長押しして「コピー」または「写真に保存」を選んでください。"); } };
+  const share=async()=>{ setMsg(""); try{ const b=await _imgBlob(src,"image/jpeg"); const file=new File([b],(name||"写真")+".jpg",{type:"image/jpeg"}); if(navigator.share&&(!navigator.canShare||navigator.canShare({files:[file]}))){ await navigator.share({files:[file]}); return; } setMsg("この端末・ブラウザでは送るボタンが使えません。「⬇ 端末に保存」で保存してから、LINEで写真として送ってください（写真の長押しでも保存できます）。"); }catch(e){ if(e&&e.name==="AbortError") return; setMsg("送れませんでした。写真を長押しして「コピー」または「写真に保存」を選んでください。"); } };
   const copy=async()=>{ setMsg(""); try{ if(!(navigator.clipboard&&navigator.clipboard.write&&window.ClipboardItem)) throw new Error("no clipboard"); await navigator.clipboard.write([new ClipboardItem({"image/png":_imgBlob(src,"image/png")})]); setMsg("✅ コピーしました。LINEのトーク画面で入力欄を長押し →「ペースト」で貼り付けられます。"); }catch(e){ setMsg("この端末ではボタンでコピーできません。写真を長押しして「コピー」を選んでください。"); } };
+  const save=async()=>{ setMsg(""); try{ const b=await _imgBlob(src,"image/jpeg"); const url=URL.createObjectURL(b); const a=document.createElement("a"); a.href=url; a.download=(name||"写真")+"_"+Date.now()+".jpg"; a.rel="noopener"; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),5000); setMsg("✅ 保存しました（Androidは「ダウンロード」、iPhoneは「ファイル」に入ります）。LINEのトークで「＋」→ 写真・ファイルから送れます。"); }catch(e){ setMsg("保存できませんでした。写真を長押しして「画像を保存」を選んでください。"); } };
   if(!src) return null;
   return <div className="pshare">
-    <div className="pshare-b"><Btn onClick={share}>📤 LINEなどに送る</Btn><Btn kind="ghost2" onClick={copy}>📋 コピー</Btn></div>
+    <div className="pshare-b"><Btn onClick={share}>📤 LINEなどに送る</Btn><Btn kind="ghost2" onClick={copy}>📋 コピー</Btn><Btn kind="ghost2" onClick={save}>⬇ 端末に保存</Btn></div>
     {msg&&<p className={"pshare-m"+(msg.indexOf("✅")===0?"":" warn")}>{msg}</p>}
-    <p className="tiny" style={{margin:"5px 0 0"}}>写真を長押ししても、コピー・保存できます。利用者のお顔など個人が分かる写真を送るときは、送り先にご注意ください。</p>
+    <p className="tiny" style={{margin:"5px 0 0"}}>iPhone・Androidのどちらでも使えます。写真を長押ししても、コピー・保存できます。利用者のお顔など個人が分かる写真を送るときは、送り先にご注意ください。</p>
   </div>;
 }
 
@@ -3364,13 +3522,89 @@ function XlPreview({lay}){
   </div>;
 }
 
+/* ============================ ご家族からの連絡 ============================ */
+const FC_FROM=["お母様","お父様","その他ご家族","ご本人","その他"];
+const FC_HOW=["電話","直接（お迎え・お送りの時など）","連絡帳・LINE・メール","その他"];
+const FC_KIND=["要望・お願い","苦情・ご意見","利用日の指定・変更","体調・様子のご連絡","その他"];
+const FC_ST=["未対応","対応中","対応済み"];
+function FamilyContacts({me,data,persist}){
+  const [resNames,setResNames]=useState([]);
+  useEffect(()=>{ (async()=>{ if(!SB_ON)return; try{ const rows=await resList(); setResNames(rows.map(r=>r.data&&r.data.name).filter(Boolean)); }catch(e){} })(); },[]);
+  const users=Array.from(new Set([].concat(resNames,(data.userList||[])))).filter(Boolean);
+  const all=(data.familyContacts||[]).slice().sort((a,b)=>String(b.at||"").localeCompare(String(a.at||"")));
+  const [fUser,setFUser]=useState(""); const [fSt,setFSt]=useState(""); const [ed,setEd]=useState(null); const [toast,setToast]=useState("");
+  const flash=(t)=>{ setToast(t); setTimeout(()=>setToast(""),1800); };
+  const nowLocal=()=>{ const n=new Date(); return n.getFullYear()+"-"+_p2(n.getMonth()+1)+"-"+_p2(n.getDate())+"T"+_p2(n.getHours())+":"+_p2(n.getMinutes()); };
+  const blank=()=>({id:"",user:fUser||"",at:nowLocal(),from:"",how:"",kinds:[],text:"",dates:[],resp:"",st:"未対応"});
+  const setE=(k,v)=>setEd(p=>Object.assign({},p,{[k]:v}));
+  const save=()=>{ const e=ed; if(!e.user){ alert("利用者を選んでください。"); return; } if(!e.from){ alert("ご連絡をくださった方を選んでください。"); return; } const dates=(e.dates||[]).filter(x=>x&&x.date); if(!String(e.text||"").trim()&&!dates.length){ alert("内容を入力してください。"); return; } const prev=(data.familyContacts||[]).find(x=>x.id===e.id); const rec=Object.assign({},e,{dates,text:String(e.text||"").trim(),resp:String(e.resp||"").trim(),id:e.id||("fc_"+uid()),by:(prev&&prev.by)||(me&&me.name)||"",created:(prev&&prev.created)||new Date().toISOString()}); if(prev&&me&&me.name&&me.name!==prev.by) rec.edBy=me.name; const next=prev?(data.familyContacts||[]).map(x=>x.id===e.id?rec:x):[rec].concat(data.familyContacts||[]); persist(Object.assign({},data,{familyContacts:next})); setEd(null); flash(prev?"更新しました":"記録しました"); };
+  const del=(c)=>{ if(!confirm("この連絡の記録を削除しますか？"))return; persist(Object.assign({},data,{familyContacts:(data.familyContacts||[]).filter(x=>x.id!==c.id)})); flash("削除しました"); };
+  const cycleSt=(c)=>{ const i=FC_ST.indexOf(c.st||"未対応"); const st=FC_ST[(i+1)%FC_ST.length]; persist(Object.assign({},data,{familyContacts:(data.familyContacts||[]).map(x=>x.id===c.id?Object.assign({},x,{st,stBy:(me&&me.name)||"",stAt:new Date().toISOString()}):x)})); };
+  const fmtAt=(a)=>{ if(!a) return ""; const m=String(a).match(/^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2}))?/); if(!m) return a; const d=new Date(m[1]+"-"+m[2]+"-"+m[3]+"T00:00:00"); return Number(m[2])+"/"+Number(m[3])+"（"+DOW_J[d.getDay()]+"）"+(m[4]?(" "+m[4]+":"+m[5]):""); };
+  const dl=(ds)=>{ const d=new Date(ds+"T00:00:00"); return (d.getMonth()+1)+"/"+d.getDate()+"（"+DOW_J[d.getDay()]+"）"; };
+  const shown=all.filter(c=>(!fUser||c.user===fUser)&&(!fSt||(c.st||"未対応")===fSt));
+  const today=iso(new Date());
+  const upcoming=[]; all.forEach(c=>(c.dates||[]).forEach(d=>{ if(d&&d.date&&d.date>=today) upcoming.push({c,d}); })); upcoming.sort((a,b)=>a.d.date.localeCompare(b.d.date));
+  const inPlan=(u,ds)=>((((data.dayPlans||{})[ds]||{}).users)||[]).includes(u);
+  const openN=all.filter(c=>(c.st||"未対応")!=="対応済み").length;
+  return <Section title="ご家族からの連絡" note="ご家族（ご本人）からの電話や、お迎え・お送りの時などに直接いただいたご要望・ご意見・利用日の指定などを記録します。利用日の指定は「利用者予定／職員シフト」に注意として表示されます。">
+    <div className="row-end"><Btn onClick={()=>setEd(blank())}>＋ 連絡を記録する</Btn></div>
+    {upcoming.length>0&&<div className="fc-up"><div className="fc-up-h">📅 これからの利用日の指定（{upcoming.length}件）</div>{upcoming.map((x,i)=>{ const ip=inPlan(x.c.user,x.d.date); const ok=(x.d.kind==="use")===ip; return <div key={i} className={"fc-up-r "+(ok?"fu-ok":"fu-ng")}><b>{dl(x.d.date)}</b><span>{x.c.user}さん：{x.d.kind==="use"?"この日に利用したい":"この日は休み"}</span><em>{ok?"✅ 予定どおり":(x.d.kind==="use"?"⚠ 予定に未設定":"⚠ 予定に入っています")}</em></div>; })}</div>}
+    <div className="fc-filt"><select value={fUser} onChange={e=>setFUser(e.target.value)}><option value="">すべての利用者</option>{users.map(u=><option key={u} value={u}>{u}</option>)}</select><select value={fSt} onChange={e=>setFSt(e.target.value)}><option value="">すべての状態</option>{FC_ST.map(x=><option key={x} value={x}>{x}</option>)}</select></div>
+    <p className="tiny" style={{margin:"2px 0 8px"}}>{shown.length}件{openN?("（未対応・対応中 "+openN+"件）"):""}。状態のボタンをタップすると「未対応 → 対応中 → 対応済み」と切り替わります。</p>
+    {shown.length===0&&<p className="empty">記録はありません。</p>}
+    {shown.map(c=>{ const st=c.st||"未対応"; return <div key={c.id} className={"fc-card"+((c.kinds||[]).includes("苦情・ご意見")?" claim":"")}>
+      <div className="fc-h"><b>{c.user}さん</b><span>{fmtAt(c.at)}</span><button className={"fc-st s"+FC_ST.indexOf(st)} onClick={()=>cycleSt(c)}>{st}</button></div>
+      <div className="fc-m">{[c.from,c.how].filter(Boolean).join("・")}{(c.kinds||[]).map(k=><span key={k} className={"fc-k"+(k==="苦情・ご意見"?" claim":"")}>{k}</span>)}</div>
+      {c.text&&<div className="fc-t">{c.text}</div>}
+      {(c.dates||[]).length>0&&<div className="fc-d">{c.dates.map((d,i)=><span key={i} className={"fc-dd "+d.kind}>📅 {dl(d.date)} {d.kind==="use"?"利用したい":"休み"}</span>)}</div>}
+      {c.resp&&<div className="fc-r"><b>対応・申し送り：</b>{c.resp}</div>}
+      <div className="fc-f"><span className="tiny">記録：{c.by||"—"}{c.edBy?("／更新："+c.edBy):""}</span><span style={{marginLeft:"auto",display:"flex",gap:8}}><button className="link-btn" onClick={()=>setEd(Object.assign(blank(),c,{dates:(c.dates||[]).slice(),kinds:(c.kinds||[]).slice()}))}>編集</button>{(me.isAdmin||(me&&me.name===c.by))&&<button className="mini-del" style={{marginLeft:0}} onClick={()=>del(c)}>🗑</button>}</span></div>
+    </div>; })}
+    {ed&&<Modal title={ed.id?"連絡の記録を編集":"ご家族からの連絡を記録"} tint="#C9788F" onClose={()=>setEd(null)}>
+      <label className="field"><span>利用者</span><select value={ed.user} onChange={e=>setE("user",e.target.value)}><option value="">（選択）</option>{users.map(u=><option key={u} value={u}>{u}</option>)}{ed.user&&!users.includes(ed.user)&&<option value={ed.user}>{ed.user}</option>}</select></label>
+      <label className="field"><span>ご連絡の日時</span><input type="datetime-local" value={ed.at} onChange={e=>setE("at",e.target.value)}/></label>
+      <div className="cx-lab">ご連絡をくださった方</div>
+      <div className="cx-pick">{FC_FROM.map(x=><button key={x} className={"cx-opt"+(ed.from===x?" on":"")} onClick={()=>setE("from",x)}>{x}</button>)}</div>
+      <div className="cx-lab">連絡の方法</div>
+      <div className="cx-pick">{FC_HOW.map(x=><button key={x} className={"cx-opt"+(ed.how===x?" on":"")} onClick={()=>setE("how",ed.how===x?"":x)}>{x}</button>)}</div>
+      <div className="cx-lab">連絡の種類（複数選べます）</div>
+      <div className="cx-pick">{FC_KIND.map(x=>{ const on=(ed.kinds||[]).includes(x); return <button key={x} className={"cx-opt"+(on?" on":"")} onClick={()=>setE("kinds",on?ed.kinds.filter(y=>y!==x):(ed.kinds||[]).concat([x]))}>{on?"✓ ":""}{x}</button>; })}</div>
+      <label className="field"><span>内容</span><textarea rows={4} value={ed.text} onChange={e=>setE("text",e.target.value)} placeholder="例：お迎えの際、お母様より「帰宅後に疲れが出やすいので、朝は少しゆっくり起こしてほしい」とのご要望"/></label>
+      <div className="cx-lab">利用日の指定（ある場合）</div>
+      {(ed.dates||[]).map((d,i)=><div key={i} className="fc-drow"><input type="date" value={d.date||""} onChange={e=>setE("dates",ed.dates.map((x,j)=>j===i?Object.assign({},x,{date:e.target.value}):x))}/><select value={d.kind||"use"} onChange={e=>setE("dates",ed.dates.map((x,j)=>j===i?Object.assign({},x,{kind:e.target.value}):x))}><option value="use">この日に利用したい</option><option value="off">この日は休み</option></select><button className="mini-del" onClick={()=>setE("dates",ed.dates.filter((_,j)=>j!==i))}>🗑</button></div>)}
+      <button className="link-btn" onClick={()=>setE("dates",(ed.dates||[]).concat([{date:"",kind:"use"}]))}>＋ 日付を追加</button>
+      <p className="tiny" style={{margin:"2px 0 8px"}}>例：「22日を土曜日に変えてほしい」→ 22日「この日は休み」と、土曜日「この日に利用したい」の2つを追加します。</p>
+      <label className="field"><span>対応・申し送り（任意）</span><textarea rows={2} value={ed.resp} onChange={e=>setE("resp",e.target.value)} placeholder="例：管理者に報告済み。予定を変更しました。"/></label>
+      <div className="cx-lab">状態</div>
+      <div className="cx-pick">{FC_ST.map(x=><button key={x} className={"cx-opt"+(ed.st===x?" on":"")} onClick={()=>setE("st",x)}>{x}</button>)}</div>
+      <div className="row-end"><Btn kind="ghost2" onClick={()=>setEd(null)}>やめる</Btn><Btn onClick={save}>保存</Btn></div>
+    </Modal>}
+    {toast&&<div className="toast">{toast}</div>}
+  </Section>;
+}
+
+/* ===== 利用日の希望・注意（利用者情報）とシフトの注意表示 ===== */
+const DOW_J=["日","月","火","水","木","金","土"];
+const UP_DAY={want:"希望",ok:"可",ng:"不可"};
+const UP_GROUP=[["alone_ng","1人での利用は避ける"],["two","2人での利用を希望"],["three","3人以上での利用を希望"]];
+function usePrefText(u){ if(!u) return ""; const a=[]; const ds=u.days||{}; const w=DOW_J.filter((_,i)=>ds[i]==="want"), ok=DOW_J.filter((_,i)=>ds[i]==="ok"), ng=DOW_J.filter((_,i)=>ds[i]==="ng"); if(w.length) a.push("希望の曜日："+w.join("・")); if(ok.length) a.push("可能な曜日："+ok.join("・")); if(ng.length) a.push("不可の曜日："+ng.join("・")); (u.group||[]).forEach(g=>{ const x=UP_GROUP.find(y=>y[0]===g); if(x) a.push(x[1]); }); (u.avoid||[]).forEach(v=>{ if(v&&v.name) a.push(v.name+"さんとの利用は避ける"+(v.note?("（"+v.note+"）"):"")); }); if(u.note) a.push("注意："+u.note); return a.join("／"); }
+function planWarnings(ds,users,prefs,contacts){ const out=[]; if(!ds) return out; const dow=new Date(ds+"T00:00:00").getDay(); const n=(users||[]).length; const P=prefs||{};
+  (users||[]).forEach(u=>{ const pf=P[String(u).trim()]; if(!pf) return; const d=(pf.days||{}); const v=d[dow]; const anyPos=Object.keys(d).some(k=>d[k]==="want"||d[k]==="ok");
+    if(v==="ng") out.push({lv:"ng",t:u+"さん："+DOW_J[dow]+"曜日は利用不可"}); else if(anyPos&&v!=="want"&&v!=="ok") out.push({lv:"warn",t:u+"さん："+DOW_J[dow]+"曜日は希望・可能な曜日ではありません"});
+    const g=pf.group||[]; if(g.includes("alone_ng")&&n===1) out.push({lv:"warn",t:u+"さん：1人での利用は避ける"}); if(g.includes("two")&&n!==2) out.push({lv:"info",t:u+"さん：2人での利用を希望（現在"+n+"人）"}); if(g.includes("three")&&n<3) out.push({lv:"info",t:u+"さん：3人以上での利用を希望（現在"+n+"人）"});
+    (pf.avoid||[]).forEach(a=>{ if(a&&a.name&&a.name!==u&&(users||[]).includes(a.name)){ const key=[u,a.name].sort().join("|"); if(out.some(x=>x.k===key)) return; out.push({lv:"warn",k:key,t:u+"さんと"+a.name+"さん：一緒の利用は避ける"+(a.note?("（"+a.note+"）"):"")}); } }); });
+  (contacts||[]).forEach(c=>{ (c.dates||[]).forEach(dd=>{ if(!dd||dd.date!==ds||!c.user) return; const inP=(users||[]).includes(c.user); const when=c.at?(" "+String(c.at).slice(5,10).replace("-","/")+"の連絡"):""; if(dd.kind==="use"&&!inP) out.push({lv:"warn",t:c.user+"さん：ご家族から「この日に利用したい」との連絡あり（予定に未設定）"+when}); if(dd.kind==="off"&&inP) out.push({lv:"warn",t:c.user+"さん：ご家族から「この日は休み」との連絡あり（予定に入っています）"+when}); if(dd.kind==="use"&&inP) out.push({lv:"ok",t:c.user+"さん：ご家族の利用希望日（予定に反映済み）"}); }); });
+  return out; }
+
 /* ===== 来所・帰宅／AI相談の共通処理 ===== */
 const _p2=(x)=>String(x).padStart(2,"0");
 // 利用日：15時より前の記録は「前日の利用日」に含める（夕方来所〜翌朝帰宅を1日として扱う）
 const recBizDay=(ts)=>{ const d=new Date(ts); if(isNaN(d)) return ""; if(d.getHours()<15) d.setDate(d.getDate()-1); return d.getFullYear()+"-"+_p2(d.getMonth()+1)+"-"+_p2(d.getDate()); };
 const recHM=(ts)=>{ const d=new Date(ts); return isNaN(d)?"":(_p2(d.getHours())+":"+_p2(d.getMinutes())); };
 const recIsIn=(r)=>/^来所/.test(String(r.item||"")); const recIsOut=(r)=>/^帰宅/.test(String(r.item||""));
-function visitRows(records,user){ const m={}; (records||[]).forEach(r=>{ if(r.user!==user||!r.ts) return; const a=recIsIn(r), b=recIsOut(r); if(!a&&!b) return; const k=recBizDay(r.ts); if(!k) return; const o=m[k]||(m[k]={day:k,ins:[],outs:[]}); (a?o.ins:o.outs).push(r.ts); }); return Object.keys(m).map(k=>m[k]).map(o=>{ o.ins.sort(); o.outs.sort(); return o; }).sort((a,b)=>b.day.localeCompare(a.day)); }
+const recIsWake=(r)=>/^起床/.test(String(r.item||""));
+function visitRows(records,user){ const m={}; (records||[]).forEach(r=>{ if(r.user!==user||!r.ts) return; const a=recIsIn(r), b=recIsOut(r), w=recIsWake(r); if(!a&&!b&&!w) return; const k=recBizDay(r.ts); if(!k) return; const o=m[k]||(m[k]={day:k,ins:[],outs:[],wakes:[],recs:[]}); (a?o.ins:(w?o.wakes:o.outs)).push(r.ts); o.recs.push(r); }); return Object.keys(m).map(k=>m[k]).map(o=>{ o.ins.sort(); o.outs.sort(); o.wakes.sort(); o.recs.sort((x,y)=>String(x.ts).localeCompare(String(y.ts))); return o; }).sort((a,b)=>b.day.localeCompare(a.day)); }
 const dayLabel=(k)=>{ const d=new Date(k+"T00:00:00"); return (d.getMonth()+1)+"/"+d.getDate()+"（"+WD[d.getDay()]+"）"; };
 const _aiHash=(str)=>{ let h=2166136261; for(let i=0;i<str.length;i++){ h^=str.charCodeAt(i); h=Math.imul(h,16777619); } return h>>>0; };
 // 名前 → 固定の番号（同じ名前はどの端末でも同じ番号）。番号から名前は逆算できない。
@@ -3380,8 +3614,8 @@ function aiNameMap(users,staff){ const used=new Set(); const L="ABCDEFGHJKLMNPQR
   pairs.sort((a,b)=>b[0].length-a[0].length); return {pairs,back}; }
 function aiMask(text,map){ let t=String(text||""); if(!map) return t; const hold=[]; map.pairs.forEach(pr=>{ if(t.indexOf(pr[0])>=0){ const tok="\u0001"+hold.length+"\u0002"; hold.push(pr[1]); t=t.split(pr[0]).join(tok); } }); return t.replace(/\u0001(\d+)\u0002/g,(m0,i)=>hold[Number(i)]); }
 function aiUnmask(text,map){ let t=String(text||""); if(!map) return t; map.back.forEach(b=>{ t=t.split(b[0]).join(b[1]); }); map.back.forEach(b=>{ const bare=b[0].replace(/^(利用者|職員)/,""); t=t.replace(new RegExp("(^|[^A-Za-z0-9])"+bare+"(?![A-Za-z0-9])","g"),(m0,a)=>a+b[1]); }); return t; }
-function aiRecordContext(records,user,code,days){ const mine=(records||[]).filter(r=>r.user===user&&r.ts).slice().sort((a,b)=>String(b.ts).localeCompare(String(a.ts))); if(!mine.length) return "【"+code+"さんの記録】記録はありません。"; const vr=visitRows(mine,user).slice(0,800); const vis=vr.map(o=>o.day+"("+WD[new Date(o.day+"T00:00:00").getDay()]+") 来所 "+(o.ins.map(recHM).join("・")||"記録なし")+" ／ 帰宅 "+(o.outs.map(recHM).join("・")||"記録なし")).join("\n"); const lim=days?Date.now()-days*86400000:0; let cut=false; const lines=[]; let size=0; for(const r of mine){ if(lim&&new Date(r.ts).getTime()<lim) break; const d=new Date(r.ts); const item=String(r.item||"").replace(/\s+/g," ").slice(0,300); const ln=d.getFullYear()+"-"+_p2(d.getMonth()+1)+"-"+_p2(d.getDate())+" "+recHM(r.ts)+" "+item+(r.abn?"【要注意の値】":""); if(size+ln.length>45000){ cut=true; break; } lines.push(ln); size+=ln.length+1; }
-  return "【"+code+"さんの来所・帰宅（全期間。利用日ごと。帰宅は翌朝のことが多い）】\n"+(vis||"来所・帰宅の記録はありません。")+"\n\n【"+code+"さんの記録の明細（"+(days?("直近"+days+"日"):"全期間")+"・新しい順・日付 時刻 内容）"+(cut?"※量が多いため古い分は省略":"")+"】\n"+(lines.join("\n")||"この期間の記録はありません。"); }
+function aiRecordContext(records,user,code,days){ const mine=(records||[]).filter(r=>r.user===user&&r.ts).slice().sort((a,b)=>String(b.ts).localeCompare(String(a.ts))); if(!mine.length) return "【"+code+"さんの記録】記録はありません。"; const vr=visitRows(mine,user).slice(0,800); const vis=vr.map(o=>o.day+"("+WD[new Date(o.day+"T00:00:00").getDay()]+") 来所 "+(o.ins.map(recHM).join("・")||"記録なし")+" ／ 起床 "+(o.wakes.map(recHM).join("・")||"記録なし")+" ／ 帰宅 "+(o.outs.map(recHM).join("・")||"記録なし")).join("\n"); const lim=days?Date.now()-days*86400000:0; let cut=false; const lines=[]; let size=0; for(const r of mine){ if(lim&&new Date(r.ts).getTime()<lim) break; const d=new Date(r.ts); const item=String(r.item||"").replace(/\s+/g," ").slice(0,300); const ln=d.getFullYear()+"-"+_p2(d.getMonth()+1)+"-"+_p2(d.getDate())+" "+recHM(r.ts)+" "+item+(r.abn?"【要注意の値】":""); if(size+ln.length>45000){ cut=true; break; } lines.push(ln); size+=ln.length+1; }
+  return "【"+code+"さんの来所・起床・帰宅（全期間。利用日ごと。起床・帰宅は翌朝のことが多い）】\n"+(vis||"来所・帰宅の記録はありません。")+"\n\n【"+code+"さんの記録の明細（"+(days?("直近"+days+"日"):"全期間")+"・新しい順・日付 時刻 内容）"+(cut?"※量が多いため古い分は省略":"")+"】\n"+(lines.join("\n")||"この期間の記録はありません。"); }
 
 /* ============================ AI相談 ============================ */
 function Consult({data,me}){
