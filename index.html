@@ -384,6 +384,25 @@
   .vis-rec span{color:#5A4A50;font-variant-numeric:tabular-nums;}
   .vis-rec .mini-del{margin-left:auto;}
   .vis-add{background:#FFF8FA;border:1px solid #F0D3DB;border-radius:12px;padding:9px 11px;margin-top:10px;}
+  .tp-state{border-radius:10px;padding:8px 11px;font-size:13px;margin-top:6px;}
+  .tp-state.on{background:#EEF7F0;border:1px solid #BFE0C6;color:#2E5E3C;}
+  .tp-state.off{background:#F6F1F2;border:1px solid #E6DADD;color:#5A4A50;}
+  .tp-res{background:#fff;border:1px solid #F0D3DB;border-radius:10px;padding:8px 10px;font-size:12.5px;line-height:1.7;margin:6px 0;}
+  .tp-ver{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:#fff;border:1px solid #F0D3DB;border-radius:10px;padding:7px 10px;margin-top:6px;font-size:13px;color:#5A4A50;}
+  .tp-ver-b{margin-left:auto;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  .tp-help{background:#FCF6F7;border-radius:10px;padding:8px 10px;margin-top:6px;}
+  .tp-help-r{display:flex;flex-wrap:wrap;gap:4px 10px;font-size:12px;padding:4px 0;border-top:1px dashed #F0D3DB;}
+  .tp-help-r code{font-size:11.5px;background:#fff;border:1px solid #F0D3DB;border-radius:6px;padding:1px 6px;color:#8A4A5C;overflow-wrap:anywhere;}
+  .tp-help-r span{color:#5A4A50;}
+  .ns-ph{background:#FFF8FA;border:1px solid #F0D3DB;border-radius:12px;padding:9px 11px;}
+  .ns-ph-t{font-size:12.5px;font-weight:800;color:#8A5A66;margin:6px 0 4px;}
+  .ns-ph-g{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px;}
+  .ns-ph-i{position:relative;width:64px;height:64px;padding:0;border:2px solid #F0D3DB;border-radius:10px;overflow:hidden;background:#fff;cursor:pointer;}
+  .ns-ph-i img{width:100%;height:100%;object-fit:cover;display:block;}
+  .ns-ph-i.on{border-color:#2E7D46;box-shadow:0 0 0 2px #BFE0C6;}
+  .ns-ph-i b{position:absolute;right:3px;top:3px;background:#2E7D46;color:#fff;border-radius:999px;width:18px;height:18px;font-size:11px;line-height:18px;text-align:center;}
+  .ns-ph-x{height:64px;padding:0 12px;border:2px dashed #E3C9CF;border-radius:10px;background:#fff;color:#8A6B74;font-weight:700;cursor:pointer;}
+  .ns-ph-x.on{border-style:solid;border-color:#C9788F;color:#C9788F;}
   .xpv-info{background:#EEF7F0;border:1px solid #BFE0C6;color:#2E5E3C;border-radius:10px;padding:9px 11px;font-size:12.5px;line-height:1.65;margin-bottom:10px;}
   table.xr-t{border-collapse:collapse;table-layout:fixed;font-family:"Yu Gothic","游ゴシック","YuGothic","Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP","Noto Sans CJK JP",sans-serif;font-size:14.67px;color:#000;}
   table.xr-t td{padding:0;overflow:visible;}
@@ -749,7 +768,7 @@ async function sbRefresh(){
   const j=await r.json(); if(!r.ok) throw new Error("refresh"); const o={access:j.access_token,refresh:j.refresh_token,at:Date.now()}; authSaveTok(o); return o;
 }
 async function authHeaders(){ let a=authLoad(); if(!a) throw new Error("未ログイン"); if(Date.now()-a.at>2700000){ try{ a=await sbRefresh(); }catch(e){} } return {"apikey":SUPABASE_KEY,"Authorization":"Bearer "+a.access,"Content-Type":"application/json"}; }
-async function authFetch(url,opts){ opts=opts||{}; opts.headers=Object.assign({}, await authHeaders(), opts.headers||{}); let r=await fetch(url,opts); if(r.status===401){ try{ await sbRefresh(); opts.headers=Object.assign({}, await authHeaders(), opts.headers||{}); r=await fetch(url,opts); }catch(e){} } return r; }
+async function authFetch(url,opts){ opts=opts||{}; const base=opts.headers||{}; opts.headers=Object.assign({}, await authHeaders(), base); let r=await fetch(url,opts); if(r.status===401){ try{ await sbRefresh(); opts.headers=Object.assign({}, await authHeaders(), base); r=await fetch(url,opts); }catch(e){} } return r; }
 async function resList(){ const r=await authFetch(`${SUPABASE_URL}/rest/v1/residents?select=id,data,updated_at&order=updated_at.desc&limit=200`); if(!r.ok) throw new Error("res list "+r.status); return await r.json(); }
 async function resSave(id,data){ const r=await authFetch(`${SUPABASE_URL}/rest/v1/residents`,{method:"POST",headers:{"Prefer":"resolution=merge-duplicates,return=minimal"},body:JSON.stringify({id,data,updated_at:new Date().toISOString()})}); if(!r.ok) throw new Error("res save "+r.status); }
 async function resDelete(id){ await authFetch(`${SUPABASE_URL}/rest/v1/residents?id=eq.${id}`,{method:"DELETE"}); }
@@ -1002,6 +1021,16 @@ const NISSHI_SYS = `あなたは、障害者生活訓練事業所「ふれあい
 }
 記録から読み取れない項目は空文字にする。推測で医療的判断はしない。`;
 
+const NS2_URL=()=>SUPABASE_URL+"/functions/v1/nisshi-excel2";
+async function ns2Call(body){ return await authFetch(NS2_URL(),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)}); }
+let _ns2Status=null;
+async function ns2Status(force){ if(_ns2Status&&!force) return _ns2Status; try{ const r=await ns2Call({action:"status"}); if(!r.ok) throw new Error(String(r.status)); _ns2Status=await r.json(); }catch(e){ _ns2Status={active:false,versions:[],known:[],err:String(e&&e.message||e)}; } return _ns2Status; }
+function bizWindow(ds){ const s=new Date(ds+"T15:00:00"); const e=new Date(ds+"T00:00:00"); e.setDate(e.getDate()+1); e.setHours(15,0,0,0); return [s,e]; }
+function mealPhotoCands(data,ds){ const [bs,be]=bizWindow(ds); const ml=((data&&data.mealLog)||{})[ds]||{}; const slotImgs=(x)=>{ if(!x) return []; if(Array.isArray(x.imgs)) return x.imgs.filter(v=>typeof v==="string"&&v.indexOf("data:image")===0); if(typeof x.img==="string"&&x.img.indexOf("data:image")===0) return [x.img]; return []; };
+  const o={d:slotImgs(ml.dinner).map((src,i)=>({key:"cal:"+i,src})),b:slotImgs(ml.breakfast).map((src,i)=>({key:"cal:"+i,src}))}; const seen={};
+  ((data&&data.records)||[]).forEach(r=>{ if(!r||!r.photoId) return; if(!(r.cat==="食事"||/写真（食事/.test(r.item||""))) return; const t=new Date(r.ts); if(!(t>=bs&&t<be)) return; if(seen[r.photoId]) return; seen[r.photoId]=1; const nextDay=t.getDate()!==bs.getDate(); (nextDay&&t.getHours()>=4?o.b:o.d).push({key:"rec:"+r.photoId,src:r.thumb||"",photoId:r.photoId}); });
+  return o; }
+function mealPhotoPick(cands,sel){ if(sel==="none") return null; const c=(sel&&sel!=="auto")?(cands.find(x=>x.key===sel)||null):(cands[0]||null); if(!c) return null; return c.photoId?{photoId:c.photoId}:{data:c.src}; }
 function stripPhotoLines(t){ return String(t||"").split("\n").filter(l=>!/^\s*(\d{1,2}[:：]\d{2}\s*)?📷/.test(l)).join("\n"); }
 function normName(s){return String(s||"").replace(/[\s　]/g,"").replace(/^[^぀-ヿ一-鿿]+/,"");}
 function Nisshi({me,data,persist}){
@@ -1171,8 +1200,15 @@ function Nisshi({me,data,persist}){
     setLoading(false);
   };
   const dlXlsx=(blob,name)=>{ try{ if(navigator.msSaveBlob){ navigator.msSaveBlob(blob,name); return; } }catch(e){} const url=URL.createObjectURL(blob); const a=document.createElement("a"); a.href=url; a.download=name; a.rel="noopener"; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),4000); };
+  const mCands=mealPhotoCands(data,date);
+  const dayPhotos=recs.filter(r=>r&&r.photoId).reduce((a,r)=>{ if(!a.some(x=>x.id===r.photoId)) a.push({id:r.photoId,thumb:r.thumb||"",ts:r.ts,cat:r.cat||""}); return a; },[]);
+  const [ns2,setNs2]=useState(null); useEffect(()=>{ let live=true; if(SB_ON) ns2Status().then(x=>{ if(live) setNs2(x); }); return ()=>{ live=false; }; },[]);
+  const [lastOut,setLastOut]=useState("");
   const fetchNisshiBuf=async()=>{
     const _next=[f.nextRequest,...activeNotices(date)].filter(x=>x&&String(x).trim()).join("\n");
+    const body=Object.assign({},f,{date,nextRequest:_next,program:stripPhotoLines(f.program),dayPhoto:f.dayPhotoId?{photoId:f.dayPhotoId}:null,dinnerPhoto:mealPhotoPick(mCands.d,f.dinnerPhotoSel||"auto"),breakfastPhoto:mealPhotoPick(mCands.b,f.breakfastPhotoSel||"auto")});
+    try{ const r2=await ns2Call(body); if(r2.ok){ setLastOut("v2"); return await r2.arrayBuffer(); } if(r2.status!==409){ let m=""; try{ m=(await r2.json()).error||""; }catch(e){} setErr("新しいひな形での作成に失敗したため、従来の形式で作成しました（"+r2.status+" "+m+"）。管理者にお知らせください。"); } }catch(e){ setErr("新しいひな形での作成に失敗したため、従来の形式で作成しました。"); }
+    setLastOut("legacy");
     const res=await authFetch(SUPABASE_URL+"/functions/v1/nisshi-excel",{method:"POST",body:JSON.stringify(Object.assign({},f,{date,nextRequest:_next,program:stripPhotoLines(f.program)}))});
     if(!res.ok){ let m=""; try{ m=(await res.json()).error||""; }catch(e){} throw new Error("func "+res.status+" "+m); }
     return await res.arrayBuffer();
@@ -1390,6 +1426,22 @@ function Nisshi({me,data,persist}){
       <div className="nf"><label>特記事項</label><textarea rows={3} value={f.special} onChange={e=>setField("special",e.target.value)}/></div>
       <div className="nf"><label>次回利用予定日</label><input type="date" value={f.nextVisitDate||""} onChange={e=>setField("nextVisitDate",e.target.value)}/>{f.nextVisitDate&&<div className="tiny">{(()=>{const d=new Date(f.nextVisitDate+"T00:00:00");return (d.getMonth()+1)+"月"+d.getDate()+"日（"+["日","月","火","水","木","金","土"][d.getDay()]+"曜日）";})()}</div>}</div>
       <div className="nf"><label>次回へのお願い（日程・ご連絡など。※家族向けのAI文は入りません）</label><input value={f.nextRequest} onChange={e=>setField("nextRequest",e.target.value)}/>{activeNotices(date).length>0&&<div className="tiny" style={{marginTop:4,color:"#B25E77"}}>この期間の共通連絡（自動で出力に入ります）：{activeNotices(date).map((t,i)=><div key={i}>・{t}</div>)}</div>}</div>
+      <div className="nf ns-ph">
+        <label>📷 Excelに入れる写真</label>
+        {ns2&&!ns2.active&&<p className="tiny" style={{margin:"0 0 6px",color:"#B07A2E"}}>※ 写真は、管理者が「新しいひな形（目印入り）」を使い始めるとExcelに入ります。いまは選んでおくだけになります。</p>}
+        <div className="ns-ph-t">その日のご様子写真（1枚）</div>
+        {dayPhotos.length===0?<p className="tiny" style={{margin:"2px 0 8px"}}>この日の「{user}」さんの写真はありません（記録タブの📷で撮った写真が出ます）。</p>:<div className="ns-ph-g">
+          <button type="button" className={"ns-ph-x"+(!f.dayPhotoId?" on":"")} onClick={()=>setField("dayPhotoId","")}>なし</button>
+          {dayPhotos.map(p=><button type="button" key={p.id} className={"ns-ph-i"+(f.dayPhotoId===p.id?" on":"")} onClick={()=>setField("dayPhotoId",p.id)}><img src={p.thumb} alt=""/>{f.dayPhotoId===p.id&&<b>✓</b>}</button>)}
+        </div>}
+        {[["d","夕食の写真（夕食メニュー欄に入ります）","dinnerPhotoSel"],["b","朝食の写真（朝食メニュー欄に入ります）","breakfastPhotoSel"]].map(([k,lab,fk])=>{ const cs=mCands[k]; const sel=f[fk]||"auto"; const cur=sel==="auto"?(cs[0]&&cs[0].key):sel; return <div key={k}>
+          <div className="ns-ph-t">{lab}</div>
+          {cs.length===0?<p className="tiny" style={{margin:"2px 0 8px"}}>この日の写真はありません（食事記録カレンダー、または記録タブの「📷 食事」で撮った写真が出ます）。</p>:<div className="ns-ph-g">
+            <button type="button" className={"ns-ph-x"+(sel==="none"?" on":"")} onClick={()=>setField(fk,"none")}>なし</button>
+            {cs.map(c=><button type="button" key={c.key} className={"ns-ph-i"+(sel!=="none"&&cur===c.key?" on":"")} onClick={()=>setField(fk,c.key)}><img src={c.src} alt=""/>{sel!=="none"&&cur===c.key&&<b>✓</b>}</button>)}
+          </div>}
+        </div>; })}
+      </div>
       {f&&f.status&&f.status!=="draft"&&<div className="tiny" style={{marginBottom:6,fontWeight:700,color:f.status==="reviewed"?"#2E8B57":"#B25E77"}}>{f.status==="submitted"?("📤 提出済み"+(f.submittedBy?("（提出者："+f.submittedBy+"）"):"")+"・管理者の確認待ち"):("✅ 確認済み"+(f.reviewedBy?("（"+f.reviewedBy+"）"):""))}</div>}
       <div className="n-actions no-print">
         <Btn onClick={saveNisshi}>💾 下書き保存</Btn>
@@ -2416,7 +2468,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.178〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.179〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
@@ -3434,7 +3486,10 @@ async function xlsxModel(buf){
   for(let r=r1;r<=r2;r++) for(let c=c1;c<=c2;c++){ const cell=ws.getCell(r,c); if(!cell) continue; const v=cell.value; let runs=null, text="";
     if(v==null) text=""; else if(typeof v==="object"){ if(Array.isArray(v.richText)) runs=v.richText.map(t=>({text:String(t.text||""),font:t.font||{}})); else if(v.result!==undefined) text=String(v.result==null?"":v.result); else if(v.text!==undefined) text=String(v.text); else if(v instanceof Date) text=v.toLocaleDateString("ja-JP"); else text=""; } else text=String(v);
     cells[r+"_"+c]={text,runs,font:cell.font||{},al:cell.alignment||{},bd:cell.border||{},fill:cell.fill||null}; }
-  return {r1,r2,c1,c2,cols,rows,merges,cells};
+  const images=[]; try{ const colX=(n0)=>{ let x=0; for(let c=c1;c<=n0;c++) x+=cols[c-c1]||0; return x; }; const rowY=(n0)=>{ let y=0; for(let r=r1;r<=n0;r++) y+=rows[r-r1]||0; return y; };
+    (ws.getImages?ws.getImages():[]).forEach(im=>{ const md=wb.getImage(Number(im.imageId)); if(!md) return; let url=""; const ext=md.extension||"jpeg"; if(md.buffer){ url=URL.createObjectURL(new Blob([md.buffer],{type:"image/"+ext})); } else if(md.base64){ url=String(md.base64).indexOf("data:")===0?md.base64:("data:image/"+ext+";base64,"+md.base64); } if(!url) return; const rg=im.range||{}; const tl=rg.tl, br=rg.br; if(!tl) return;
+      const pos=(a)=>({x:colX(a.nativeCol)+(a.nativeColOff||0)/9525, y:rowY(a.nativeRow)+(a.nativeRowOff||0)/9525}); const p1=pos(tl); let p2=null; if(br) p2=pos(br); else if(rg.ext) p2={x:p1.x+rg.ext.width,y:p1.y+rg.ext.height}; if(!p2) return; images.push({url,x:p1.x,y:p1.y,w:Math.max(4,p2.x-p1.x),h:Math.max(4,p2.y-p1.y)}); }); }catch(e){}
+  return {r1,r2,c1,c2,cols,rows,merges,cells,images};
 }
 function XlRealView({m}){
   const wrapRef=useRef(null); const [fit,setFit]=useState(true); const [wW,setWW]=useState(320);
@@ -3456,6 +3511,7 @@ function XlRealView({m}){
       <div style={{width:totW*sc,height:totH*sc,position:"relative"}}>
         <div className="xpv-paper xr" style={{width:totW,position:"absolute",left:0,top:0,transform:"scale("+sc+")",transformOrigin:"top left",padding:8}}>
           <table className="xr-t"><colgroup>{m.cols.map((w,i)=><col key={i} style={{width:w}}/>)}</colgroup><tbody>{trs}</tbody></table>
+          {(m.images||[]).map((im,i)=><img key={i} src={im.url} alt="" style={{position:"absolute",left:8+im.x,top:8+im.y,width:im.w,height:im.h,objectFit:"fill"}}/>)}
         </div>
       </div>
     </div>
@@ -3706,6 +3762,53 @@ function Consult({data,me}){
 
 /* ============================ 管理者パネル ============================ */
 
+/* ============ 管理者：日誌のひな形（目印方式） ============ */
+const NS2_MARK_HELP=[["利用者名","利用者のお名前"],["利用日時","利用日時（例：11月17日（火）16:00〜…）"],["測定時間1／体温1／血圧1／脈拍1","1回目のバイタル（2回目は末尾が2）"],["排尿／排便","排泄の記録"],["投薬","投薬"],["担当職員","担当職員"],["活動16〜活動23、活動0〜活動9","その時間の活動（このセルに見出し、右隣の結合セルに内容）"],["夕食メニュー／朝食メニュー","メニュー（見出し・内容・喫食。写真があれば欄の右側に入る）"],["夕食写真／朝食写真","（任意）食事写真を別の欄に置きたいとき"],["ご様子","利用のご様子まとめ（特記も含む）"],["次回利用予定日","例：11月24日（火曜日）"],["次回へのお願い","次回へのお願い・共通連絡"],["写真","その日のご様子写真（1枚）。同じセルの文字は見出しとして残ります"],["記録者","記録者（複数可）"]];
+function NisshiTemplateAdmin(){
+  const [st,setSt]=useState(null); const [busy,setBusy]=useState(false); const [msg,setMsg]=useState(""); const [pw,setPw]=useState(""); const [res,setRes]=useState(null); const [pv,setPv]=useState(null); const fileRef=useRef(null); const [help,setHelp]=useState(false);
+  const load=async()=>{ setSt(await ns2Status(true)); };
+  useEffect(()=>{ if(SB_ON) load(); },[]);
+  const fdt=(a)=>{ if(!a) return ""; const d=new Date(a); return isNaN(d)?"":(d.getFullYear()+"/"+(d.getMonth()+1)+"/"+d.getDate()+" "+_p2(d.getHours())+":"+_p2(d.getMinutes())); };
+  const needPw=()=>{ if(!pw){ setMsg("⚠ 管理者のパスワードを入力してください（ひな形の変更には毎回必要です）。"); return true; } return false; };
+  const call=async(body)=>{ const r=await ns2Call(Object.assign({pw},body)); let j={}; try{ j=await r.json(); }catch(e){} if(!r.ok) throw new Error(j.error||("エラー "+r.status)); return j; };
+  const onFile=async(e)=>{ const file=e.target.files&&e.target.files[0]; e.target.value=""; if(!file) return; if(needPw()) return; if(!/\.xlsx$/i.test(file.name)){ setMsg("⚠ .xlsx 形式のファイルを選んでください。"); return; } setBusy(true); setMsg("アップロードして、目印を確認しています…"); setRes(null);
+    try{ const buf=new Uint8Array(await file.arrayBuffer()); let bin=""; for(let i=0;i<buf.length;i+=0x8000) bin+=String.fromCharCode.apply(null,buf.subarray(i,i+0x8000)); const j=await call({action:"upload",filename:file.name,b64:btoa(bin)}); setRes(j); setMsg("✅ アップロードしました。下の一覧の「試しに表示」で見た目を確認してから「この形式で使う」を押してください。"); await load(); }catch(err){ setMsg("⚠ "+String(err&&err.message||err)); } setBusy(false); };
+  const sampleImg=(w,h,c1,c2,label)=>{ try{ const cv=document.createElement("canvas"); cv.width=w; cv.height=h; const g=cv.getContext("2d"); if(!g) return null; g.fillStyle=c1; g.fillRect(0,0,w,h); g.fillStyle=c2; g.beginPath(); g.ellipse(w/2,h/2,w*0.33,h*0.3,0,0,Math.PI*2); g.fill(); g.fillStyle="#333"; g.font=Math.round(h/9)+"px sans-serif"; g.fillText(label,12,h/7); return cv.toDataURL("image/jpeg",0.8); }catch(e){ return null; } };
+  const sampleF=()=>({name:"見本 太郎",period:"11月17日（火）16:00 〜 11月18日（水）9:30",v1:{time:"16:10",temp:"36.5",bp:"122/78",pulse:"72"},v2:{time:"7:30",temp:"36.3",bp:"118/76",pulse:"66"},urine:"17:20、21:00、6:40",stool:"7:10",medication:"夕食後・就寝前 服薬確認",staff:"職員A・職員B",program:"16:05 来所\n16:30 余暇活動（テレビ）\n17:30 夕食準備（調理）\n18:30 夕食\n19:30 入浴\n21:30 口腔ケア\n22:00 就寝\n0:00 巡回\n6:30 起床\n7:00 朝食\n9:00 帰宅",dinnerMenu:"豚肉ときのこのカレー、サラダ、みかん",breakfastMenu:"目玉焼き、食パン、牛乳",dinnerMainLeft:0,dinnerSideLeft:2,appearance:"来所時から笑顔が多く、調理では野菜を切る作業に集中して取り組まれました。夕食は主食を完食されています。入浴後は落ち着いて過ごされ、夜間は良眠されました。",special:"",nextVisitDate:"2026-11-24",nextRequest:"次回は着替えを1組多めにお持ちください。",writer:"職員A・職員B",date:"2026-11-17",dayPhoto:{data:sampleImg(480,640,"#9CC4EE","#F7F1E3","見本")},dinnerPhoto:{data:sampleImg(640,480,"#C9784A","#F7E9D0","夕食")},breakfastPhoto:{data:sampleImg(640,480,"#E5C65A","#FFF6DA","朝食")}});
+  const tryShow=async(v)=>{ setBusy(true); setMsg("見本のデータで作っています…"); try{ const r=await ns2Call(Object.assign(sampleF(),{templatePath:v.path})); if(!r.ok){ let j={}; try{ j=await r.json(); }catch(e){} throw new Error(j.error||("エラー "+r.status)); } const buf=await r.arrayBuffer(); const m=await xlsxModel(buf); setPv({name:v.name,m,buf}); setMsg(""); }catch(err){ setMsg("⚠ 表示できませんでした："+String(err&&err.message||err)); } setBusy(false); };
+  const act=async(v)=>{ if(needPw()) return; if(!confirm("「"+v.name+"」を日誌のひな形として使い始めますか？\n（全員のExcel出力がこの形式になります。いつでも元に戻せます）")) return; setBusy(true); try{ await call({action:"activate",path:v.path}); setMsg("✅ 「"+v.name+"」を使い始めました。"); await load(); }catch(err){ setMsg("⚠ "+String(err&&err.message||err)); } setBusy(false); };
+  const deact=async()=>{ if(needPw()) return; if(!confirm("新しいひな形の使用をやめて、従来の形式（写真なし）に戻しますか？")) return; setBusy(true); try{ await call({action:"deactivate"}); setMsg("✅ 従来の形式に戻しました。"); await load(); }catch(err){ setMsg("⚠ "+String(err&&err.message||err)); } setBusy(false); };
+  const del=async(v)=>{ if(needPw()) return; if(!confirm("「"+v.name+"」を一覧から削除しますか？")) return; setBusy(true); try{ await call({action:"delete",path:v.path}); await load(); setMsg("削除しました。"); }catch(err){ setMsg("⚠ "+String(err&&err.message||err)); } setBusy(false); };
+  const down=async(path,name)=>{ setBusy(true); try{ const r=await ns2Call({action:"download",path}); if(!r.ok) throw new Error("ダウンロードできませんでした"); const blob=new Blob([await r.arrayBuffer()],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}); const url=URL.createObjectURL(blob); const a=document.createElement("a"); a.href=url; a.download=name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),4000); }catch(err){ setMsg("⚠ "+String(err&&err.message||err)); } setBusy(false); };
+  const activePath=st&&st.meta&&st.meta.path;
+  return <React.Fragment>
+    <h3 className="blk">📄 日誌のひな形（Excelの形式）</h3>
+    <p className="tiny">日誌のExcel出力に使う形式を、ここで差し替えられます。ひな形の中に <b>{"{{利用者名}}"}</b> のような目印を書いておくと、その場所に内容が入ります。写真（その日のご様子写真・食事の写真）は、この目印方式のひな形で使えます。</p>
+    {st===null&&<p className="tiny">読み込み中…</p>}
+    {st&&st.err&&<p className="err">状態を読み込めませんでした（{st.err}）。</p>}
+    {st&&!st.err&&<div className={"tp-state "+(st.active?"on":"off")}>{st.active?<>✅ 使用中：<b>{(st.meta&&st.meta.name)||"新しいひな形"}</b>{st.meta&&st.meta.at?<span className="tiny">（{fdt(st.meta.at)} から）</span>:null}</>:<>いまは<b>従来の形式</b>（写真なし）で出力しています。</>}</div>}
+    <label className="field" style={{marginTop:8}}><span>管理者のパスワード（変更の操作に必要）</span><input type="password" value={pw} onChange={e=>setPw(e.target.value)} autoComplete="current-password"/></label>
+    <div className="row-end" style={{flexWrap:"wrap"}}>
+      <Btn kind="ghost2" disabled={busy} onClick={()=>down(st&&st.active?"active":"legacy",st&&st.active?"日誌ひな形_使用中.xlsx":"日誌ひな形_従来.xlsx")}>⬇ いまのひな形をダウンロード</Btn>
+      <Btn disabled={busy} onClick={()=>{ if(needPw()) return; fileRef.current&&fileRef.current.click(); }}>⬆ ひな形をアップロード</Btn>
+    </div>
+    <input ref={fileRef} type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={onFile} style={{display:"none"}}/>
+    {msg&&<p className="tiny" style={{fontWeight:700,color:msg.indexOf("⚠")===0?"#B33A2B":"#2E6B42"}}>{msg}</p>}
+    {res&&<div className="tp-res"><div><b>見つかった目印（{res.markers.length}）：</b>{res.markers.join("、")}</div>{res.missing&&res.missing.length>0&&<div style={{color:"#8A5A12"}}><b>入っていない目印：</b>{res.missing.join("、")}（この項目はExcelに出ません）</div>}{res.unknown&&res.unknown.length>0&&<div style={{color:"#B33A2B"}}><b>名前が違う目印：</b>{res.unknown.join("、")}（下の一覧の名前にしてください）</div>}</div>}
+    {st&&st.versions&&st.versions.length>0&&<div style={{marginTop:8}}>
+      <div className="tiny" style={{fontWeight:800,color:"#8A5A66"}}>アップロード済みのひな形</div>
+      {st.versions.map(v=><div key={v.path} className="tp-ver">
+        <div><b>{v.name}</b>{activePath===v.path&&<span className="chip" style={{marginLeft:6,background:"#2E7D46",color:"#fff",borderColor:"#2E7D46"}}>使用中</span>}<div className="tiny">{fdt(v.at)}{v.by?("・"+v.by):""}・目印{(v.markers||[]).length}個</div></div>
+        <div className="tp-ver-b"><button className="link-btn" disabled={busy} onClick={()=>tryShow(v)}>試しに表示</button>{activePath!==v.path&&<button className="link-btn" disabled={busy} onClick={()=>act(v)}>この形式で使う</button>}<button className="link-btn" disabled={busy} onClick={()=>down(v.path,v.name)}>⬇</button>{activePath!==v.path&&<button className="mini-del" style={{marginLeft:0}} disabled={busy} onClick={()=>del(v)}>🗑</button>}</div>
+      </div>)}
+    </div>}
+    {st&&st.active&&<div className="row-end" style={{marginTop:6}}><button className="link-btn" disabled={busy} onClick={deact}>従来の形式（写真なし）に戻す</button></div>}
+    <button className="link-btn" style={{marginTop:6}} onClick={()=>setHelp(!help)}>{help?"▼ 目印の一覧を閉じる":"▶ 使える目印の一覧"}</button>
+    {help&&<div className="tp-help"><p className="tiny" style={{marginTop:0}}>Excelのセルに目印を書きます。内容が空のときに出す文字は <b>{"{{体温1|　　}}"}</b> のように「|」のあとに書けます。「測定時間（ {"{{測定時間1}}"} ）」のように、文字と組み合わせることもできます。</p>{NS2_MARK_HELP.map(([k,d])=><div key={k} className="tp-help-r"><code>{k.split("／").map(x=>"{{"+x.replace(/〜.*$/,"…")+"}}").join(" ")}</code><span>{d}</span></div>)}</div>}
+    {pv&&<Modal title={"試しに表示：「"+pv.name+"」"} tint="#C9788F" onClose={()=>setPv(null)}><div className="xpv-info">見本のデータ（架空の内容・見本の写真）を入れて、このひな形で実際に作ったExcelです。</div><XlRealView m={pv.m}/></Modal>}
+  </React.Fragment>;
+}
+
 /* ============ 管理者：AI相談の履歴と参考回答 ============ */
 function AiLogAdmin({data,persist}){
   const [rows,setRows]=useState(null); const [busy,setBusy]=useState(false); const [err,setErr]=useState(""); const [openId,setOpenId]=useState(""); const [ed,setEd]=useState(null); const [fUser,setFUser]=useState("");
@@ -3925,6 +4028,7 @@ function AdminPanel({data,persist}){
     <p className="tiny"><b>軽量</b>＝写真・計画ファイルの画像は含めず（小さい）。<b>フル</b>＝写真・個別訓練計画の画像も全部含める（大きく時間がかかります）。</p>
     <div className="row-end" style={{gap:"8px",flexWrap:"wrap"}}><Btn kind="ghost2" onClick={()=>doBackup(false)} disabled={bkBusy}>{bkBusy?"書き出し中…":"⬇ 軽量バックアップ"}</Btn><Btn onClick={()=>doBackup(true)} disabled={bkBusy}>{bkBusy?"書き出し中…":"⬇ フルバックアップ（画像込み）"}</Btn></div>
     {bkProg&&<p className="tiny" style={{color:"#B25E77"}}>{bkProg}</p>}
+    <NisshiTemplateAdmin/>
     <AiLogAdmin data={data} persist={persist}/>
     <h3 className="blk">🛡 データ保護</h3>
     <p className="tiny">毎日1回、文字のデータ（補充品・申し送り・食事記録・利用者一覧・アカウントなど）を自動でバックアップしています（この端末に直近4日分、サーバーに直近約2週間分）。万一のときは、下のボタンから日付を選んで戻せます。</p>
