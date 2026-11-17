@@ -336,6 +336,7 @@
   @keyframes recpop{0%{transform:scale(.86);}55%{transform:scale(1.08);}100%{transform:scale(1);}}
   .recbtn.cam{background:#EAF3E6;border-color:#CFE3C6;color:#5B8A45;}
   .rec-log{display:flex;flex-direction:column;gap:6px;margin-top:6px;}
+  .xpv-warn{background:#FFF4E5;border:1px solid #F0C98A;color:#7A5418;border-radius:10px;padding:9px 11px;font-size:12.5px;line-height:1.65;margin-bottom:10px;}
   .xpv-wrap{background:#EDE7E9;border-radius:10px;padding:8px;}
   .xpv-paper{background:#fff;box-shadow:0 2px 10px rgba(0,0,0,.15);padding:14px 10px;}
   table.xpv{border-collapse:collapse;table-layout:fixed;font-family:"Hiragino Sans","Yu Gothic","Meiryo",sans-serif;font-size:12px;color:#222;}
@@ -383,6 +384,13 @@
   .thumb img{width:100%;height:100px;object-fit:cover;display:block;}
   .thumb span{font-size:10px;color:#94808A;padding:4px 6px;background:#fff;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .rec-thumb{width:40px;height:40px;object-fit:cover;border-radius:8px;cursor:pointer;}
+  .recfood{background:#FBF6F0;border-radius:10px;padding:7px 8px;margin-top:8px;}
+  .canSave{-webkit-touch-callout:default;-webkit-user-select:auto;user-select:auto;}
+  .pshare{margin:10px 0 4px;}
+  .pshare-b{display:flex;gap:8px;flex-wrap:wrap;}
+  .pshare-b>*{flex:1 1 140px;}
+  .pshare-m{font-size:12.5px;line-height:1.6;color:#2E6B42;background:#EEF7F0;border-radius:9px;padding:7px 10px;margin:8px 0 0;}
+  .pshare-m.warn{color:#7A5418;background:#FFF4E5;}
   .noSave{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;pointer-events:auto;}
   .album-filter{display:flex;gap:12px;margin-bottom:12px;flex-wrap:wrap;}
   .album-filter label{font-size:12px;color:#C9788F;font-weight:700;display:flex;flex-direction:column;gap:4px;}
@@ -467,6 +475,11 @@
   .shop-head{display:flex;justify-content:space-between;align-items:center;font-weight:800;color:#9A7B1E;font-size:15px;cursor:pointer;}
   .shop-sec{margin-top:8px;}
   .shop-sec-h{font-weight:700;color:#B07A2E;font-size:12px;background:#F6ECCF;border-radius:6px;padding:3px 8px;display:inline-block;margin-bottom:4px;}
+  .wr-chips{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px;}
+  .wr-chip{display:inline-flex;align-items:center;gap:4px;background:#FBEAEE;color:#8A4A5C;border-radius:999px;padding:4px 6px 4px 10px;font-size:13px;font-weight:700;}
+  .wr-chip button{border:none;background:#fff;color:#C0392B;border-radius:999px;width:20px;height:20px;font-size:11px;line-height:20px;padding:0;cursor:pointer;}
+  .shop-skip{flex:none;display:flex;flex-direction:column;align-items:center;background:#fff;border:1px solid #E8C9C2;color:#B4574A;border-radius:8px;padding:2px 6px;font-size:13px;font-weight:700;line-height:1.1;cursor:pointer;}
+  .shop-skip span{font-size:9.5px;font-weight:700;}
   .shop-item{display:flex;align-items:center;gap:8px;padding:5px 2px;border-bottom:1px dashed #EADFBF;}
   .shop-check{width:26px;height:26px;border-radius:50%;border:2px solid #C9A94A;background:#fff;color:#C9A94A;font-weight:800;cursor:pointer;flex:none;line-height:1;}
   .shop-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px;}
@@ -1288,7 +1301,9 @@ function Nisshi({me,data,persist}){
     {f&&<div className="nisshi">
       <div className="nisshi-head">ふれあいホームみずほ 利用日誌</div>
       <div className="nf2"><div className="nf"><label>利用者名</label><input value={f.name} onChange={e=>setField("name",e.target.value)}/></div>
-        <div className="nf"><label>記録者</label><select value={f.writer||""} onChange={e=>setField("writer",e.target.value)}><option value="">（選択してください）</option>{(data.accounts||[]).map(a=><option key={a.id} value={a.name}>{a.name}</option>)}{f.writer&&!(data.accounts||[]).some(a=>a.name===f.writer)&&<option value={f.writer}>{f.writer}</option>}</select></div></div>
+        <div className="nf"><label>記録者（複数可）</label>{(()=>{ const wl=String(f.writer||"").split(/[・、,，]/).map(x=>x.trim()).filter(Boolean); const setW=(a)=>setField("writer",a.join("・")); return <>
+          <div className="wr-chips">{wl.map(n=><span key={n} className="wr-chip">{n}<button type="button" onClick={()=>setW(wl.filter(x=>x!==n))} aria-label={n+"を外す"}>✕</button></span>)}{wl.length===0&&<span className="tiny" style={{color:"#B0895A"}}>（未選択）</span>}</div>
+          <select value="" onChange={e=>{ const v=e.target.value; if(!v) return; if(!wl.includes(v)) setW(wl.concat([v])); }}><option value="">＋ 記録者を追加</option>{(data.accounts||[]).filter(a=>!wl.includes(a.name)).map(a=><option key={a.id} value={a.name}>{a.name}</option>)}</select></>; })()}</div></div>
       <div className="nf"><label>期間</label><input value={f.period} onChange={e=>setField("period",e.target.value)}/></div>
       <div className="nf2"><div className="nf"><label>バイタル（来所）</label><input value={f.vitals1} onChange={e=>setField("vitals1",e.target.value)}/></div>
         <div className="nf"><label>バイタル（起床）</label><input value={f.vitals2} onChange={e=>setField("vitals2",e.target.value)}/></div></div>
@@ -1330,7 +1345,7 @@ function Nisshi({me,data,persist}){
       </div>
     </div>}
     {xpv&&f&&<Modal title="👁 Excel出力のプレビュー" tint="#C9788F" onClose={()=>setXpv(false)}>
-      <p className="tiny" style={{marginTop:0}}>Excelで出力したときの、おおよその見た目です（いま画面に入っている内容で表示）。文字の大きさ・罫線・改行の位置など、細かい部分は実際のファイルと異なることがあります。</p>
+      <div className="xpv-warn"><b>⚠ ご注意</b><br/>このプレビューは、升目の配置を画面上で再現した<b>おおよその見た目</b>です。実際のExcelファイルは事業所のひな形をもとにサーバーで作るため、<b>文字の大きさ・罫線の太さ・改行の位置・項目の位置</b>などが異なります。提出・印刷の前は、出力したExcelファイルでご確認ください。</div>
       <XlPreview lay={nsLayout()}/>
       <div className="row-end" style={{marginTop:10}}><Btn kind="ghost2" onClick={()=>setXpv(false)}>閉じる</Btn><Btn onClick={()=>{setXpv(false);toExcel();}}>⬇ このままExcel出力</Btn></div>
     </Modal>}
@@ -1482,6 +1497,7 @@ function Handover({me,data,persist}){
   const addVariant=(it)=>{ const nn=prompt("追加する種類の名前（例：ブルーベリー）",""); if(nn===null)return; const v=(nn||"").trim(); if(!v)return; const cur=it.variants||[]; if(cur.indexOf(v)>=0){ flash("「"+v+"」はすでにあります"); return; } persist(Object.assign({},data,{supplyItems:items.map(i=>i.id===it.id?Object.assign({},i,{variants:cur.concat([v])}):i)})); flash("種類「"+v+"」を追加しました"); };
   const delVariant=(it,v)=>{ if(!confirm("種類「"+v+"」を削除しますか？（この種類の希望・写真も消えます）"))return; const vars=(it.variants||[]).filter(x=>x!==v); const wv=wvOf(it).filter(x=>x!==v); const photos=Object.assign({},it.photos||{}); delete photos[v]; const photos2=Object.assign({},it.photos2||{}); delete photos2[v]; persist(Object.assign({},data,{supplyItems:items.map(i=>i.id===it.id?Object.assign({},i,{variants:vars,wantVariants:wv,photos:photos,photos2:photos2,want:wv.length>0?i.want:false}):i)})); };
   const toggleWant=(it)=>{ const now=new Date().toISOString(); const upd=it.want?{want:false}:{want:true,wantBy:me.name,wantAt:now,done:false,doneAt:null}; persist(Object.assign({},data,{supplyItems:items.map(i=>i.id===it.id?Object.assign({},i,upd):i)})); };
+  const skipShop=(en)=>{ const it=en.it, v=en.v; const nm=it.name+(v?("（"+v+"）"):""); if(!confirm("「"+nm+"」を買い物リストから外しますか？\n（購入せずに外します。必要になったら、また補充品の一覧でチェックしてください）"))return; const now=new Date().toISOString(); let upd; if(v){ const next=wvOf(it).filter(x=>x!==v); upd={wantVariants:next,skipBy:me.name,skipAt:now,skipName:nm}; if(next.length===0) upd.want=false; } else { upd={want:false,skipBy:me.name,skipAt:now,skipName:nm}; } persist(Object.assign({},data,{supplyItems:items.map(i=>i.id===it.id?Object.assign({},i,upd):i)})); flash("「"+nm+"」を買い物リストから外しました"); };
   const markDone=(it)=>{ persist(Object.assign({},data,{supplyItems:items.map(i=>i.id===it.id?Object.assign({},i,{done:true,doneAt:new Date().toISOString(),want:false,wantVariants:[]}):i)})); };
   const clearDone=(it)=>{ persist(Object.assign({},data,{supplyItems:items.map(i=>i.id===it.id?Object.assign({},i,{done:false,doneAt:null}):i)})); };
   const saveNote=()=>{ persist(Object.assign({},data,{supplyNote:note})); flash("備考を保存しました"); };
@@ -1519,7 +1535,7 @@ function Handover({me,data,persist}){
       {(()=>{ const entries=[]; items.forEach(it=>{ if(it.done)return; if(isVar(it)){ wvOf(it).forEach(v=>entries.push({it,v})); } else if(it.want){ entries.push({it,v:""}); } }); if(entries.length===0) return null; const bySec={}; entries.forEach(en=>{ const s=secOf(en.it); (bySec[s]=bySec[s]||[]).push(en); }); const order=SHOP_SECTIONS.filter(s=>bySec[s]); Object.keys(bySec).forEach(s=>{ if(!order.includes(s)) order.push(s); }); return <div className="shop-box">
         <div className="shop-head" onClick={()=>setShopOpen(!shopOpen)}><span>🛒 買い物リスト（{entries.length}）</span><span className="tiny">{shopOpen?"▼ 閉じる":"▶ 開く"}</span></div>
         {shopOpen&&<div>
-          <p className="tiny" style={{margin:"2px 0 8px",color:"#8A6B74"}}>売り場ごとにまとめています。買えたら「○」を押すと消えます（＝済）。</p>
+          <p className="tiny" style={{margin:"2px 0 8px",color:"#8A6B74"}}>売り場ごとにまとめています。買えたら「○」を押すと消えます（＝済）。買わなくてよいと判断したものは、右の「✕不要」でリストから外せます。</p>
           {order.map(sec=>(<div key={sec} className="shop-sec">
             <div className="shop-sec-h">{sec}</div>
             {bySec[sec].map((en,i)=>{ const ph=en.v?((en.it.photos||{})[en.v]):en.it.photo; const ph2=ph?(en.v?((en.it.photos2||{})[en.v]):en.it.photo2):""; const note=(en.it.note||"").trim(); return (<div key={en.it.id+"_"+en.v+"_"+i} className="shop-item">
@@ -1527,6 +1543,7 @@ function Handover({me,data,persist}){
               {ph?<img className="shop-thumb" src={ph} alt="" onClick={()=>setAv({data:ph,meta:{type:"image"}})}/>:<button className="shop-noimg" title="写真を登録" onClick={()=>{setSupPhotoFor({id:en.it.id,v:en.v||null});supFileRef.current&&supFileRef.current.click();}}>📷<span className="shop-noimg-t">登録</span></button>}{ph&&ph2&&<img className="shop-thumb" src={ph2} alt="" onClick={()=>setAv({data:ph2,meta:{type:"image"}})}/>}
               <div className="shop-main"><span className="shop-name">{en.it.name}{en.v?("（"+en.v+"）"):""}</span>{note&&<span className="shop-note">📝 {note}</span>}</div>
               <span className="shop-meta">希望{mdOnly(en.it.wantAt)}{en.it.wantBy?("・"+en.it.wantBy):""}</span>
+              <button className="shop-skip" onClick={()=>skipShop(en)} title="不要としてリストから外す（購入しない）">✕<span>不要</span></button>
             </div>);})}
           </div>))}
         </div>}
@@ -1561,7 +1578,7 @@ function Handover({me,data,persist}){
       </div>}
     </>}
     <input ref={supFileRef} type="file" accept="image/*" onChange={onSupPhoto} style={{display:"none"}}/>
-    {av&&<Modal title="添付" tint="#C9788F" onClose={()=>setAv(null)}>{av.meta&&av.meta.type==="pdf"?<embed src={av.data} type="application/pdf" style={{width:"100%",height:"60vh"}}/>:<img src={av.data} style={{width:"100%",borderRadius:8}} alt="添付"/>}</Modal>}
+    {av&&<Modal title="添付" tint="#C9788F" onClose={()=>setAv(null)}>{av.meta&&av.meta.type==="pdf"?<embed src={av.data} type="application/pdf" style={{width:"100%",height:"60vh"}}/>:<><img className="canSave" src={av.data} style={{width:"100%",borderRadius:8}} alt="添付"/><PhotoShare src={av.data} name="写真"/></>}</Modal>}
     {supCatFor&&(()=>{ const cur=items.find(i=>i.id===supCatFor.id)||supCatFor; const sel=scatsOf(cur); return <Modal title={"カテゴリー："+(cur.name||"")} tint="#C9788F" onClose={()=>setSupCatFor(null)}>
       <p className="hint">この品目を表示するカテゴリーを選びます（複数選べます）。選んだ全てのカテゴリーに表示されます。</p>
       <div className="chk-grid" style={{gridTemplateColumns:"repeat(2,1fr)",gap:8}}>{supCats.map(c=><label className="chk" key={c}><input type="checkbox" checked={sel.indexOf(c)>=0} onChange={()=>toggleItemCat(cur.id,c)}/>{c}</label>)}</div>
@@ -1741,14 +1758,27 @@ function Records({me,data,persist,reload}){
   const normSlot=(x)=>{ x=x||{}; const imgs=Array.isArray(x.imgs)?x.imgs.filter(Boolean):(x.img?[x.img]:[]); return {menu:x.menu||"",cook1:x.cook1||"",cook2:x.cook2||"",imgs:imgs,img:imgs[0]||""}; };
   const mealNorm=(v)=>{ v=v||{}; if(v.dinner||v.breakfast) return {dinner:normSlot(v.dinner),breakfast:normSlot(v.breakfast)}; if(v.menu||v.cook1||v.cook2||v.img||v.imgs) return {dinner:normSlot(v),breakfast:normSlot({})}; return {dinner:normSlot({}),breakfast:normSlot({})}; };
   const mealAuto=(ds)=>{ const bs=new Date(ds+"T15:00:00"); const be=(()=>{const e=addDays(new Date(ds+"T00:00:00"),1);e.setHours(15,0,0,0);return e;})(); const recs=(data.records||[]).filter(r=>{const t=new Date(r.ts);return t>=bs&&t<be;}); const pick=(re)=>recs.filter(r=>re.test(r.item||"")).map(r=>(r.item||"").replace(/^メニュー[^：]*：/,"")).join(" / "); const plan=(data.dayPlans||{})[ds]||{}; const shifts=(data.shifts||[]).filter(s=>s.date===ds); const eve=[plan.s3,plan.s4].filter(Boolean); if(!eve.length){ shifts.filter(s=>s.role==="eve").forEach(s=>{if(s.name&&eve.indexOf(s.name)<0)eve.push(s.name);}); } const night=[plan.s1,plan.s2].filter(Boolean); if(!night.length){ shifts.filter(s=>s.role==="A"||s.role==="B").forEach(s=>{if(s.name&&night.indexOf(s.name)<0)night.push(s.name);}); } const dCooks=eve.length?eve:night; return {dMenu:(plan.menuD||pick(/^メニュー（晩）/)),bMenu:(plan.menuB||pick(/^メニュー（朝）/)),dCook1:dCooks[0]||"",dCook2:dCooks[1]||"",bCook1:night[0]||"",bCook2:night[1]||""}; };
-  const mealView=(ds)=>{ const v=mealNorm(mealLog[ds]); if(v.dinner.menu&&v.breakfast.menu) return v; const plan=(data.dayPlans||{})[ds]||{}; let dm=plan.menuD||"", bm=plan.menuB||""; if((!v.dinner.menu&&!dm)||(!v.breakfast.menu&&!bm)){ const au=mealAuto(ds); dm=dm||au.dMenu||""; bm=bm||au.bMenu||""; } return {dinner:Object.assign({},v.dinner,{menu:v.dinner.menu||dm}),breakfast:Object.assign({},v.breakfast,{menu:v.breakfast.menu||bm})}; };
+  const recFood=(ds)=>{ const bs=new Date(ds+"T15:00:00"); const be=addDays(new Date(ds+"T00:00:00"),1); be.setHours(15,0,0,0); const seen={}; const o={d:[],b:[]}; (data.records||[]).forEach(r=>{ if(!r||!r.photoId) return; if(!(r.cat==="食事"||/写真（食事/.test(r.item||""))) return; const t=new Date(r.ts); if(!(t>=bs&&t<be)) return; if(seen[r.photoId]) return; seen[r.photoId]=1; const nextDay=t.getDate()!==bs.getDate(); (nextDay&&t.getHours()>=4?o.b:o.d).push({id:r.photoId,thumb:r.thumb||"",ts:r.ts}); }); return o; };
+  const mealView=(ds)=>{ const v=mealView0(ds); const rf=recFood(ds); const add=(x,arr)=>(x.img||!arr.length)?Object.assign({},x,{rec:arr}):Object.assign({},x,{img:arr[0].thumb,rec:arr}); return {dinner:add(v.dinner,rf.d),breakfast:add(v.breakfast,rf.b)}; };
+  const menuRecsOf=(ds,which)=>{ const bs=new Date(ds+"T15:00:00"); const be=addDays(new Date(ds+"T00:00:00"),1); be.setHours(15,0,0,0); return (data.records||[]).filter(r=>{ const t=new Date(r.ts); if(!(t>=bs&&t<be)) return false; const it=String(r.item||""); return (which!=="b"&&/^メニュー（晩）/.test(it))||(which!=="d"&&/^メニュー（朝）/.test(it)); }); };
+  const menuClear=async(ds,which,ask)=>{ const recs=menuRecsOf(ds,which); const lab=which==="d"?"晩":which==="b"?"朝":"晩・朝"; if(ask&&!confirm(fmtDate(ds)+" の"+lab+"のメニューを取り消しますか？"+(recs.length?("\n（記録一覧の「メニュー」の記録 "+recs.length+"件も削除します）"):"")+"\n\n取り消したあと、正しいメニューを登録し直せます。")) return false; const plans=Object.assign({},data.dayPlans||{}); const cur=Object.assign({},plans[ds]||{}); if(which!=="b") delete cur.menuD; if(which!=="d") delete cur.menuB; plans[ds]=cur; const patch={dayPlans:plans}; const ml=(data.mealLog||{})[ds]; if(ml){ const v=mealNorm(ml); const strip=(x)=>({menu:x.menu,cook1:x.cook1,cook2:x.cook2,imgs:x.imgs}); const nd=strip(v.dinner), nb=strip(v.breakfast); if(which!=="b") nd.menu=""; if(which!=="d") nb.menu=""; patch.mealLog=Object.assign({},data.mealLog||{},{[ds]:{dinner:nd,breakfast:nb}}); } persist(Object.assign({},data,patch)); let ok=true; for(const r of recs){ try{ await recDelete(r.id); }catch(e){ ok=false; } } if(recs.length){ try{ await reload(); }catch(e){} } flash(ok?("メニューを取り消しました（"+lab+"）"):"メニューは取り消しましたが、一部の記録を削除できませんでした"); return true; };
+  const useRecPhoto=async(slot,id)=>{ try{ const ph=await sbPhotoFull(id); if(!ph||!ph.image){ flash("写真を読み込めませんでした"); return; } const img=await resizeDataUrl(ph.image,340,0.45); setMealEdit(p=>{ const k=slot==="b"?"bImgs":"dImgs"; const arr=(p[k]||[]); return Object.assign({},p,{[k]:arr.concat(img)}); }); flash("カレンダーの写真に追加しました（保存を押すと確定）"); }catch(e){ flash("写真を読み込めませんでした"); } };
+  const [imgView,setImgView]=useState(null);
+  const mealView0=(ds)=>{ const v=mealNorm(mealLog[ds]); if(v.dinner.menu&&v.breakfast.menu) return v; const plan=(data.dayPlans||{})[ds]||{}; let dm=plan.menuD||"", bm=plan.menuB||""; if((!v.dinner.menu&&!dm)||(!v.breakfast.menu&&!bm)){ const au=mealAuto(ds); dm=dm||au.dMenu||""; bm=bm||au.bMenu||""; } return {dinner:Object.assign({},v.dinner,{menu:v.dinner.menu||dm}),breakfast:Object.assign({},v.breakfast,{menu:v.breakfast.menu||bm})}; };
   const menuSync=(ds,d,b)=>{ const plans=Object.assign({},data.dayPlans||{}); const cur=Object.assign({},plans[ds]||{}); if(d) cur.menuD=d; if(b) cur.menuB=b; plans[ds]=cur; const patch={dayPlans:plans}; const ml=(data.mealLog||{})[ds]; if(ml){ const v=mealNorm(ml); const strip=(x)=>({menu:x.menu,cook1:x.cook1,cook2:x.cook2,imgs:x.imgs}); const nd=strip(v.dinner), nb=strip(v.breakfast); if(d) nd.menu=d; if(b) nb.menu=b; patch.mealLog=Object.assign({},data.mealLog||{},{[ds]:{dinner:nd,breakfast:nb}}); } persist(Object.assign({},data,patch)); };
   const mealCells=(()=>{ const p=mealMonth.split("-"); const y=+p[0],m=+p[1]; const startW=new Date(y,m-1,1).getDay(); const dim=new Date(y,m,0).getDate(); const a=[]; for(let i=0;i<startW;i++)a.push(null); for(let d=1;d<=dim;d++)a.push(y+"-"+String(m).padStart(2,"0")+"-"+String(d).padStart(2,"0")); while(a.length%7)a.push(null); return a; })();
   const mealShift=(delta)=>{ const p=mealMonth.split("-"); const d=new Date(+p[0],+p[1]-1+delta,1); setMealMonth(d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")); };
   const openMealDay=(ds)=>{ const cur=mealNorm(mealLog[ds]); const d=cur.dinner,b=cur.breakfast; const au=mealAuto(ds); setMealEdit({date:ds, dMenu:d.menu||au.dMenu||"",dCook1:d.cook1||au.dCook1||"",dCook2:d.cook2||au.dCook2||"",dImgs:d.imgs.slice(), bMenu:b.menu||au.bMenu||"",bCook1:b.cook1||au.bCook1||"",bCook2:b.cook2||au.bCook2||"",bImgs:b.imgs.slice()}); setMealBulk(""); setMealBulkOpen(false); };
   const mealReAuto=()=>{ const e=mealEdit; const au=mealAuto(e.date); setMealEdit(p=>Object.assign({},p,{dMenu:au.dMenu||p.dMenu,dCook1:au.dCook1||p.dCook1,dCook2:au.dCook2||p.dCook2,bMenu:au.bMenu||p.bMenu,bCook1:au.bCook1||p.bCook1,bCook2:au.bCook2||p.bCook2})); flash("シフト・メニューから反映しました"); };
   const onMealPhoto=async(ev)=>{ const f=ev.target.files&&ev.target.files[0]; ev.target.value=""; if(!f)return; try{ const img=await compressImage(f,340,0.45); setMealEdit(p=>{ const k=mealPhotoSlot==="b"?"bImgs":"dImgs"; return Object.assign({},p,{[k]:(p[k]||[]).concat(img)}); }); }catch(e){} };
-  const saveMeal=()=>{ const e=mealEdit; const dinner={menu:(e.dMenu||"").trim(),cook1:e.dCook1||"",cook2:e.dCook2||"",imgs:(e.dImgs||[]).filter(Boolean)}; const breakfast={menu:(e.bMenu||"").trim(),cook1:e.bCook1||"",cook2:e.bCook2||"",imgs:(e.bImgs||[]).filter(Boolean)}; const empty=(x)=>!x.menu&&!x.cook1&&!x.cook2&&!(x.imgs&&x.imgs.length); const next=Object.assign({},mealLog); if(empty(dinner)&&empty(breakfast)){ delete next[e.date]; } else { next[e.date]={dinner,breakfast}; } persist(Object.assign({},data,{mealLog:next})); setMealEdit(null); flash("食事記録を保存しました"); };
+  const saveMeal=async()=>{ const e=mealEdit; const dinner={menu:(e.dMenu||"").trim(),cook1:e.dCook1||"",cook2:e.dCook2||"",imgs:(e.dImgs||[]).filter(Boolean)}; const breakfast={menu:(e.bMenu||"").trim(),cook1:e.bCook1||"",cook2:e.bCook2||"",imgs:(e.bImgs||[]).filter(Boolean)}; const empty=(x)=>!x.menu&&!x.cook1&&!x.cook2&&!(x.imgs&&x.imgs.length);
+    const delD=!dinner.menu?menuRecsOf(e.date,"d"):[], delB=!breakfast.menu?menuRecsOf(e.date,"b"):[]; const dels=delD.concat(delB);
+    if(dels.length&&!confirm("メニュー欄を空にしたため、記録一覧の「メニュー」の記録 "+dels.length+"件も削除します。よろしいですか？\n（「キャンセル」を押すと記録は残して保存します）")){ dels.length=0; }
+    const next=Object.assign({},mealLog); if(empty(dinner)&&empty(breakfast)){ delete next[e.date]; } else { next[e.date]={dinner,breakfast}; }
+    const plans=Object.assign({},data.dayPlans||{}); const cur=Object.assign({},plans[e.date]||{}); if(dinner.menu) cur.menuD=dinner.menu; else delete cur.menuD; if(breakfast.menu) cur.menuB=breakfast.menu; else delete cur.menuB; plans[e.date]=cur;
+    persist(Object.assign({},data,{mealLog:next,dayPlans:plans})); setMealEdit(null);
+    for(const r of dels){ try{ await recDelete(r.id); }catch(err){} } if(dels.length){ try{ await reload(); }catch(err){} }
+    flash("食事記録を保存しました（記録画面のメニュー表示にも反映）"); };
   const mealToExcel=()=>{ if(!window.XLSX){flash("Excel機能の読み込み中です");return;} const p=mealMonth.split("-"); const y=+p[0],m=+p[1]; const dim=new Date(y,m,0).getDate(); const wd=["日","月","火","水","木","金","土"]; const ck=(x)=>[x.cook1,x.cook2].filter(Boolean).join("・"); const A=[["日付","曜日","晩メニュー","晩 調理担当","朝メニュー","朝 調理担当"]]; for(let d=1;d<=dim;d++){ const ds=y+"-"+String(m).padStart(2,"0")+"-"+String(d).padStart(2,"0"); const v=mealView(ds); const dd=new Date(ds+"T00:00:00"); A.push([m+"/"+d, wd[dd.getDay()], v.dinner.menu||"", ck(v.dinner), v.breakfast.menu||"", ck(v.breakfast)]); } const ws=XLSX.utils.aoa_to_sheet(A); ws["!cols"]=[{wch:8},{wch:5},{wch:36},{wch:14},{wch:36},{wch:14}]; const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,y+"年"+m+"月食事"); const out=XLSX.write(wb,{bookType:"xlsx",type:"array"}); const blob=new Blob([out],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}); const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="食事記録_"+y+"年"+m+"月.xlsx"; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),4000); };
   const mealShrunkRef=useRef({});
   const mealPngRef=useRef("");
@@ -1984,7 +2014,7 @@ function Records({me,data,persist,reload}){
         <button className={"seg "+(showAllUsers?"on":"")} onClick={()=>setShowAllUsers(true)}>全員</button>
       </div>}
       {(()=>{ const pl=(data.dayPlans||{})[logDate]||{}; if(!pl.menuD&&!pl.menuB) return null; return <div className={"menu-band"+(menuExp?" exp":"")}>
-        <div className="menu-band-h"><span>🍱 この日のメニュー</span><span style={{display:"flex",gap:6}}><button className="link-btn" onClick={()=>setMenuExp(!menuExp)}>{menuExp?"たたむ":"全文"}</button><button className="link-btn" onClick={()=>{setMenuFor(logDate);setMenuRaw("");setMenuD(pl.menuD||"");setMenuB(pl.menuB||"");setMenuOpen(true);}}>✎ 直す</button></span></div>
+        <div className="menu-band-h"><span>🍱 この日のメニュー</span><span style={{display:"flex",gap:6}}><button className="link-btn" onClick={()=>setMenuExp(!menuExp)}>{menuExp?"たたむ":"全文"}</button><button className="link-btn" onClick={()=>{setMenuFor(logDate);setMenuRaw("");setMenuD(pl.menuD||"");setMenuB(pl.menuB||"");setMenuOpen(true);}}>✎ 直す</button><button className="link-btn" style={{color:"#C0392B"}} onClick={()=>menuClear(logDate,"both",true)}>取り消す</button></span></div>
         {pl.menuD&&<div className="menu-band-l" onClick={()=>setMenuExp(!menuExp)}><span className="mc-tag d">晩</span><span className="menu-band-t">{pl.menuD}</span></div>}
         {pl.menuB&&<div className="menu-band-l" onClick={()=>setMenuExp(!menuExp)}><span className="mc-tag b">朝</span><span className="menu-band-t">{pl.menuB}</span></div>}
       </div>; })()}
@@ -1994,7 +2024,7 @@ function Records({me,data,persist,reload}){
         <span className="rec-time">{hm(r.ts)}</span><span className="chip" style={{background:uc.bg,color:uc.fg}}>{r.user}</span>
         {r.thumb&&<img className="rec-thumb noSave" draggable={false} onContextMenu={e=>e.preventDefault()} src={r.thumb} alt="写真" onClick={()=>openFull(r.photoId)}/>}
         <span className={"rec-item"+(r.abn?" abn":"")}>{r.item}</span>
-        {(r.by||r.edBy)&&<span className="rec-by" title={(r.by?("入力："+r.by):"")+(r.edBy?("　修正："+r.edBy):"")}>{r.by?shortBy(r.by):""}{r.edBy&&<span className="rec-ed">{r.by?<br/>:null}修正:{shortBy(r.edBy)}</span>}</span>}
+        {(r.by||r.edBy)&&<span className="rec-by" title={(r.by?("入力："+r.by):"")+(r.edBy?("　修正補足："+r.edBy):"")}>{r.by?shortBy(r.by):""}{r.edBy&&<span className="rec-ed">{r.by?<br/>:null}修正補足:{shortBy(r.edBy)}</span>}</span>}
         <button className="mini-key" onClick={()=>openEditRec(r)}>✏️</button><button className="mini-del" onClick={()=>delRec(r.id)}>🗑</button></div>;})}</div>
     </>}
     <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={onFile} style={{display:"none"}}/>
@@ -2072,11 +2102,13 @@ function Records({me,data,persist,reload}){
       <div className="row-end"><Btn onClick={saveEditRec}>修正を保存</Btn></div>
     </Modal>}
     {pv&&<Modal title="記録写真" tint="#C9788F" onClose={()=>setPv(null)}>
-      <img className="noSave" draggable={false} onContextMenu={e=>e.preventDefault()} src={pv.image} style={{width:"100%",borderRadius:12}} alt="記録写真"/>
+      <img className="canSave" src={pv.image} style={{width:"100%",borderRadius:12}} alt="記録写真"/>
+      <PhotoShare src={pv.image} name={"写真_"+((pv.meta&&pv.meta.cat)||"記録")}/>
       <p className="hint" style={{marginTop:10}}>{pv.meta&&pv.meta.users?pv.meta.users.join("・"):""}　{pv.created?new Date(pv.created).toLocaleString():""}</p>
       <div className="row-between"><Btn kind="ghost2" disabled={busy} onClick={()=>setPvCrop(true)}>✂️ 切り取り・回転</Btn><Btn kind="ghost2" onClick={()=>delPhoto(pv.id)}>削除</Btn></div>
     </Modal>}
     {pvCrop&&pv&&<CropModal src={pv.image} onCancel={()=>setPvCrop(false)} onDone={savePvEdit}/>}
+    {imgView&&<Modal title="食事の写真" tint="#C9788F" onClose={()=>setImgView(null)}><img className="canSave" src={imgView} style={{width:"100%",borderRadius:12}} alt="食事の写真"/><PhotoShare src={imgView} name="食事"/></Modal>}
     {mealEdit&&<Modal title={(()=>{const d=new Date(mealEdit.date+"T00:00:00");return (d.getMonth()+1)+"月"+d.getDate()+"日（"+["日","月","火","水","木","金","土"][d.getDay()]+"）の食事記録";})()} tint="#C9788F" onClose={()=>setMealEdit(null)}>
       <div className="row-between" style={{marginBottom:6,flexWrap:"wrap",gap:6}}><button className="link-btn" onClick={()=>setMealBulkOpen(v=>!v)}>{mealBulkOpen?"▲ まとめ貼り付けを閉じる":"🍱 晩・朝まとめて貼り付け"}</button><button className="link-btn" onClick={mealReAuto}>⟳ シフト・配食メニューから自動反映</button></div>
       {mealBulkOpen&&<div className="nf" style={{background:"#FFF6F8",border:"1px solid #F0D3DB",borderRadius:10,padding:"8px 10px",marginBottom:8}}><label>メニューをコピーして貼り付け（晩・朝を自動で分けます）</label><textarea rows={5} value={mealBulk} onChange={e=>onMealBulk(e.target.value)} placeholder={"例：\n11/4夜\n・豚肉ときのこのカレー\n11/5 朝\n・ブロッコリーのおかか和え"}/><p className="hint" style={{margin:"4px 0 0"}}>※「→」で始まる内訳の行（例：→ブロッコリー60g）は自動で除きます。下の各欄で手直しできます。</p></div>}
@@ -2087,9 +2119,10 @@ function Records({me,data,persist,reload}){
         <div className="nf2"><div className="nf"><label>調理担当1</label><select value={mealEdit[ck1]||""} onChange={e=>setMealEdit(p=>Object.assign({},p,{[ck1]:e.target.value}))}><option value="">（選択）</option>{(data.accounts||[]).map(a=><option key={a.id} value={a.name}>{a.name}</option>)}{mealEdit[ck1]&&!(data.accounts||[]).some(a=>a.name===mealEdit[ck1])&&<option value={mealEdit[ck1]}>{mealEdit[ck1]}</option>}</select></div>
           <div className="nf"><label>調理担当2</label><select value={mealEdit[ck2]||""} onChange={e=>setMealEdit(p=>Object.assign({},p,{[ck2]:e.target.value}))}><option value="">（選択）</option>{(data.accounts||[]).map(a=><option key={a.id} value={a.name}>{a.name}</option>)}{mealEdit[ck2]&&!(data.accounts||[]).some(a=>a.name===mealEdit[ck2])&&<option value={mealEdit[ck2]}>{mealEdit[ck2]}</option>}</select></div></div>
         <div className="nf"><label>写真（複数可）</label>
-          <div className="meal-thumbs">{imgs.map((im,idx)=><div key={idx} className="meal-thumb"><img src={im} alt={"食事"+(idx+1)}/><div className="meal-thumb-btns"><button type="button" title="切り取り" onClick={()=>setMealCrop({slot:sl.k,index:idx,src:im})}>✂️</button><button type="button" title="削除" onClick={()=>delImg(idx)}>🗑</button></div></div>)}{imgs.length===0&&<span className="tiny" style={{color:"#B0895A",alignSelf:"center"}}>写真なし</span>}</div>
+          <div className="meal-thumbs">{imgs.map((im,idx)=><div key={idx} className="meal-thumb"><img src={im} alt={"食事"+(idx+1)} onClick={()=>setImgView(im)}/><div className="meal-thumb-btns"><button type="button" title="切り取り" onClick={()=>setMealCrop({slot:sl.k,index:idx,src:im})}>✂️</button><button type="button" title="削除" onClick={()=>delImg(idx)}>🗑</button></div></div>)}{imgs.length===0&&<span className="tiny" style={{color:"#B0895A",alignSelf:"center"}}>写真なし</span>}</div>
           <div style={{display:"flex",gap:6,flexWrap:"wrap",marginTop:6}}><button className="recbtn cam" onClick={()=>{setMealPhotoSlot(sl.k);setTimeout(()=>{mealRef.current&&mealRef.current.click();},0);}}>📷 撮影／アルバム</button><button className="recbtn" onClick={()=>{setMealPhotoSlot(sl.k);pasteMealPhoto(sl.k);}}>📋 貼り付け</button></div>
-          <p className="tiny" style={{margin:"3px 0 0"}}>何枚でも追加できます。各写真の <b>✂️</b> で切り取り、<b>🗑</b> で削除。</p>
+          <p className="tiny" style={{margin:"3px 0 0"}}>何枚でも追加できます。各写真の <b>✂️</b> で切り取り、<b>🗑</b> で削除。写真をタップすると大きく表示し、LINEなどに送れます。</p>
+          {(()=>{ const rf=recFood(mealEdit.date)[sl.k]||[]; if(!rf.length) return null; return <div className="recfood"><div className="tiny" style={{fontWeight:700,color:"#8A6B74"}}>記録タブの「📷 食事」で撮った写真（{rf.length}枚）</div><div className="meal-thumbs">{rf.map(x=><div key={x.id} className="meal-thumb"><img src={x.thumb} alt="" onClick={()=>openFull(x.id)}/><div className="meal-thumb-btns"><button type="button" title="カレンダーの写真に使う" onClick={()=>useRecPhoto(sl.k,x.id)}>＋使う</button></div></div>)}</div><p className="tiny" style={{margin:"3px 0 0"}}>カレンダーには自動で表示されます。印刷をきれいにしたいときは「＋使う」で高画質の写真として取り込めます。</p></div>; })()}
         </div>
       </div>; })}
       <div className="row-end"><Btn onClick={saveMeal}>保存</Btn></div>
@@ -2328,7 +2361,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.175〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.176〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
@@ -2538,7 +2571,8 @@ function Album({me,data}){
     {photos!==null&&results.length===0&&<p className="empty">写真がありません。</p>}
     <div className="album">{results.map(p=>(<button key={p.id} className="thumb" onClick={()=>openFull(p.id)}><img className="noSave" draggable={false} onContextMenu={e=>e.preventDefault()} src={p.meta&&p.meta.thumb?p.meta.thumb:""} alt="写真"/><span>{((p.meta&&p.meta.users)||[]).join("・")||((p.meta&&p.meta.name)||"")} {p.created?(p.created.slice(0,10)+" "+hm(p.created)):""}</span></button>))}</div>
     {pv&&<Modal title="写真" tint="#C9788F" onClose={()=>setPv(null)}>
-      <img className="noSave" draggable={false} onContextMenu={e=>e.preventDefault()} src={pv.image} style={{width:"100%",borderRadius:12}} alt="写真"/>
+      <img className="canSave" src={pv.image} style={{width:"100%",borderRadius:12}} alt="写真"/>
+      <PhotoShare src={pv.image} name={"写真_"+((pv.meta&&pv.meta.cat)||"記録")}/>
       <p className="hint">{((pv.meta&&pv.meta.users)||[]).join("・")||((pv.meta&&pv.meta.name)||"")}　{pv.created?new Date(pv.created).toLocaleString():""}</p>
       <div className="row-between"><Btn kind="ghost2" disabled={busy} onClick={()=>setPvCrop(true)}>✂️ 切り取り・回転</Btn>{me.isAdmin&&<button className="link-btn" onClick={()=>delPhoto(pv.id)}>この写真を削除</button>}</div>
     </Modal>}
@@ -3283,6 +3317,20 @@ function VisitsView({data}){
     </tbody></table>}
     <p className="tiny" style={{marginTop:10}}>※ 一覧に出るのは、アプリに読み込まれている直近の記録（最大3000件）の範囲です。</p>
   </Section>;
+}
+
+/* ===== 写真のコピー・共有（LINEなど） ===== */
+function _imgBlob(src,type){ return new Promise((res,rej)=>{ const im=new Image(); im.onload=()=>{ try{ const c=document.createElement("canvas"); c.width=im.naturalWidth||im.width; c.height=im.naturalHeight||im.height; c.getContext("2d").drawImage(im,0,0); c.toBlob(b=>b?res(b):rej(new Error("blob")),type,0.92); }catch(e){ rej(e); } }; im.onerror=()=>rej(new Error("img")); im.src=src; }); }
+function PhotoShare({src,name}){
+  const [msg,setMsg]=useState("");
+  const share=async()=>{ setMsg(""); try{ const b=await _imgBlob(src,"image/jpeg"); const file=new File([b],(name||"写真")+".jpg",{type:"image/jpeg"}); if(navigator.share&&(!navigator.canShare||navigator.canShare({files:[file]}))){ await navigator.share({files:[file]}); return; } setMsg("この端末では送るボタンが使えません。写真を長押しして「コピー」または「写真に保存」を選んでください。"); }catch(e){ if(e&&e.name==="AbortError") return; setMsg("送れませんでした。写真を長押しして「コピー」または「写真に保存」を選んでください。"); } };
+  const copy=async()=>{ setMsg(""); try{ if(!(navigator.clipboard&&navigator.clipboard.write&&window.ClipboardItem)) throw new Error("no clipboard"); await navigator.clipboard.write([new ClipboardItem({"image/png":_imgBlob(src,"image/png")})]); setMsg("✅ コピーしました。LINEのトーク画面で入力欄を長押し →「ペースト」で貼り付けられます。"); }catch(e){ setMsg("この端末ではボタンでコピーできません。写真を長押しして「コピー」を選んでください。"); } };
+  if(!src) return null;
+  return <div className="pshare">
+    <div className="pshare-b"><Btn onClick={share}>📤 LINEなどに送る</Btn><Btn kind="ghost2" onClick={copy}>📋 コピー</Btn></div>
+    {msg&&<p className={"pshare-m"+(msg.indexOf("✅")===0?"":" warn")}>{msg}</p>}
+    <p className="tiny" style={{margin:"5px 0 0"}}>写真を長押ししても、コピー・保存できます。利用者のお顔など個人が分かる写真を送るときは、送り先にご注意ください。</p>
+  </div>;
 }
 
 /* ===== Excel出力のプレビュー（升目をHTMLで再現） ===== */
