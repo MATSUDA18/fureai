@@ -436,6 +436,21 @@
   .tbl.vtbl tr.vit-abn td{color:#C0392B;font-weight:700;}
   .tbl.vtbl .vtbl-act{padding:4px 2px;}
   .tbl.vtbl .vtbl-act button{margin:0 1px;}
+  .am-banner{display:flex;justify-content:space-between;align-items:center;width:100%;border:none;background:#FFF1DC;color:#8A5A12;font-weight:800;font-size:14px;border-radius:12px;padding:10px 12px;margin:0 0 10px;cursor:pointer;box-shadow:0 0 0 1px #F0C98A inset;}
+  .am-banner span{font-size:12.5px;}
+  .am-compose{background:#FFF8EC;border:1px solid #F0D9A8;border-radius:12px;padding:9px 11px;margin-bottom:8px;}
+  .am-ch{font-size:13px;font-weight:800;color:#A6812F;margin-bottom:5px;}
+  .am-compose textarea{width:100%;box-sizing:border-box;border:1px solid #EAD9B5;border-radius:10px;padding:8px 10px;font-size:16px;font-family:inherit;resize:vertical;}
+  .am-row{background:#FFF8EC;border:1px solid #F0C98A;border-left:5px solid #E0A94E;border-radius:10px;padding:8px 10px;}
+  .am-row.am-new{background:#FFF1DC;box-shadow:0 0 0 2px #F6D28E;}
+  .am-h{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:800;color:#8A5A12;flex-wrap:wrap;}
+  .am-time{font-variant-numeric:tabular-nums;color:#C9788F;}
+  .am-t{font-size:14.5px;line-height:1.6;color:#3F3237;white-space:pre-wrap;overflow-wrap:anywhere;margin:4px 0 6px;}
+  .am-f{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .am-btn{border:none;background:#2E7D46;color:#fff;font-weight:800;font-size:13px;border-radius:999px;padding:7px 14px;cursor:pointer;}
+  .am-ok{font-size:12.5px;font-weight:800;color:#2E7D46;}
+  .am-acks{font-size:12px;color:#5A4A50;background:#fff;border-radius:8px;padding:2px 8px;}
+  .am-adm{margin-left:auto;display:flex;align-items:center;gap:8px;}
   .menu-band{background:#FFF8EC;border:1px solid #F0D9A8;border-radius:12px;padding:8px 11px;margin-bottom:8px;}
   .menu-band-h{display:flex;justify-content:space-between;align-items:center;font-size:12.5px;font-weight:800;color:#A6812F;margin-bottom:4px;}
   .menu-band-l{display:flex;align-items:flex-start;gap:7px;font-size:13.5px;line-height:1.55;color:#5A4A50;padding:2px 0;min-width:0;}
@@ -1928,6 +1943,18 @@ function Records({me,data,persist,reload}){
   const _bs=new Date(logDate+"T15:00:00"); const _be=(()=>{const e=addDays(new Date(logDate+"T00:00:00"),1); e.setHours(15,0,0,0); return e;})();
   const log=(data.records||[]).filter(r=>r&&r.ts).filter(r=>{ const t=new Date(r.ts); return t>=_bs && t<_be; }).sort((a,b)=>String(b.ts||"").localeCompare(String(a.ts||"")));
   const logFiltered=(sel.length>0&&!showAllUsers)?log.filter(r=>sel.includes(r.user)||r.user==="全体"):log;
+  // 管理者からのひとこと（記録・日誌まとめ・AIには入らない。共有データの adminMsgs に保存）
+  const amsgs=(data.adminMsgs||[]).filter(m=>m&&m.ds===logDate);
+  const amUnack=amsgs.filter(m=>m.by!==me.name&&!(m.acks||[]).some(a=>a.name===me.name));
+  const logMerged=logFiltered.concat(amsgs.map(m=>Object.assign({__msg:true},m))).sort((a,b)=>String(b.ts||"").localeCompare(String(a.ts||"")));
+  const [amText,setAmText]=useState(""); const [amEdit,setAmEdit]=useState(null);
+  const sendMsg=()=>{ const t=String(amText||"").trim(); if(!t){ flash("ひとことを入力してください"); return; } const all=data.adminMsgs||[]; let next;
+    if(amEdit){ next=all.map(m=>m.id===amEdit?Object.assign({},m,{text:t,edAt:new Date().toISOString()}):m); } else { next=all.concat([{id:"am_"+uid(),ds:logDate,ts:new Date().toISOString(),text:t,by:me.name,acks:[]}]); }
+    const lim=iso(addDays(new Date(),-120)); next=next.filter(m=>m&&m.ds>=lim);
+    persist(Object.assign({},data,{adminMsgs:next})); setAmText(""); setAmEdit(null); flash(amEdit?"ひとことを直しました":"ひとことを送りました"); };
+  const ackMsg=(m)=>{ if((m.acks||[]).some(a=>a.name===me.name)) return; persist(Object.assign({},data,{adminMsgs:(data.adminMsgs||[]).map(x=>x.id===m.id?Object.assign({},x,{acks:(x.acks||[]).concat([{name:me.name,at:new Date().toISOString()}])}):x)})); flash("✓ 確認しました"); };
+  const delMsg=(m)=>{ if(!confirm("このひとことを削除しますか？"))return; persist(Object.assign({},data,{adminMsgs:(data.adminMsgs||[]).filter(x=>x.id!==m.id)})); };
+  const goMsgs=()=>{ try{ const el=document.querySelector(".am-row.am-new")||document.querySelector(".am-row"); if(el) el.scrollIntoView({behavior:"smooth",block:"center"}); }catch(e){} };
   // 配食メニューの貼り付け（晩・朝を一括で分割記録）
   const [menuOpen,setMenuOpen]=useState(false); const [menuFor,setMenuFor]=useState(""); const [menuExp,setMenuExp]=useState(false); const [menuRaw,setMenuRaw]=useState(""); const [menuD,setMenuD]=useState(""); const [menuB,setMenuB]=useState("");
   const splitMenu=(raw)=>{ const lines=String(raw||"").replace(/\r/g,"").split("\n"); const bare=(L)=>String(L||"").replace(/[\s　]/g,""); const isDH=(L)=> /(夜|夕食|夕飯|晩)/.test(L)&&!/朝/.test(L)&&(/\d/.test(L)||bare(L).length<=4); const isBH=(L)=> /朝/.test(L)&&(/\d/.test(L)||bare(L).length<=4); let di=-1,bi=-1; for(let i=0;i<lines.length;i++){ if(isDH(lines[i])){ di=i; break; } } for(let i=(di>=0?di+1:0);i<lines.length;i++){ if(isBH(lines[i])){ bi=i; break; } } const grab=(a,b)=> lines.slice(a,b).join("\n").trim(); let dinner="",breakfast=""; if(di>=0){ dinner=grab(di+1, bi>di?bi:lines.length); } if(bi>=0){ breakfast=grab(bi+1, lines.length); } if(!dinner&&!breakfast){ const t=String(raw||""); const d2=t.search(/(夜|夕食|晩)/), b2=t.search(/朝/); if(d2>=0&&b2>d2){ dinner=t.slice(d2,b2); breakfast=t.slice(b2); } else { dinner=t.trim(); } } return {dinner:dinner.trim(),breakfast:breakfast.trim()}; };
@@ -1981,6 +2008,7 @@ function Records({me,data,persist,reload}){
   const itemMove=(id,dir)=>{ const arr=rItems.slice(); const idx=arr.findIndex(x=>x.id===id); if(idx<0)return; const cat=catsOf(arr[idx])[0]; let j=idx+dir; while(j>=0&&j<arr.length&&catsOf(arr[j]).indexOf(cat)<0) j+=dir; if(j<0||j>=arr.length)return; const t=arr[idx];arr[idx]=arr[j];arr[j]=t; persist({...data,recItems:arr,recCats:cats}); };
   const itemSetCat=(id,cat)=>persist({...data,recItems:rItems.map(x=>x.id===id?Object.assign({},x,{cat}):x),recCats:cats});
   return <Section title="記録" note="利用者を選び、項目をタップすると時刻つきで記録されます。写真も残せます。あとで「まとめ」の材料になります。">
+    {amUnack.length>0&&<button className="am-banner" onClick={goMsgs}>📣 管理者からのひとこと（未確認 {amUnack.length}件）<span>見る ›</span></button>}
     <button className="time-toggle" style={{marginTop:0,marginBottom:4}} onClick={()=>setDpOpen(true)}>👥 この日の利用者・支援員を設定</button>
     <p className="tiny" style={{textAlign:"center",marginBottom:8,color:"#B0895A"}}>💡 ここで設定すると、シフト・タイムスケジュール・日誌にも反映されます</p>
     <div className="rec-users">{dayUsers.map(u=>(<button key={u} className={"ruser "+(sel.includes(u)?"on":"")} onClick={()=>toggleUser(u)}>{u}</button>))}</div>
@@ -2127,14 +2155,27 @@ function Records({me,data,persist,reload}){
         <button className={"seg "+(!showAllUsers?"on":"")} onClick={()=>setShowAllUsers(false)}>選択中（{sel.join("・")}）のみ</button>
         <button className={"seg "+(showAllUsers?"on":"")} onClick={()=>setShowAllUsers(true)}>全員</button>
       </div>}
+      {me.isAdmin&&<div className="am-compose">
+        <div className="am-ch">📣 世話人さんへのひとこと（{fmtDate(logDate)} の記録に表示）</div>
+        <textarea rows={2} value={amText} onChange={e=>setAmText(e.target.value)} placeholder="例：明日の朝は〇〇さんの体温を必ず測ってください"/>
+        <div className="row-end" style={{marginTop:6}}>{amEdit&&<Btn kind="ghost2" onClick={()=>{setAmEdit(null);setAmText("");}}>やめる</Btn>}<Btn onClick={sendMsg}>{amEdit?"直して送る":"送る"}</Btn></div>
+        <p className="tiny" style={{margin:"4px 0 0"}}>管理者だけが送れます。記録・日誌まとめ・AI相談には入りません。前後の勤務日の記録を表示してから送ると、その日に出ます。</p>
+      </div>}
       {(()=>{ const pl=(data.dayPlans||{})[logDate]||{}; if(!pl.menuD&&!pl.menuB) return null; return <div className={"menu-band"+(menuExp?" exp":"")}>
         <div className="menu-band-h"><span>🍱 この日のメニュー</span><span style={{display:"flex",gap:6}}><button className="link-btn" onClick={()=>setMenuExp(!menuExp)}>{menuExp?"たたむ":"全文"}</button><button className="link-btn" onClick={()=>{setMenuFor(logDate);setMenuRaw("");setMenuD(pl.menuD||"");setMenuB(pl.menuB||"");setMenuOpen(true);}}>✎ 直す</button><button className="link-btn" style={{color:"#C0392B"}} onClick={()=>menuClear(logDate,"both",true)}>取り消す</button></span></div>
         {pl.menuD&&<div className="menu-band-l" onClick={()=>setMenuExp(!menuExp)}><span className="mc-tag d">晩</span><span className="menu-band-t">{pl.menuD}</span></div>}
         {pl.menuB&&<div className="menu-band-l" onClick={()=>setMenuExp(!menuExp)}><span className="mc-tag b">朝</span><span className="menu-band-t">{pl.menuB}</span></div>}
       </div>; })()}
       {me.isAdmin&&logFiltered.length>0&&<div className="row-end" style={{marginBottom:6}}><button className="mini-del" style={{padding:"6px 12px",borderRadius:"10px"}} onClick={delAllShown}>🗑 表示中の記録を一括削除</button></div>}
-      {logFiltered.length===0&&<p className="empty">{sel.length>0&&!showAllUsers?"この日の「"+sel.join("・")+"」の記録はありません。":"まだ記録がありません。"}</p>}
-      <div className="rec-log">{logFiltered.map(r=>{const uc=userColor(r.user);return <div key={r.id} className="rec-row" style={{borderLeft:"5px solid "+uc.fg}}>
+      {logFiltered.length===0&&amsgs.length===0&&<p className="empty">{sel.length>0&&!showAllUsers?"この日の「"+sel.join("・")+"」の記録はありません。":"まだ記録がありません。"}</p>}
+      <div className="rec-log">{logMerged.map(r=>{ if(r.__msg){ const m=r; const acks=m.acks||[]; const mine=acks.find(a=>a.name===me.name); return <div key={m.id} className={"am-row"+((mine||m.by===me.name)?"":" am-new")}>
+          <div className="am-h"><span>📣 管理者より</span><span className="am-time">{hm(m.ts)}</span><span className="tiny">{m.by}{m.edAt?"（修正あり）":""}</span></div>
+          <div className="am-t">{m.text}</div>
+          <div className="am-f">{m.by===me.name?null:(mine?<span className="am-ok">✓ 確認しました（{hm(mine.at)}）</span>:<button className="am-btn" onClick={()=>ackMsg(m)}>✓ 確認しました</button>)}
+            {me.isAdmin&&<span className="am-acks">確認：{acks.length?acks.map(a=>a.name+"（"+hm(a.at)+"）").join("・"):"まだ誰も確認していません"}</span>}
+            {me.isAdmin&&<span className="am-adm"><button className="link-btn" onClick={()=>{setAmEdit(m.id);setAmText(m.text);try{window.scrollTo({top:(document.querySelector(".am-compose")||{}).offsetTop-120||0,behavior:"smooth"});}catch(e){}}}>直す</button><button className="mini-del" style={{marginLeft:0}} onClick={()=>delMsg(m)}>🗑</button></span>}
+          </div>
+        </div>; }const uc=userColor(r.user);return <div key={r.id} className="rec-row" style={{borderLeft:"5px solid "+uc.fg}}>
         <span className="rec-time">{hm(r.ts)}</span><span className="chip" style={{background:uc.bg,color:uc.fg}}>{r.user}</span>
         {r.thumb&&<img className="rec-thumb noSave" draggable={false} onContextMenu={e=>e.preventDefault()} src={r.thumb} alt="写真" onClick={()=>openFull(r.photoId)}/>}
         <span className={"rec-item"+(r.abn?" abn":"")}>{r.item}</span>
@@ -2479,7 +2520,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.181〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.182〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
