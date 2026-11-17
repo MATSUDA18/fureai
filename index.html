@@ -1873,8 +1873,8 @@ function Records({me,data,persist,reload}){
   const useRecPhoto=async(slot,id)=>{ try{ const ph=await sbPhotoFull(id); if(!ph||!ph.image){ flash("写真を読み込めませんでした"); return; } const img=await resizeDataUrl(ph.image,340,0.45); setMealEdit(p=>{ const k=slot==="b"?"bImgs":"dImgs"; const arr=(p[k]||[]); return Object.assign({},p,{[k]:arr.concat(img)}); }); flash("カレンダーの写真に追加しました（保存を押すと確定）"); }catch(e){ flash("写真を読み込めませんでした"); } };
   const [imgView,setImgView]=useState(null);
   const [mShare,setMShare]=useState(null);
-  const isMealRec=(r)=>/^(メニュー（|食事|夕食|朝食|📷 写真（食事）)/.test(String(r&&r.item||""));
-  const openMealShare=async(r)=>{ const it=String(r.item||""); let x=mealSlotOfTs(r.ts); if(!x) return; if(/^メニュー（晩）|^夕食/.test(it)) x={ds:recBizDay(r.ts)||x.ds,slot:"d"}; else if(/^メニュー（朝）|^朝食/.test(it)) x={ds:recBizDay(r.ts)||x.ds,slot:"b"};
+  const isMealRec=(r)=>/^(メニュー（(晩|朝)）|食事|📷 写真（食事）|(夕食|朝食)[　 ]*(主食|副食|完食|開始|終了|[：:（(]))/.test(String(r&&r.item||""));
+  const openMealShare=async(r)=>{ const it=String(r.item||""); let x=mealSlotOfTs(r.ts); if(!x) return; if(/^メニュー（晩）|^夕食[　 ]*(主食|副食|完食|開始|終了|[：:（(])/.test(it)) x={ds:recBizDay(r.ts)||x.ds,slot:"d"}; else if(/^メニュー（朝）|^朝食[　 ]*(主食|副食|完食|開始|終了|[：:（(])/.test(it)) x={ds:recBizDay(r.ts)||x.ds,slot:"b"};
     const v=mealView(x.ds)[x.slot==="b"?"breakfast":"dinner"]; const menu=(v&&v.menu)||mealMenuOf(data,x.ds,x.slot); const st={ds:x.ds,slot:x.slot,text:mealShareText(x.slot,menu),src:"",loading:true}; setMShare(st);
     let src=""; try{ if(r.photoId){ const p=await sbPhotoFull(r.photoId); src=(p&&p.image)||""; } if(!src&&v&&v.imgs&&v.imgs.length) src=v.imgs[0]; if(!src&&v&&v.rec&&v.rec.length){ const p=await sbPhotoFull(v.rec[0].id); src=(p&&p.image)||""; } }catch(e){}
     setMShare(Object.assign({},st,{src,loading:false})); };
@@ -2479,7 +2479,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.180〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.181〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
