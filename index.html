@@ -238,6 +238,8 @@
   .seg{flex:1 1 auto;border:none;background:#fff;color:#94808A;padding:8px 14px;font-size:13px;font-weight:700;cursor:pointer;}
   .seg.on{background:#E79AB0;color:#fff;}
   .seg+.seg{border-left:1px solid #F0D3DB;}
+  .tl-modes .seg{box-shadow:-1px -1px 0 #F0D3DB;}
+  .tl-modes .seg+.seg{border-left:none;}
   .tl-datenav{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
   .topdate{background:#FCF4F5;border:1px solid #F0D3DB;border-radius:14px;padding:8px 10px;margin-bottom:10px;}
   .topdate .time-toggle{margin-top:4px;}
@@ -334,6 +336,35 @@
   @keyframes recpop{0%{transform:scale(.86);}55%{transform:scale(1.08);}100%{transform:scale(1);}}
   .recbtn.cam{background:#EAF3E6;border-color:#CFE3C6;color:#5B8A45;}
   .rec-log{display:flex;flex-direction:column;gap:6px;margin-top:6px;}
+  .xpv-wrap{background:#EDE7E9;border-radius:10px;padding:8px;}
+  .xpv-paper{background:#fff;box-shadow:0 2px 10px rgba(0,0,0,.15);padding:14px 10px;}
+  table.xpv{border-collapse:collapse;table-layout:fixed;font-family:"Hiragino Sans","Yu Gothic","Meiryo",sans-serif;font-size:12px;color:#222;}
+  table.xpv td{padding:2px 4px;white-space:pre-wrap;overflow:hidden;line-height:1.35;overflow-wrap:anywhere;}
+  table.xpv td.xb{border:1px solid #444;}
+  table.xpv td.xh{font-weight:700;background:#F3F3F3;}
+  table.xpv td.xt{font-size:20px;font-weight:700;text-align:center;}
+  .plan-one{background:#FFF8FA;border:1px solid #F0D3DB;border-radius:12px;padding:10px 11px;margin-top:10px;}
+  .plan-one-t{font-size:13px;font-weight:800;color:#C9788F;}
+  .plan-row{border-top:1px dashed #F0D3DB;padding:7px 0;}
+  .plan-row:first-of-type{border-top:none;}
+  .plan-txt{font-size:12.5px;line-height:1.6;color:#5A4A50;background:#FCF4F5;border-radius:8px;padding:7px 9px;margin-top:5px;white-space:pre-wrap;overflow-wrap:anywhere;max-height:240px;overflow:auto;}
+  .vavg{background:#fff;border:1px solid #F0D3DB;border-radius:14px;padding:9px 10px;margin-top:10px;}
+  .vavg-h{display:flex;justify-content:space-between;align-items:center;font-size:13px;font-weight:800;color:#C9788F;margin-bottom:6px;}
+  .vavg-h select{font-size:13px;padding:4px 6px;border:1px solid #F0D3DB;border-radius:8px;background:#fff;color:#5A4A50;}
+  .vavg-g{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+  .vavg-c{background:#FCF6F7;border-radius:10px;padding:7px 9px;}
+  .vavg-t{display:flex;align-items:center;gap:6px;margin-bottom:3px;}
+  .vavg-t .mc-tag{font-size:11.5px;padding:1px 8px;}
+  .vavg-r{display:flex;justify-content:space-between;align-items:baseline;font-size:12.5px;color:#8A6B74;padding:1px 0;white-space:nowrap;}
+  .vavg-r b{font-size:16px;color:#5A4A50;font-variant-numeric:tabular-nums;}
+  .vavg-r small{font-size:10.5px;font-weight:400;color:#8A6B74;margin-left:2px;}
+  .tbl.vtbl th,.tbl.vtbl td{padding:8px 4px;font-size:13.5px;text-align:center;white-space:nowrap;overflow-wrap:normal;width:auto;vertical-align:middle;font-variant-numeric:tabular-nums;}
+  .tbl.vtbl th{font-size:12px;}
+  .tbl.vtbl td{border-top:1px solid #F0D3DB;}
+  .tbl.vtbl .mc-tag{font-size:10px;padding:0 4px;vertical-align:1px;}
+  .tbl.vtbl tr.vit-abn td{color:#C0392B;font-weight:700;}
+  .tbl.vtbl .vtbl-act{padding:4px 2px;}
+  .tbl.vtbl .vtbl-act button{margin:0 1px;}
   .menu-band{background:#FFF8EC;border:1px solid #F0D9A8;border-radius:12px;padding:8px 11px;margin-bottom:8px;}
   .menu-band-h{display:flex;justify-content:space-between;align-items:center;font-size:12.5px;font-weight:800;color:#A6812F;margin-bottom:4px;}
   .menu-band-l{display:flex;align-items:flex-start;gap:7px;font-size:13.5px;line-height:1.55;color:#5A4A50;padding:2px 0;min-width:0;}
@@ -920,10 +951,15 @@ function Nisshi({me,data,persist}){
   const planRef=useRef(null);
   const [planOneName,setPlanOneName]=useState("");
   const planOneRef=useRef(null);
+  const [planOneSel,setPlanOneSel]=useState(""); const [planOneText,setPlanOneText]=useState(""); const [planOpen,setPlanOpen]=useState("");
+  const planWho=()=>planOneSel==="__other"?planOneName.trim():(planOneSel||"");
+  const planStore=(who,text,src)=>{ const nm=normName(who); const yr=String(planYear); const yearMap=Object.assign({},(data.trainingPlans||{})[yr]||{},{[nm]:text}); const meta=Object.assign({},(data.trainingPlansMeta||{})[yr]||{},{[nm]:{name:who,date:iso(new Date()),by:(me&&me.name)||"",src:src}}); const had=!!(((data.trainingPlans||{})[yr]||{})[nm]); if(persist) persist(Object.assign({},data,{trainingPlans:Object.assign({},data.trainingPlans||{},{[yr]:yearMap}),trainingPlansMeta:Object.assign({},data.trainingPlansMeta||{},{[yr]:meta})})); return had; };
+  const savePlanText=()=>{ const who=planWho(); if(!normName(who)){ setPlanMsg("利用者を選んでください。"); return; } const t=String(planOneText||"").trim(); if(!t){ setPlanMsg("計画の内容を入力（貼り付け）してください。"); return; } const had=planStore(who,t.slice(0,4000),"text"); setPlanOneText(""); setPlanMsg("「"+who+"」の個別訓練計画を"+(had?"変更":"登録")+"しました（"+planYear+"年度）。"); };
+  const delPlan=(nm,label)=>{ if(!confirm("「"+label+"」さんの "+planYear+"年度 の個別訓練計画を削除しますか？"))return; const yr=String(planYear); const ym=Object.assign({},(data.trainingPlans||{})[yr]||{}); delete ym[nm]; const mm=Object.assign({},(data.trainingPlansMeta||{})[yr]||{}); delete mm[nm]; if(persist) persist(Object.assign({},data,{trainingPlans:Object.assign({},data.trainingPlans||{},{[yr]:ym}),trainingPlansMeta:Object.assign({},data.trainingPlansMeta||{},{[yr]:mm})})); setPlanMsg("「"+label+"」さんの計画を削除しました。"); };
   const onPlanFileOne=async(e)=>{
     const file=e.target.files&&e.target.files[0]; e.target.value=""; if(!file) return;
-    const who=planOneName||user; const nm=normName(who);
-    if(!nm){ setPlanMsg("利用者名を入力してください。"); return; }
+    const who=planWho(); const nm=normName(who);
+    if(!nm){ setPlanMsg("先に利用者を選んでください。"); return; }
     if(!window.XLSX){ setPlanMsg("Excel機能の読み込み中です。少し待って再度お試しください。"); return; }
     setPlanMsg("取り込み中…");
     try{
@@ -933,11 +969,8 @@ function Nisshi({me,data,persist}){
       wb.SheetNames.forEach(sn=>{ const ws=wb.Sheets[sn]; if(!ws) return; const rows=XLSX.utils.sheet_to_json(ws,{header:1,blankrows:false,defval:""}); const t=rows.map(r=>(r||[]).map(c=>String(c==null?"":c).replace(/\s+/g," ").trim()).filter(Boolean).join(" ")).filter(Boolean).join("\n"); if(t) text+=(text?"\n":"")+t; });
       text=text.slice(0,2000);
       if(!text){ setPlanMsg("内容を読み取れませんでした。"); return; }
-      const yr=String(planYear);
-      const yearMap=Object.assign({},(data.trainingPlans||{})[yr]||{},{[nm]:text});
-      const next=Object.assign({},data,{trainingPlans:Object.assign({},data.trainingPlans||{},{[yr]:yearMap})});
-      if(persist) persist(next);
-      setPlanMsg("「"+who+"」を取り込みました（"+yr+"年度・1名分）。");
+      const had=planStore(who,text,"file");
+      setPlanMsg("「"+who+"」の個別訓練計画を"+(had?"変更":"登録")+"しました（"+planYear+"年度・ファイルから）。");
     }catch(err){ setPlanMsg("取り込みに失敗しました："+String(err&&err.message||err)); }
   };
   const onPlanFile=async(e)=>{
@@ -1082,9 +1115,9 @@ function Nisshi({me,data,persist}){
       dlXlsx(blob,"利用日誌_"+(f.name||"")+"_"+date+".xlsx");
     }catch(e){ setErr("サーバー出力に失敗しました（"+String(e&&e.message||e)+"）。簡易版で出力します。"); toExcelLocal(); }
   };
-  const toExcelLocal=()=>{
-    if(!window.XLSX){ setErr("Excel機能の読み込みに失敗しました。少し待って再度お試しください。"); return; }
-    const XU=XLSX.utils; const ws={}; const S=(a,v)=>{ ws[a]={t:"s",v:(v==null?"":String(v))}; };
+  // 日誌の升目（Excel簡易版とプレビューで共通）
+  const nsLayout=()=>{
+    const cells={}; const S=(a,v)=>{ cells[a]=(v==null?"":String(v)); };
     const pvit=(s)=>{ s=s||""; const tm=s.match(/(\d{1,2}[:：]\d{2})/); const tp=s.match(/体温\s*([\d.]+)/); const bp=s.match(/(\d{2,3})\s*[\/／]\s*(\d{2,3})/); const pu=s.match(/(\d{2,3})\s*回/); return {time:tm?tm[1]:"", temp:tp?tp[1]:"", bp:bp?(bp[1]+"/"+bp[2]):"", pulse:pu?pu[1]:""}; };
     const v1=pvit(f.vitals1), v2=pvit(f.vitals2);
     S("B1","ふれあいホームみずほ　利用日誌");
@@ -1111,18 +1144,26 @@ function Nisshi({me,data,persist}){
     S("B36","【利用のご様子】"); S("B37",f.appearance||"");
     S("B43","【次回へのお願い】"); S("D43",[f.nextRequest,...activeNotices(date)].filter(x=>x&&String(x).trim()).join("\n"));
     S("I47","記入者名　"+(f.writer||""));
-    ws["!ref"]="A1:L48";
     const mg=["B1:K1","C6:K6","B7:B8","G7:H7","G8:H8","B9:B10","C9:K9","C10:K10","C11:K11","C12:K12","C13:K13","B16:E16","F16:K16","B36:C36","B37:K37","B38:K38","B39:K39","B40:K40","B41:K41","B43:C43","D43:K43","B44:K44","B45:K45","I47:K47"];
     for(let r=17;r<=34;r++){ mg.push("C"+r+":E"+r); mg.push("F"+r+":K"+r); }
-    ws["!merges"]=mg.map(a=>XU.decode_range(a));
-    ws["!cols"]=[{wch:3.6},{wch:12.5},{wch:22},{wch:4.8},{wch:4.4},{wch:4.7},{wch:5.8},{wch:4.6},{wch:10.9},{wch:24.7},{wch:40.7},{wch:2.5}];
-    const rows=[]; for(let i=0;i<48;i++){ let h=29.1; if(i<2)h=36; else if(i===2)h=24; else if(i===45)h=15; else if(i===46)h=24; rows[i]={hpt:h}; }
-    ws["!rows"]=rows;
+    const cols=[3.6,12.5,22,4.8,4.4,4.7,5.8,4.6,10.9,24.7,40.7,2.5];
+    const rows=[]; for(let i=0;i<48;i++){ let h=29.1; if(i<2)h=36; else if(i===2)h=24; else if(i===45)h=15; else if(i===46)h=24; rows[i]=h; }
+    return {cells,mg,cols,rows};
+  };
+  const toExcelLocal=()=>{
+    if(!window.XLSX){ setErr("Excel機能の読み込みに失敗しました。少し待って再度お試しください。"); return; }
+    const XU=XLSX.utils; const L=nsLayout(); const ws={};
+    Object.keys(L.cells).forEach(a=>{ ws[a]={t:"s",v:L.cells[a]}; });
+    ws["!ref"]="A1:L48";
+    ws["!merges"]=L.mg.map(a=>XU.decode_range(a));
+    ws["!cols"]=L.cols.map(w=>({wch:w}));
+    ws["!rows"]=L.rows.map(h=>({hpt:h}));
     const wb=XU.book_new(); XU.book_append_sheet(wb,ws,"利用日誌");
     const out=XLSX.write(wb,{bookType:"xlsx",type:"array"});
     const blob=new Blob([out],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
     dlXlsx(blob,"利用日誌_"+(f.name||"")+"_"+date+".xlsx");
   };
+  const [xpv,setXpv]=useState(false);
   return <Section title="日誌まとめ" note="利用者と日付を選び、その日の記録からAIが「利用のご様子」などを下書きします。作成後は保存でき、あとから検索できます。">
     <div className="tl-modes" style={{marginBottom:12}}>
       <button className={"seg "+(mode==="edit"?"on":"")} onClick={()=>setMode("edit")}>作成</button>
@@ -1209,17 +1250,30 @@ function Nisshi({me,data,persist}){
       <Btn onClick={genDraft} kind={loading?"ghost2":"primary"}>{loading?"作成中…":"🤖 AIで下書きを作成"}</Btn>
       <Btn kind="ghost2" onClick={emptyForm}>空フォーム</Btn>
     </div>
-    {me.isAdmin&&<details className="tl-editpanel" style={{marginBottom:8}}><summary style={{cursor:"pointer",fontWeight:700,color:"#C9788F"}}>⚙ 個別訓練計画の年度取り込み（管理者）</summary>
+    {me.isAdmin&&<details className="tl-editpanel" style={{marginBottom:8}}><summary style={{cursor:"pointer",fontWeight:700,color:"#C9788F"}}>⚙ 個別訓練計画の取り込み（年度・途中参加・変更）（管理者）</summary>
       <div className="tiny" style={{marginTop:8,fontWeight:700}}>① 全員分（タブ＝お一人）をまとめて取り込む</div>
       <div className="wheel" style={{marginTop:6}}><input type="number" value={planYear} onChange={e=>setPlanYear(e.target.value)} placeholder="年度（西暦）" style={{flex:1,padding:"10px",border:"1px solid #F0D3DB",borderRadius:"10px"}}/><button className="btn ghost2" onClick={()=>planRef.current&&planRef.current.click()}>⬆ まとめて取り込む</button></div>
       <input ref={planRef} type="file" accept=".xlsx,.xls,.ods,.csv" onChange={onPlanFile} style={{display:"none"}}/>
       <p className="tiny">お一人ずつタブに分かれたファイル（タブ名＝利用者名）を選ぶと、各タブの内容を読み取り、AIまとめ生成時に「本人の目標・取り組むこと」として反映します（タブ名の丸数字などは自動で除いて氏名で照合）。※既存の人は上書き・追加され、載っていない人は消えません。</p>
-      <div style={{marginTop:10,borderTop:"1px dashed #F0D3DB",paddingTop:8}}>
-        <div className="tiny" style={{fontWeight:700}}>② 1名だけ取り込む（年度途中の更新・新規の方）</div>
-        <div className="wheel" style={{marginTop:6}}><input value={planOneName} onChange={e=>setPlanOneName(e.target.value)} placeholder={"利用者名（空欄なら選択中："+user+"）"} style={{flex:1,padding:"10px",border:"1px solid #F0D3DB",borderRadius:"10px"}}/><button className="btn ghost2" onClick={()=>planOneRef.current&&planOneRef.current.click()}>⬆ 1名分を取り込む</button></div>
+      <div className="plan-one">
+        <div className="plan-one-t">② 途中から参加される方・計画を変更する方（1名ずつ）</div>
+        <p className="tiny" style={{margin:"2px 0 6px"}}>上の年度に、選んだ方の計画だけを登録します。すでに登録がある方は、新しい内容に差し替わります（他の方は変わりません）。</p>
+        <label className="field"><span>利用者</span><select value={planOneSel} onChange={e=>setPlanOneSel(e.target.value)}><option value="">選んでください</option>{allResidents.map(u=>{ const has=!!(((data.trainingPlans||{})[String(planYear)]||{})[normName(u)]); return <option key={u} value={u}>{u}{has?"（登録済み → 変更）":"（未登録 → 新規）"}</option>; })}<option value="__other">一覧にない方（名前を入力）</option></select></label>
+        {planOneSel==="__other"&&<label className="field"><span>利用者名</span><input value={planOneName} onChange={e=>setPlanOneName(e.target.value)} placeholder="例：みずほ 太郎"/></label>}
+        <div className="row-end" style={{justifyContent:"flex-start",flexWrap:"wrap"}}><button className="btn ghost2" onClick={()=>{ if(!normName(planWho())){ setPlanMsg("先に利用者を選んでください。"); return; } planOneRef.current&&planOneRef.current.click(); }}>⬆ ファイル（Excel）から登録</button></div>
         <input ref={planOneRef} type="file" accept=".xlsx,.xls,.ods,.csv" onChange={onPlanFileOne} style={{display:"none"}}/>
-        <p className="tiny">その方1名分のファイルを選ぶと、上の年度にその利用者だけ上書き保存します（氏名が未入力のときは、上で選択中の利用者になります）。</p>
+        <label className="field" style={{marginTop:8}}><span>または、計画の文章を貼り付けて登録</span><textarea rows={4} value={planOneText} onChange={e=>setPlanOneText(e.target.value)} placeholder="本人の目標・取り組むことなど（WordやPDFからコピーして貼り付けできます）"/></label>
+        <div className="row-end"><Btn onClick={savePlanText}>この内容で登録・変更</Btn></div>
       </div>
+      {(()=>{ const yr=String(planYear); const ym=(data.trainingPlans||{})[yr]||{}; const mm=(data.trainingPlansMeta||{})[yr]||{}; const keys=Object.keys(ym); const missing=allResidents.filter(u=>!ym[normName(u)]); return <div className="plan-one" style={{background:"#fff"}}>
+        <div className="plan-one-t">③ {yr}年度に登録済みの計画（{keys.length}名）</div>
+        {keys.length===0&&<p className="tiny">まだ登録がありません。</p>}
+        {keys.map(k=>{ const m=mm[k]||{}; const label=m.name||(allResidents.find(u=>normName(u)===k))||k; return <div key={k} className="plan-row">
+          <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}><b style={{fontSize:13.5,color:"#5A4A50"}}>{label}</b><span className="tiny">{m.date?("更新 "+m.date+(m.by?("・"+m.by):"")):"年度取り込み"}</span><span style={{marginLeft:"auto",display:"flex",gap:6}}><button className="link-btn" onClick={()=>setPlanOpen(planOpen===k?"":k)}>{planOpen===k?"閉じる":"内容"}</button><button className="link-btn" onClick={()=>{ const u=allResidents.find(x=>normName(x)===k); if(u){ setPlanOneSel(u); } else { setPlanOneSel("__other"); setPlanOneName(label); } setPlanOneText(String(ym[k]||"")); setPlanMsg("「"+label+"」の内容を②に読み込みました。直して「この内容で登録・変更」を押してください。"); }}>変更</button><button className="mini-del" style={{marginLeft:0}} onClick={()=>delPlan(k,label)}>🗑</button></span></div>
+          {planOpen===k&&<div className="plan-txt">{String(ym[k]||"")}</div>}
+        </div>; })}
+        {missing.length>0&&<p className="tiny" style={{marginTop:6,color:"#B07A2E"}}>この年度に計画が未登録の方：{missing.join("・")}</p>}
+      </div>; })()}
       <p className="tiny" style={{marginTop:8,color:"#8A6B74"}}>Googleスプレッドシートの場合は「ファイル → ダウンロード → Microsoft Excel(.xlsx)」で保存してから選んでください（タブも保持されます）。</p>
       {planMsg&&<p className="tiny" style={{color:"#B25E77"}}>{planMsg}</p>}
     </details>}
@@ -1270,10 +1324,16 @@ function Nisshi({me,data,persist}){
         <Btn onClick={saveNisshi}>💾 下書き保存</Btn>
         <Btn onClick={submitNisshi}>📤 提出する</Btn>
         <Btn onClick={()=>window.print()}>🖨 印刷</Btn>
+        <Btn kind="ghost2" onClick={()=>setXpv(true)}>👁 Excelのプレビュー</Btn>
         <Btn kind="ghost2" onClick={toExcel}>⬇ Excel出力</Btn>
         {me.isAdmin&&<Btn onClick={markReviewed}>✅ 確認済みにする</Btn>}
       </div>
     </div>}
+    {xpv&&f&&<Modal title="👁 Excel出力のプレビュー" tint="#C9788F" onClose={()=>setXpv(false)}>
+      <p className="tiny" style={{marginTop:0}}>Excelで出力したときの、おおよその見た目です（いま画面に入っている内容で表示）。文字の大きさ・罫線・改行の位置など、細かい部分は実際のファイルと異なることがあります。</p>
+      <XlPreview lay={nsLayout()}/>
+      <div className="row-end" style={{marginTop:10}}><Btn kind="ghost2" onClick={()=>setXpv(false)}>閉じる</Btn><Btn onClick={()=>{setXpv(false);toExcel();}}>⬇ このままExcel出力</Btn></div>
+    </Modal>}
     </>}
     {toast2&&<div className="toast">{toast2}</div>}
   </Section>;
@@ -1590,6 +1650,10 @@ function VitalsView({data,persist,reload}){
   const [ed,setEd]=useState(null); const [toast,setToast]=useState("");
   const flash=(m)=>{setToast(m);setTimeout(()=>setToast(""),1600);};
   const list=(data.records||[]).filter(r=>r.user===user&&(r.item||"").indexOf("🩺")===0).sort((a,b)=>String(b.ts||"").localeCompare(String(a.ts||"")));
+  const [avgSpan,setAvgSpan]=useState(30);
+  const isAM=(ts)=>{ const h=new Date(ts).getHours(); return h>=4&&h<12; };
+  const avgOf=(arr,k)=>{ const v=arr.map(r=>Number(parseVit(r.item)[k])).filter(x=>x>0&&isFinite(x)); if(!v.length) return null; return {avg:v.reduce((a,b)=>a+b,0)/v.length,n:v.length}; };
+  const avgSet=(am)=>{ const lim=avgSpan?Date.now()-avgSpan*86400000:0; const arr=list.filter(r=>isAM(r.ts)===am&&(!lim||new Date(r.ts).getTime()>=lim)); return {n:arr.length,sys:avgOf(arr,"sys"),dia:avgOf(arr,"dia"),hr:avgOf(arr,"hr"),temp:avgOf(arr,"temp")}; };
   const hm=(ts)=>{const d=new Date(ts);return String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0");};
   const ymd=(ts)=>{const d=new Date(ts);return (d.getMonth()+1)+"/"+d.getDate();};
   const openNew=()=>{ const n=new Date(); setEd({id:"",y:n.getFullYear(),mo:n.getMonth()+1,da:n.getDate(),h:n.getHours(),mi:Math.floor(n.getMinutes()/5)*5,sys:"",dia:"",hr:"",temp:""}); };
@@ -1602,13 +1666,24 @@ function VitalsView({data,persist,reload}){
     <label className="field"><span>利用者</span><select value={user} onChange={e=>setUser(e.target.value)}>{users.map(u=><option key={u} value={u}>{u}</option>)}</select></label>
     <div className="row-end"><Btn onClick={openNew}>＋ 過去の測定を手入力</Btn></div>
     {list.length===0&&<p className="empty">記録がありません。</p>}
-    {list.length>0&&<table className="tbl" style={{marginTop:10}}><tbody>
-      <tr><th style={{width:"58px"}}>日付</th><th style={{width:"48px"}}>時刻</th><td>測定値</td></tr>
-      {list.map(r=>{const v=parseVit(r.item);return <tr key={r.id}>
-        <th>{ymd(r.ts)}</th><td style={{padding:"8px",textAlign:"center"}}>{hm(r.ts)}</td>
-        <td className={r.abn?"vit-abn":""}>{v.sys&&(v.sys+"/"+v.dia+" ")}{v.hr&&(v.hr+"回 ")}{v.temp&&(v.temp+"℃")} <button className="mini-key" onClick={()=>openEdit(r)}>✏️</button><button className="mini-del" onClick={()=>del(r.id)}>🗑</button></td>
+    {list.length>0&&<div className="vavg">
+      <div className="vavg-h"><span>平均（朝・晩）</span><select value={avgSpan} onChange={e=>setAvgSpan(Number(e.target.value))}><option value={7}>直近1週間</option><option value={30}>直近1か月</option><option value={90}>直近3か月</option><option value={0}>全期間</option></select></div>
+      <div className="vavg-g">{[{am:false,lab:"晩",cls:"d",sub:"12時〜翌4時"},{am:true,lab:"朝",cls:"b",sub:"4時〜12時"}].map(x=>{ const a=avgSet(x.am); const f0=(o)=>o?Math.round(o.avg):"—"; const f1=(o)=>o?o.avg.toFixed(1):"—"; return <div key={x.lab} className="vavg-c">
+        <div className="vavg-t"><span className={"mc-tag "+x.cls}>{x.lab}</span><span className="tiny">{x.sub}・{a.n}回</span></div>
+        <div className="vavg-r"><span>血圧</span><b>{a.sys?(f0(a.sys)+"/"+f0(a.dia)):"—"}</b></div>
+        <div className="vavg-r"><span>脈拍</span><b>{f0(a.hr)}{a.hr?<small>回/分</small>:null}</b></div>
+        <div className="vavg-r"><span>体温</span><b>{f1(a.temp)}{a.temp?<small>℃</small>:null}</b></div>
+      </div>; })}</div>
+    </div>}
+    {list.length>0&&<table className="tbl vtbl" style={{marginTop:10}}><tbody>
+      <tr><th>日付</th><th>時刻</th><th>血圧</th><th>脈拍</th><th>体温</th><th></th></tr>
+      {list.map(r=>{const v=parseVit(r.item);const am=isAM(r.ts);return <tr key={r.id} className={r.abn?"vit-abn":""}>
+        <td>{ymd(r.ts)}</td><td><span className={"mc-tag "+(am?"b":"d")}>{am?"朝":"晩"}</span> {hm(r.ts)}</td>
+        <td><b>{v.sys?(v.sys+"/"+v.dia):"—"}</b></td><td>{v.hr||"—"}</td><td>{v.temp||"—"}</td>
+        <td className="vtbl-act"><button className="mini-key" onClick={()=>openEdit(r)}>✏️</button><button className="mini-del" onClick={()=>del(r.id)}>🗑</button></td>
       </tr>;})}
     </tbody></table>}
+    {list.length>0&&<p className="tiny" style={{marginTop:6}}>血圧はmmHg、脈拍は回/分、体温は℃。赤字は要注意の値です。</p>}
     {ed&&<Modal title={ed.id?"バイタルの修正":"過去の測定を手入力"} tint="#C9788F" onClose={()=>setEd(null)}>
       <div className="chk-grid" style={{gridTemplateColumns:"repeat(3,1fr)"}}>
         <label className="field"><span>年</span><select value={ed.y} onChange={e=>setE("y",+e.target.value)}>{YEARS.map(y=><option key={y} value={y}>{y}</option>)}</select></label>
@@ -2253,7 +2328,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.174〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.175〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
@@ -3208,6 +3283,37 @@ function VisitsView({data}){
     </tbody></table>}
     <p className="tiny" style={{marginTop:10}}>※ 一覧に出るのは、アプリに読み込まれている直近の記録（最大3000件）の範囲です。</p>
   </Section>;
+}
+
+/* ===== Excel出力のプレビュー（升目をHTMLで再現） ===== */
+const _colN=(c)=>{ let n=0; for(const ch of c) n=n*26+(ch.charCodeAt(0)-64); return n; };
+const _addr=(a)=>{ const m=String(a).match(/^([A-Z]+)(\d+)$/); return m?{c:_colN(m[1]),r:Number(m[2])}:null; };
+function XlPreview({lay}){
+  const wrapRef=useRef(null); const [fit,setFit]=useState(true); const [wW,setWW]=useState(320);
+  useEffect(()=>{ const el=wrapRef.current; if(!el) return; const upd=()=>setWW(el.clientWidth||320); upd(); let ro=null; try{ ro=new ResizeObserver(upd); ro.observe(el); }catch(e){ window.addEventListener("resize",upd); } return ()=>{ try{ ro&&ro.disconnect(); }catch(e){} window.removeEventListener("resize",upd); }; },[]);
+  // 表示する範囲：B〜K列、1〜47行（左右の余白列は省く）
+  const C0=2, C1=11, R0=1, R1=47;
+  const pv=lay.mg.filter(m=>!/^B3[7-9]:K|^B4[01]:K|^D43:K43$|^B4[45]:K4[45]$|^B43:C43$/.test(m)).concat(["B15:K15","B37:K41","B43:C45","D43:K45"]);
+  const span={}, skip={};
+  pv.forEach(m=>{ const [p,q]=m.split(":"); const A=_addr(p), B=_addr(q); if(!A||!B) return; span[A.r+"_"+A.c]={rs:B.r-A.r+1,cs:B.c-A.c+1}; for(let r=A.r;r<=B.r;r++) for(let c=A.c;c<=B.c;c++) if(r!==A.r||c!==A.c) skip[r+"_"+c]=1; });
+  const val={}; Object.keys(lay.cells).forEach(a=>{ const A=_addr(a); if(A) val[A.r+"_"+A.c]=lay.cells[a]; });
+  const boxed=(r)=> (r>=6&&r<=13)||(r>=16&&r<=34)||(r>=37&&r<=45);
+  const pxW=lay.cols.slice(C0-1,C1).map(w=>Math.round(w*7.4+5)); const totW=pxW.reduce((a,b)=>a+b,0);
+  const sc=fit?Math.min(1,(wW-2)/totW):1;
+  const trs=[]; for(let r=R0;r<=R1;r++){ const tds=[]; for(let c=C0;c<=C1;c++){ const k=r+"_"+c; if(skip[k]) continue; const sp=span[k]||{}; const v=val[k]||""; const head=/^【|^(年月日|バイタル記録|排泄記録|投薬|担当職員|他利用者|プログラム|特記事項|利用者名)$/.test(v)||(c===2&&r>=17&&r<=34);
+      tds.push(<td key={k} rowSpan={sp.rs||1} colSpan={sp.cs||1} className={(boxed(r)?"xb ":"")+(head?"xh ":"")+(r===1?"xt":"")} style={{fontWeight:(r===15||r===36)?700:undefined,verticalAlign:(r===37||r===43)?"top":"middle",textAlign:(r===1||(c===2&&r>=17&&r<=34)||(r>=6&&r<=13&&c===2))?"center":"left"}}>{v}</td>); }
+    trs.push(<tr key={r} style={{height:Math.round(lay.rows[r-1]*1.33)}}>{tds}</tr>); }
+  return <div>
+    <div className="tl-modes" style={{marginBottom:8}}><button className={"seg "+(fit?"on":"")} onClick={()=>setFit(true)}>画面に合わせる</button><button className={"seg "+(!fit?"on":"")} onClick={()=>setFit(false)}>実際の大きさ（横にスクロール）</button></div>
+    <div ref={wrapRef} className="xpv-wrap" style={{overflowX:fit?"hidden":"auto"}}>
+      <div style={{width:totW*sc,height:"auto"}}>
+        <div className="xpv-paper" style={{width:totW,transform:"scale("+sc+")",transformOrigin:"top left",marginBottom:fit?("calc(-1 * "+(1-sc)+" * var(--xpvh,1300px))"):0}} ref={el=>{ if(el){ const h=el.offsetHeight; if(h) el.style.setProperty("--xpvh",h+"px"); } }}>
+          <table className="xpv"><colgroup>{pxW.map((w,i)=><col key={i} style={{width:w}}/>)}</colgroup><tbody>{trs}</tbody></table>
+        </div>
+      </div>
+    </div>
+    {fit&&sc<0.6&&<p className="tiny" style={{marginTop:6}}>文字が小さい場合は「実際の大きさ」に切り替えるか、ピンチで拡大してください。</p>}
+  </div>;
 }
 
 /* ===== 来所・帰宅／AI相談の共通処理 ===== */
