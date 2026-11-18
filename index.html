@@ -684,6 +684,33 @@
   .mc-tag{display:inline-block;font-size:8px;font-weight:800;color:#fff;border-radius:4px;padding:0 5px;width:fit-content;}
   .mc-tag.d{background:#C9788F;}
   .mc-tag.b{background:#E0A94E;}
+  .goal-band{margin:-4px 0 12px;display:flex;flex-direction:column;gap:6px;}
+  .goal-card{background:#F4F8FF;border:1px solid #CFDDF3;border-radius:12px;overflow:hidden;}
+  .goal-head{width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;background:none;border:0;padding:9px 12px;font-size:13.5px;font-weight:700;color:#3E5A86;text-align:left;cursor:pointer;font-family:inherit;}
+  .goal-head em{font-style:normal;font-size:12px;color:#6F87AD;white-space:nowrap;}
+  .goal-body{padding:0 12px 10px;}
+  .goal-tip{margin:0 0 8px;font-size:12px;line-height:1.55;color:#5C6F8E;background:#fff;border:1px dashed #BFD0EA;border-radius:8px;padding:6px 8px;}
+  .goal-item{background:#fff;border:1px solid #DCE6F5;border-radius:10px;padding:8px 10px;margin-bottom:6px;}
+  .goal-it{font-weight:800;font-size:13px;color:#3E5A86;margin-bottom:4px;}
+  .goal-it small{font-weight:500;color:#8193B0;font-size:11px;}
+  .goal-row{display:flex;gap:6px;align-items:flex-start;margin:3px 0;}
+  .goal-lab{flex:0 0 auto;font-size:10.5px;font-weight:800;border-radius:6px;padding:2px 6px;margin-top:2px;}
+  .goal-lab.me{background:#FFE9EF;color:#B25E77;}
+  .goal-lab.st{background:#E6F2E9;color:#3F7A52;}
+  .goal-tx{font-size:13px;line-height:1.55;color:#4A4046;white-space:pre-wrap;word-break:break-word;min-width:0;}
+  .goal-per{font-size:11.5px;color:#8193B0;margin-top:2px;}
+  .goal-write{margin-top:6px;border:1px solid #9FB7DC;background:#EEF4FD;color:#3E5A86;border-radius:999px;padding:5px 12px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit;}
+  .goal-foot{text-align:right;font-size:11px;color:#8193B0;}
+  .goal-none{margin:0;color:#8A6B74;}
+  .pe-box{border:1px solid #CFDDF3;background:#F7FAFF;border-radius:10px;padding:8px 10px;margin-top:6px;}
+  .pe-box textarea,.pe-box input{width:100%;box-sizing:border-box;border:1px solid #CFDDF3;border-radius:8px;padding:7px 8px;font-size:13px;font-family:inherit;}
+  .pe-sec{margin-bottom:8px;}
+  .pe-sec b{display:block;font-size:12.5px;color:#3E5A86;margin-bottom:3px;}
+  .pe-lab{font-size:11px;color:#6F87AD;margin:3px 0 2px;display:block;}
+  .pe-badge{font-size:10.5px;font-weight:700;border-radius:6px;padding:1px 6px;}
+  .pe-badge.ok{background:#E6F2E9;color:#3F7A52;}
+  .pe-badge.ck{background:#FFF1D6;color:#9A6A12;}
+  .pe-badge.no{background:#F2EEF0;color:#8A6B74;}
   .care-band{background:#FFF8EF;border:1px solid #F3DEC2;border-radius:14px;padding:10px 12px;margin:4px 0 12px;}
   .care-head{font-weight:800;color:#C08A3E;font-size:14px;margin-bottom:6px;}
   .care-note{background:#fff;border:1px solid #F0E2C9;border-radius:12px;padding:8px 10px;margin-bottom:6px;}
@@ -1084,6 +1111,65 @@ function mealPhotoCands(data,ds){ const [bs,be]=bizWindow(ds); const ml=((data&&
 function mealPhotoPick(cands,sel){ if(sel==="none") return null; const c=(sel&&sel!=="auto")?(cands.find(x=>x.key===sel)||null):(cands[0]||null); if(!c) return null; return c.photoId?{photoId:c.photoId}:{data:c.src}; }
 function stripPhotoLines(t){ return String(t||"").split("\n").filter(l=>!/^\s*(\d{1,2}[:：]\d{2}\s*)?📷/.test(l)).join("\n"); }
 function normName(s){return String(s||"").replace(/[\s　]/g,"").replace(/^[^぀-ヿ一-鿿]+/,"");}
+/* ===== 個別訓練計画の項目（本人／支援者） ===== */
+const PLAN_KEYS=[{k:"adl",label:"日常生活動作訓練",sub:"食事・入浴・宿泊・整容等",tag:"日常生活動作"},{k:"app",label:"応用日常生活動作訓練",sub:"調理・洗濯・清掃等",tag:"応用日常生活動作"},{k:"env",label:"環境適応訓練",sub:"",tag:"環境適応"}];
+function planCreatedOf(text){ const m=String(text||"").match(/計画作成日\s*[：:]?\s*((?:令和|平成)\s*\d+\s*年\s*\d+\s*月\s*\d+\s*日)/); return m?m[1].replace(/\s+/g,""):""; }
+function planItemsEmpty(it){ return !it||!PLAN_KEYS.some(p=>it[p.k]&&(it[p.k].self||it[p.k].staff)); }
+function planItemsClean(o){ const out={}; PLAN_KEYS.forEach(p=>{ const x=(o&&o[p.k])||{}; out[p.k]={self:String(x.self||"").trim(),staff:String(x.staff||"").trim(),period:String(x.period||"").trim(),note:String(x.note||"").trim()}; }); return out; }
+function parsePlanRows(rows){
+  const s=(v)=>String(v==null?"":v).replace(/\r/g,"").trim();
+  let h=-1,cItem=0,cSelf=-1,cStaff=-1,cPer=-1;
+  for(let i=0;i<rows.length;i++){ const r=rows[i]||[]; let a=-1,b=-1,c=-1,d=-1; r.forEach((v,j)=>{ const t=s(v).replace(/\s/g,""); if(!t) return; if(a<0&&/本人/.test(t)&&/取り?組/.test(t))a=j; else if(b<0&&/支援者/.test(t)&&/支援/.test(t.replace("支援者","")))b=j; else if(c<0&&/^期間$/.test(t))c=j; else if(d<0&&/個別訓練項目/.test(t))d=j; }); if(a>=0&&b>a){ h=i; cSelf=a; cStaff=b; cPer=c>b?c:-1; cItem=(d>=0&&d<a)?d:0; break; } }
+  if(h<0) return null;
+  const out={}; PLAN_KEYS.forEach(p=>out[p.k]={self:"",staff:"",period:"",note:""});
+  let cur=null, inNote=false;
+  const add=(o,k,t)=>{ if(!t) return; o[k]=o[k]?(o[k]+"\n"+t):t; };
+  for(let i=h+1;i<rows.length;i++){ const r=rows[i]||[]; const all=r.map(s).join(""); if(/上記個別訓練計画|同意します/.test(all)) break;
+    const lab=r.slice(cItem,cSelf).map(s).filter(Boolean).join(" ").replace(/\s/g,"");
+    if(lab){ if(/^備考/.test(lab)) inNote=true; else if(/応用/.test(lab)){cur="app";inNote=false;} else if(/環境/.test(lab)){cur="env";inNote=false;} else if(/日常生活/.test(lab)){cur="adl";inNote=false;} }
+    if(!cur) continue;
+    const seg=(from,to)=>r.slice(from,to<0?undefined:to).map(s).filter(Boolean).join(" ");
+    const tSelf=seg(cSelf,cStaff), tStaff=seg(cStaff,cPer>=0?cPer:-1), tPer=cPer>=0?seg(cPer,-1):"";
+    if(inNote){ add(out[cur],"note",[tSelf,tStaff,tPer].filter(Boolean).join(" ")); continue; }
+    add(out[cur],"self",tSelf); add(out[cur],"staff",tStaff); add(out[cur],"period",tPer);
+  }
+  return planItemsEmpty(out)?null:planItemsClean(out);
+}
+function parsePlanSheet(ws){ try{ return parsePlanRows(XLSX.utils.sheet_to_json(ws,{header:1,blankrows:false,defval:"",raw:false})); }catch(e){ return null; } }
+function planItemsFor(data,name,ds){ const pi=(data&&data.planItems)||{}; const k=normName(name); if(!k) return null; const d=ds?new Date(ds+"T00:00:00"):new Date(); const y0=String((d.getMonth()+1)>=4?d.getFullYear():d.getFullYear()-1); if(pi[y0]&&pi[y0][k]&&!planItemsEmpty(pi[y0][k].items)) return Object.assign({yr:y0},pi[y0][k]); const ys=Object.keys(pi).filter(y=>Number(y)<=Number(y0)).sort((a,b)=>Number(b)-Number(a)); for(const y of ys){ if(pi[y]&&pi[y][k]&&!planItemsEmpty(pi[y][k].items)) return Object.assign({yr:y},pi[y][k]); } return null; }
+function planItemsText(p){ if(!p) return ""; return PLAN_KEYS.map(k=>{ const it=(p.items||{})[k.k]||{}; return (it.self||it.staff)?("■"+k.label+"\n　本人："+String(it.self||"").replace(/\n/g," ")+"\n　支援者："+String(it.staff||"").replace(/\n/g," ")):""; }).filter(Boolean).join("\n"); }
+const PLAN_SPLIT_SYS="あなたは障害福祉（生活訓練）の「個別訓練計画」の表を整理する係です。渡される文章は、Excelの表を1行ずつ文字につなげたもので、各行は「個別訓練項目」「訓練に向けて取り組むこと（本人）」「具体的な訓練支援内容（支援者）」「期間」の欄が空白でつながっています。\n項目は次の3つです：adl＝日常生活動作訓練（食事・入浴・宿泊・整容等）、app＝応用日常生活動作訓練（調理・洗濯・清掃等）、env＝環境適応訓練。\n各項目の文を「本人（self）」「支援者（staff）」「期間（period）」に振り分けてください。\n・本人の欄は、本人が取り組むこと（例：〜に慣れる、〜を覚える、〜する）。支援者の欄は、支援者が行うこと（例：〜を見守る、〜を説明する、声をかける、一緒に〜する、〜を教える）。\n・同じ行では、通常は前半が本人、後半が支援者です。\n・期間は日付（例：令和9年3月31日）。\n・「備考」の行の内容は note に入れてください。\n・文はそのまま写し、言い換え・要約・追加はしないこと。箇条書き（・）は改行で区切って残すこと。\n・どちらか迷う文は self に入れてください。内容が無い欄は空文字にします。\n出力は次のJSONだけにしてください（説明文は不要）：{\"adl\":{\"self\":\"\",\"staff\":\"\",\"period\":\"\",\"note\":\"\"},\"app\":{...},\"env\":{...}}";
+function planTablePart(text){ let t=String(text||""); const a=t.search(/個別訓練項目/); if(a>=0) t=t.slice(a); const b=t.search(/上記個別訓練計画|同意します/); if(b>0) t=t.slice(0,b); return t.slice(0,3000); }
+async function aiSplitPlan(apiKey,text){
+  const part=planTablePart(text); if(!/訓練/.test(part)) throw new Error("計画の表の部分が見つかりません");
+  const res=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",headers:{"content-type":"application/json","x-api-key":apiKey,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},body:JSON.stringify({model:"claude-sonnet-5",max_tokens:2500,system:PLAN_SPLIT_SYS,messages:[{role:"user",content:part}]})});
+  const d=await res.json(); if(d.error) throw new Error(d.error.message||"AIエラー");
+  const txt=(d.content||[]).filter(b=>b.type==="text").map(b=>b.text).join("\n"); const m=txt.match(/\{[\s\S]*\}/); if(!m) throw new Error("AIの回答を読み取れませんでした");
+  const j=JSON.parse(m[0]); const out=planItemsClean(j); if(planItemsEmpty(out)) throw new Error("項目を振り分けられませんでした"); return out;
+}
+function PlanGoals({data,users,date,me,onWrite}){
+  const [open,setOpen]=useState("");
+  const list=users.map(u=>({u,p:planItemsFor(data,u,date)}));
+  const has=list.filter(x=>x.p); const none=list.filter(x=>!x.p);
+  if(!has.length&&!(me&&me.isAdmin&&none.length)) return null;
+  return <div className="goal-band">
+    {has.map(({u,p})=>{ const isOpen=open===u; const items=PLAN_KEYS.filter(k=>p.items&&p.items[k.k]&&(p.items[k.k].self||p.items[k.k].staff)); return <div key={u} className={"goal-card"+(isOpen?" on":"")}>
+      <button className="goal-head" onClick={()=>setOpen(isOpen?"":u)}><span>🎯 {u}さんの訓練目標（{items.length}項目）</span><em>{isOpen?"▲ 閉じる":"▼ 見る"}</em></button>
+      {isOpen&&<div className="goal-body">
+        <p className="goal-tip">✏️ この目標について、様子を<b>ひと言でも</b>記録に残すと、日誌まとめで目標に沿った内容を作れます。</p>
+        {items.map(k=>{ const it=p.items[k.k]; return <div key={k.k} className="goal-item">
+          <div className="goal-it">{k.label}{k.sub&&<small>（{k.sub}）</small>}</div>
+          {it.self&&<div className="goal-row"><span className="goal-lab me">本人</span><div className="goal-tx">{it.self}</div></div>}
+          {it.staff&&<div className="goal-row"><span className="goal-lab st">支援者</span><div className="goal-tx">{it.staff}</div></div>}
+          {it.period&&<div className="goal-per">期間：{it.period}</div>}
+          <button className="goal-write" onClick={()=>{ setOpen(""); onWrite(u,k); }}>✏️ この目標の様子を書く</button>
+        </div>; })}
+        <div className="goal-foot">{p.created?("計画作成日 "+p.created):""}{p.yr?("（"+p.yr+"年度）"):""}</div>
+      </div>}
+    </div>; })}
+    {me&&me.isAdmin&&none.length>0&&<p className="tiny goal-none">🔒（管理者のみ表示）{none.map(x=>x.u).join("・")}さんは、訓練目標の項目がまだ整理されていません（日誌まとめ →「個別訓練計画の取り込み」③から整理できます）。</p>}
+  </div>;
+}
 function Nisshi({me,data,persist}){
   const nendoOf=(ds)=>{const dt=new Date(ds+"T00:00:00");const y=dt.getFullYear();return (dt.getMonth()+1)>=4?y:y-1;};
   const [planYear,setPlanYear]=useState(()=>{const n=new Date();return (n.getMonth()+1)>=4?n.getFullYear():n.getFullYear()-1;});
@@ -1098,9 +1184,18 @@ function Nisshi({me,data,persist}){
   const planOneRef=useRef(null);
   const [planOneSel,setPlanOneSel]=useState(""); const [planOneText,setPlanOneText]=useState(""); const [planOpen,setPlanOpen]=useState("");
   const planWho=()=>planOneSel==="__other"?planOneName.trim():(planOneSel||"");
-  const planStore=(who,text,src)=>{ const nm=normName(who); const yr=String(planYear); const yearMap=Object.assign({},(data.trainingPlans||{})[yr]||{},{[nm]:text}); const meta=Object.assign({},(data.trainingPlansMeta||{})[yr]||{},{[nm]:{name:who,date:iso(new Date()),by:(me&&me.name)||"",src:src}}); const had=!!(((data.trainingPlans||{})[yr]||{})[nm]); if(persist) persist(Object.assign({},data,{trainingPlans:Object.assign({},data.trainingPlans||{},{[yr]:yearMap}),trainingPlansMeta:Object.assign({},data.trainingPlansMeta||{},{[yr]:meta})})); return had; };
-  const savePlanText=()=>{ const who=planWho(); if(!normName(who)){ setPlanMsg("利用者を選んでください。"); return; } const t=String(planOneText||"").trim(); if(!t){ setPlanMsg("計画の内容を入力（貼り付け）してください。"); return; } const had=planStore(who,t.slice(0,4000),"text"); setPlanOneText(""); setPlanMsg("「"+who+"」の個別訓練計画を"+(had?"変更":"登録")+"しました（"+planYear+"年度）。"); };
-  const delPlan=(nm,label)=>{ if(!confirm("「"+label+"」さんの "+planYear+"年度 の個別訓練計画を削除しますか？"))return; const yr=String(planYear); const ym=Object.assign({},(data.trainingPlans||{})[yr]||{}); delete ym[nm]; const mm=Object.assign({},(data.trainingPlansMeta||{})[yr]||{}); delete mm[nm]; if(persist) persist(Object.assign({},data,{trainingPlans:Object.assign({},data.trainingPlans||{},{[yr]:ym}),trainingPlansMeta:Object.assign({},data.trainingPlansMeta||{},{[yr]:mm})})); setPlanMsg("「"+label+"」さんの計画を削除しました。"); };
+  const dLatest=useRef(data); dLatest.current=data;
+  const [planEdit,setPlanEdit]=useState(null); const [planAiBusy,setPlanAiBusy]=useState("");
+  const piEntry=(who,text,items,src,checked)=>({name:who,created:planCreatedOf(text),items:planItemsClean(items),src:src,checked:!!checked,at:iso(new Date()),by:(me&&me.name)||""});
+  const planStore=(who,text,src,items)=>{ const nm=normName(who); const yr=String(planYear); const yearMap=Object.assign({},(data.trainingPlans||{})[yr]||{},{[nm]:text}); const meta=Object.assign({},(data.trainingPlansMeta||{})[yr]||{},{[nm]:{name:who,date:iso(new Date()),by:(me&&me.name)||"",src:src}}); const had=!!(((data.trainingPlans||{})[yr]||{})[nm]); const piY=Object.assign({},(data.planItems||{})[yr]||{}); if(items) piY[nm]=piEntry(who,text,items,"excel",true); else delete piY[nm]; if(persist) persist(Object.assign({},data,{trainingPlans:Object.assign({},data.trainingPlans||{},{[yr]:yearMap}),trainingPlansMeta:Object.assign({},data.trainingPlansMeta||{},{[yr]:meta}),planItems:Object.assign({},data.planItems||{},{[yr]:piY})})); return had; };
+  const savePlanItems=(yr,nm,entry)=>{ const d=dLatest.current; const piY=Object.assign({},(d.planItems||{})[yr]||{}); if(entry) piY[nm]=entry; else delete piY[nm]; if(persist) persist(Object.assign({},d,{planItems:Object.assign({},d.planItems||{},{[yr]:piY})})); };
+  const openPlanEdit=(yr,nm,label)=>{ const cur=((data.planItems||{})[yr]||{})[nm]; const text=String(((data.trainingPlans||{})[yr]||{})[nm]||""); setPlanEdit({yr,nm,label,created:(cur&&cur.created)||planCreatedOf(text),items:planItemsClean(cur&&cur.items),src:(cur&&cur.src)||"manual"}); };
+  const setPE=(k,f,v)=>setPlanEdit(p=>{ const items=Object.assign({},p.items); items[k]=Object.assign({},items[k],{[f]:v}); return Object.assign({},p,{items}); });
+  const savePlanEdit=()=>{ const e=planEdit; if(!e) return; if(planItemsEmpty(e.items)&&!confirm("本人・支援者の欄がすべて空です。項目の整理を取り消しますか？")) return; savePlanItems(e.yr,e.nm,planItemsEmpty(e.items)?null:{name:e.label,created:String(e.created||"").trim(),items:planItemsClean(e.items),src:e.src==="ai"?"ai":(e.src||"manual"),checked:true,at:iso(new Date()),by:(me&&me.name)||""}); setPlanEdit(null); setPlanMsg("「"+e.label+"」さんの訓練目標の項目を保存しました。記録ページに表示されます。"); };
+  const aiRedoEdit=async()=>{ const e=planEdit; if(!e) return; if(!apiKey){ setPlanMsg("AIで整理するにはAPIキーの設定が必要です（AI相談タブの「AIの設定」）。"); return; } const text=String(((data.trainingPlans||{})[e.yr]||{})[e.nm]||""); setPlanAiBusy(e.nm); try{ const items=await aiSplitPlan(apiKey,text); setPlanEdit(p=>p&&p.nm===e.nm?Object.assign({},p,{items,src:"ai"}):p); setPlanMsg("AIで振り分けました。内容を確認して「保存」を押してください。"); }catch(err){ setPlanMsg("AIでの整理に失敗しました："+String(err&&err.message||err)); } setPlanAiBusy(""); };
+  const aiSplitAll=async(yr,keys)=>{ if(!apiKey){ setPlanMsg("AIで整理するにはAPIキーの設定が必要です（AI相談タブの「AIの設定」）。"); return; } if(!confirm(keys.length+"名分の計画を、AIで「本人／支援者」の項目に振り分けます。\n（AIには計画の表の部分だけを送ります。お名前・診断名は送りません）\n\n終わったら、1名ずつ内容を確認してください。始めますか？")) return; let ok=0,ng=[]; for(let i=0;i<keys.length;i++){ const nm=keys[i]; const d=dLatest.current; const label=(((d.trainingPlansMeta||{})[yr]||{})[nm]||{}).name||nm; setPlanAiBusy("all"); setPlanMsg("AIで整理中… "+(i+1)+" / "+keys.length+"（"+label+"）　※この画面を開いたままお待ちください"); try{ const text=String(((d.trainingPlans||{})[yr]||{})[nm]||""); const items=await aiSplitPlan(apiKey,text); savePlanItems(yr,nm,piEntry(label,text,items,"ai",false)); ok++; await new Promise(r=>setTimeout(r,300)); }catch(err){ ng.push(label); } } setPlanAiBusy(""); setPlanMsg("AIでの整理が終わりました："+ok+"名"+(ng.length?("／できなかった方："+ng.join("・")+"（「項目」から手で入力できます）"):"")+"。「🤖 未確認」の方は「項目」を開いて内容を確認し、保存してください。"); };
+  const savePlanText=()=>{ const who=planWho(); if(!normName(who)){ setPlanMsg("利用者を選んでください。"); return; } const t=String(planOneText||"").trim(); if(!t){ setPlanMsg("計画の内容を入力（貼り付け）してください。"); return; } const had=planStore(who,t.slice(0,4000),"text"); setPlanOneText(""); setPlanMsg("「"+who+"」の個別訓練計画を"+(had?"変更":"登録")+"しました（"+planYear+"年度）。記録ページに目標を出すには、下の③で「🎯 項目」から本人／支援者の欄を整理してください。"); };
+  const delPlan=(nm,label)=>{ if(!confirm("「"+label+"」さんの "+planYear+"年度 の個別訓練計画を削除しますか？"))return; const yr=String(planYear); const ym=Object.assign({},(data.trainingPlans||{})[yr]||{}); delete ym[nm]; const mm=Object.assign({},(data.trainingPlansMeta||{})[yr]||{}); delete mm[nm]; const piY=Object.assign({},(data.planItems||{})[yr]||{}); delete piY[nm]; if(persist) persist(Object.assign({},data,{trainingPlans:Object.assign({},data.trainingPlans||{},{[yr]:ym}),trainingPlansMeta:Object.assign({},data.trainingPlansMeta||{},{[yr]:mm}),planItems:Object.assign({},data.planItems||{},{[yr]:piY})})); setPlanMsg("「"+label+"」さんの計画を削除しました。"); };
   const onPlanFileOne=async(e)=>{
     const file=e.target.files&&e.target.files[0]; e.target.value=""; if(!file) return;
     const who=planWho(); const nm=normName(who);
@@ -1110,12 +1205,12 @@ function Nisshi({me,data,persist}){
     try{
       const buf=await file.arrayBuffer();
       const wb=XLSX.read(buf,{type:"array"});
-      let text="";
-      wb.SheetNames.forEach(sn=>{ const ws=wb.Sheets[sn]; if(!ws) return; const rows=XLSX.utils.sheet_to_json(ws,{header:1,blankrows:false,defval:""}); const t=rows.map(r=>(r||[]).map(c=>String(c==null?"":c).replace(/\s+/g," ").trim()).filter(Boolean).join(" ")).filter(Boolean).join("\n"); if(t) text+=(text?"\n":"")+t; });
+      let text=""; let items=null;
+      wb.SheetNames.forEach(sn=>{ const ws=wb.Sheets[sn]; if(!ws) return; const rows=XLSX.utils.sheet_to_json(ws,{header:1,blankrows:false,defval:""}); const t=rows.map(r=>(r||[]).map(c=>String(c==null?"":c).replace(/\s+/g," ").trim()).filter(Boolean).join(" ")).filter(Boolean).join("\n"); if(t) text+=(text?"\n":"")+t; if(!items) items=parsePlanSheet(ws); });
       text=text.slice(0,2000);
       if(!text){ setPlanMsg("内容を読み取れませんでした。"); return; }
-      const had=planStore(who,text,"file");
-      setPlanMsg("「"+who+"」の個別訓練計画を"+(had?"変更":"登録")+"しました（"+planYear+"年度・ファイルから）。");
+      const had=planStore(who,text,"file",items);
+      setPlanMsg("「"+who+"」の個別訓練計画を"+(had?"変更":"登録")+"しました（"+planYear+"年度・ファイルから）。"+(items?"本人／支援者の項目も読み取りました（③の「🎯 項目」で確認・修正できます）。":"本人／支援者の欄は読み分けられなかったため、③の「🎯 項目」から整理してください。"));
     }catch(err){ setPlanMsg("取り込みに失敗しました："+String(err&&err.message||err)); }
   };
   const onPlanFile=async(e)=>{
@@ -1125,17 +1220,18 @@ function Nisshi({me,data,persist}){
     try{
       const buf=await file.arrayBuffer();
       const wb=XLSX.read(buf,{type:"array"});
-      const map={}; const names=[];
+      const map={}; const names=[]; const itemMap={};
       wb.SheetNames.forEach(sn=>{
         const ws=wb.Sheets[sn]; if(!ws) return;
         const rows=XLSX.utils.sheet_to_json(ws,{header:1,blankrows:false,defval:""});
         const text=rows.map(r=>(r||[]).map(c=>String(c==null?"":c).replace(/\s+/g," ").trim()).filter(Boolean).join(" ")).filter(Boolean).join("\n").slice(0,2000);
         const nm=normName(sn);
-        if(nm&&text){ map[nm]=text; names.push(sn); }
+        if(nm&&text){ map[nm]=text; names.push(sn); const it=parsePlanSheet(ws); itemMap[nm]=it?piEntry(sn,text,it,"excel",true):null; }
       });
       const yr=String(planYear);
       const yearMap=Object.assign({},(data.trainingPlans||{})[yr]||{},map); // 既存に追加・上書き（他の人は消さない）
-      const next=Object.assign({},data,{trainingPlans:Object.assign({},data.trainingPlans||{},{[yr]:yearMap})});
+      const piY=Object.assign({},(data.planItems||{})[yr]||{}); Object.keys(itemMap).forEach(k=>{ if(itemMap[k]) piY[k]=itemMap[k]; else delete piY[k]; });
+      const next=Object.assign({},data,{trainingPlans:Object.assign({},data.trainingPlans||{},{[yr]:yearMap}),planItems:Object.assign({},data.planItems||{},{[yr]:piY})});
       if(persist) persist(next);
       setPlanMsg("取り込み完了："+Object.keys(map).length+"名分を保存しました（"+yr+"年度）。／タブ："+names.join("、"));
     }catch(err){ setPlanMsg("取り込みに失敗しました："+String(err&&err.message||err)); }
@@ -1208,6 +1304,7 @@ function Nisshi({me,data,persist}){
     let _plan=(_tp[_nd]&&_tp[_nd][_key])||"";
     if(!_plan){ const ys=Object.keys(_tp).sort((a,b)=>Number(b)-Number(a)); for(const y of ys){ if(_tp[y]&&_tp[y][_key]){ _plan=_tp[y][_key]; break; } } }
     if(_plan) s+="\n\n【個別訓練計画（本人の目標・取り組むこと）】\n"+_plan;
+    const _pi=planItemsFor(data,user,date); if(_pi){ s+="\n\n【個別訓練計画の項目（本人の取り組み／支援者の支援内容）】\n"+planItemsText(_pi)+"\n※記録のうち「【目標：〇〇】」で始まるものは、上の該当項目についての様子です。ご様子の中で、その目標と結び付けて自然に触れてください（できた点・取り組んだ点を事実に沿って）。"; }
     try{ if(SB_ON){ const list=await nsList(); const mine=(list||[]).filter(r=>r.user_name===user && String(r.biz_date)<date).sort((a,b)=>String(b.biz_date).localeCompare(String(a.biz_date))); if(mine[0]){ const full=await nsGet(mine[0].id); if(full&&full.data&&full.data.appearance){ s+="\n\n【前回（"+mine[0].biz_date+"）のご様子】\n"+String(full.data.appearance).slice(0,800); } } const paper=(list||[]).filter(r=>r.user_name===user && String(r.keywords||"").includes("【紙】")).sort((a,b)=>String(b.biz_date).localeCompare(String(a.biz_date))); if(paper[0] && (!mine[0]||paper[0].id!==mine[0].id)){ const pf=await nsGet(paper[0].id); if(pf&&pf.data&&pf.data.appearance){ s+="\n\n【過去の記録（"+paper[0].biz_date+"・参考）】\n"+String(pf.data.appearance).slice(0,800); } } const styled=(list||[]).filter(r=>String(r.keywords||"").includes("#STYLEREF#")).sort((a,b)=>String(b.biz_date).localeCompare(String(a.biz_date))).slice(0,3); if(styled.length){ let ex=""; for(const r of styled){ const sf=await nsGet(r.id); if(sf&&sf.data&&sf.data.appearance){ const bef=sf.data.appearanceBefore; if(bef&&String(bef).trim()&&String(bef)!==String(sf.data.appearance)){ ex+="\n【まとめ例】修正前："+String(bef).slice(0,300)+"\n→修正後："+String(sf.data.appearance).slice(0,400); } else { ex+="\n・"+String(sf.data.appearance).slice(0,400); } const ab=sf.data.activityBefore, af=sf.data.activityFinal; if(af&&String(af).trim()&&String(ab||"")!==String(af)){ ex+="\n【活動記録の書き方】修正前："+String(ab||"").slice(0,250)+"\n→修正後："+String(af).slice(0,350); } } } if(ex) s+="\n\n【表現の参考（管理者が整えた過去のまとめ・活動記録。文体・言い回し・まとめ方・長さをこれに寄せる。「修正前→修正後」の例は“どう直すか”の手本。内容はコピーしない）】"+ex; } } }catch(e){}
     return s;
   };
@@ -1424,9 +1521,27 @@ function Nisshi({me,data,persist}){
       {(()=>{ const yr=String(planYear); const ym=(data.trainingPlans||{})[yr]||{}; const mm=(data.trainingPlansMeta||{})[yr]||{}; const keys=Object.keys(ym); const missing=allResidents.filter(u=>!ym[normName(u)]); return <div className="plan-one" style={{background:"#fff"}}>
         <div className="plan-one-t">③ {yr}年度に登録済みの計画（{keys.length}名）</div>
         {keys.length===0&&<p className="tiny">まだ登録がありません。</p>}
+        {keys.length>0&&(()=>{ const pY=(data.planItems||{})[yr]||{}; const todo=keys.filter(k=>!pY[k]||planItemsEmpty(pY[k].items)); const unck=keys.filter(k=>pY[k]&&!planItemsEmpty(pY[k].items)&&!pY[k].checked); return <div className="pe-box" style={{marginBottom:8}}>
+          <div className="tiny" style={{fontWeight:700,color:"#3E5A86"}}>🎯 訓練目標の項目（記録ページに表示）</div>
+          <p className="tiny" style={{margin:"3px 0 6px"}}>「個別訓練項目」ごとに「本人（取り組むこと）」「支援者（支援内容）」を分けて保存すると、記録ページで利用者を選んだときに目標が表示されます。各方の「🎯 項目」から確認・修正できます。</p>
+          <div className="tiny">整理済み {keys.length-todo.length}名{unck.length?("（うち未確認 "+unck.length+"名）"):""}／未整理 {todo.length}名</div>
+          {todo.length>0&&<div className="row-end" style={{justifyContent:"flex-start",marginTop:6}}><Btn kind="ghost2" onClick={()=>aiSplitAll(yr,todo)}>{planAiBusy==="all"?"AIで整理中…":("🤖 未整理の"+todo.length+"名をAIで整理")}</Btn></div>}
+        </div>; })()}
         {keys.map(k=>{ const m=mm[k]||{}; const label=m.name||(allResidents.find(u=>normName(u)===k))||k; return <div key={k} className="tp-row">
-          <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}><b style={{fontSize:13.5,color:"#5A4A50"}}>{label}</b><span className="tiny">{m.date?("更新 "+m.date+(m.by?("・"+m.by):"")):"年度取り込み"}</span><span style={{marginLeft:"auto",display:"flex",gap:6}}><button className="link-btn" onClick={()=>setPlanOpen(planOpen===k?"":k)}>{planOpen===k?"閉じる":"内容"}</button><button className="link-btn" onClick={()=>{ const u=allResidents.find(x=>normName(x)===k); if(u){ setPlanOneSel(u); } else { setPlanOneSel("__other"); setPlanOneName(label); } setPlanOneText(String(ym[k]||"")); setPlanMsg("「"+label+"」の内容を②に読み込みました。直して「この内容で登録・変更」を押してください。"); }}>変更</button><button className="mini-del" style={{marginLeft:0}} onClick={()=>delPlan(k,label)}>🗑</button></span></div>
+          <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}><b style={{fontSize:13.5,color:"#5A4A50"}}>{label}</b><span className="tiny">{m.date?("更新 "+m.date+(m.by?("・"+m.by):"")):"年度取り込み"}</span>{(()=>{ const pe=((data.planItems||{})[yr]||{})[k]; return (!pe||planItemsEmpty(pe.items))?<span className="pe-badge no">項目なし</span>:pe.checked?<span className="pe-badge ok">🎯 項目あり</span>:<span className="pe-badge ck">🤖 未確認</span>; })()}<span style={{marginLeft:"auto",display:"flex",gap:6}}><button className="link-btn" onClick={()=>planEdit&&planEdit.nm===k?setPlanEdit(null):openPlanEdit(yr,k,label)}>{planEdit&&planEdit.nm===k?"閉じる":"🎯 項目"}</button><button className="link-btn" onClick={()=>setPlanOpen(planOpen===k?"":k)}>{planOpen===k?"閉じる":"内容"}</button><button className="link-btn" onClick={()=>{ const u=allResidents.find(x=>normName(x)===k); if(u){ setPlanOneSel(u); } else { setPlanOneSel("__other"); setPlanOneName(label); } setPlanOneText(String(ym[k]||"")); setPlanMsg("「"+label+"」の内容を②に読み込みました。直して「この内容で登録・変更」を押してください。"); }}>変更</button><button className="mini-del" style={{marginLeft:0}} onClick={()=>delPlan(k,label)}>🗑</button></span></div>
           {planOpen===k&&<div className="plan-txt">{String(ym[k]||"")}</div>}
+          {planEdit&&planEdit.nm===k&&planEdit.yr===yr&&<div className="pe-box">
+            <div className="tiny" style={{fontWeight:700,color:"#3E5A86",marginBottom:4}}>🎯 {label}さんの訓練目標の項目{planEdit.src==="ai"&&<span className="pe-badge ck" style={{marginLeft:6}}>🤖 AIが振り分け（要確認）</span>}</div>
+            <label className="pe-lab">計画作成日</label><input value={planEdit.created||""} onChange={e=>setPlanEdit(p=>Object.assign({},p,{created:e.target.value}))} placeholder="例：令和8年6月15日"/>
+            {PLAN_KEYS.map(pk=>{ const it=planEdit.items[pk.k]||{}; return <div key={pk.k} className="pe-sec" style={{marginTop:8}}>
+              <b>{pk.label}{pk.sub&&<small style={{fontWeight:500}}>（{pk.sub}）</small>}</b>
+              <label className="pe-lab">訓練に向けて取り組むこと（本人）</label><textarea rows={3} value={it.self||""} onChange={e=>setPE(pk.k,"self",e.target.value)}/>
+              <label className="pe-lab">具体的な訓練支援内容（支援者）</label><textarea rows={3} value={it.staff||""} onChange={e=>setPE(pk.k,"staff",e.target.value)}/>
+              <label className="pe-lab">期間</label><input value={it.period||""} onChange={e=>setPE(pk.k,"period",e.target.value)} placeholder="例：令和9年3月31日"/>
+            </div>; })}
+            <div className="row-end" style={{flexWrap:"wrap",gap:6}}><Btn kind="ghost2" onClick={aiRedoEdit}>{planAiBusy===k?"AIで振り分け中…":"🤖 AIで振り分け直す"}</Btn><Btn kind="ghost2" onClick={()=>setPlanEdit(null)}>やめる</Btn><Btn onClick={savePlanEdit}>保存</Btn></div>
+            <p className="tiny" style={{margin:"4px 0 0"}}>元の計画の文章は「内容」で見られます。保存すると記録ページの「🎯 訓練目標」に反映されます。</p>
+          </div>}
         </div>; })}
         {missing.length>0&&<p className="tiny" style={{marginTop:6,color:"#B07A2E"}}>この年度に計画が未登録の方：{missing.join("・")}</p>}
       </div>; })()}
@@ -2101,6 +2216,7 @@ function Records({me,data,persist,reload}){
         <div className="row-end"><Btn onClick={addCareNote}>登録する</Btn></div>
       </div>}
     </div>}
+    {sel.length>0&&<PlanGoals data={data} me={me} users={sel.filter(u=>dayUsers.includes(u))} date={effDate} onWrite={(u,pk)=>{ setSel([u]); setView("log"); setNote(prev=>{ const rest=String(prev||"").replace(/^【目標：[^】]*】/,""); return "【目標："+pk.tag+"】"+rest; }); setTimeout(()=>{ const el=document.getElementById("recNoteTa"); if(el){ try{ el.scrollIntoView({block:"center",behavior:"smooth"}); }catch(e){} el.focus(); try{ const n=el.value.length; el.setSelectionRange(n,n); }catch(e){} } },120); flash("✏️ "+u+"さんの「"+pk.tag+"」の様子を書いて「＋」で記録してください"); }}/>}
     <div className="tl-modes" style={{marginBottom:12}}>
       <button className={"seg "+(view==="log"?"on":"")} onClick={()=>setView("log")}>記録</button>
       <button className={"seg "+(view==="album"?"on":"")} onClick={()=>setView("album")}>📷 写真記録</button>
@@ -2185,7 +2301,7 @@ function Records({me,data,persist,reload}){
       </Modal>}
       <div className="rec-sub">自由に記録（様子・エピソード）</div>
       <div className="composer">
-        <textarea rows={1} value={note} placeholder="様子を具体的に（例：夕食後、笑顔で職員と将棋。勝って嬉しそう）" onChange={e=>setNote(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();addNote();}}}/>
+        <textarea id="recNoteTa" rows={/^【目標：/.test(note)?3:1} value={note} placeholder="様子を具体的に（例：夕食後、笑顔で職員と将棋。勝って嬉しそう）" onChange={e=>setNote(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();addNote();}}}/>
         <button className="send" onClick={addNote} title="現在時刻で記録">＋</button>
       </div>
       <p className="tiny" style={{marginTop:4}}>「＋」を押すと<b>現在の時刻</b>のまま記録します。💡 具体的な様子はここに残すと、日誌の「ご様子まとめ」を簡潔にできます（活動記録はそのまま印刷されます）。<br/>※ 過去の日時を指定して記録したいときは、<b>ページ上部の「🕒 過去の日時を指定して記録」</b>をお使いください。</p>
@@ -2593,7 +2709,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.185〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.186〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
