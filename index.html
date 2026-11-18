@@ -705,6 +705,19 @@
   .pe-box{border:1px solid #CFDDF3;background:#F7FAFF;border-radius:10px;padding:8px 10px;margin-top:6px;}
   .pe-box textarea,.pe-box input{width:100%;box-sizing:border-box;border:1px solid #CFDDF3;border-radius:8px;padding:7px 8px;font-size:13px;font-family:inherit;}
   .pe-sec{margin-bottom:8px;}
+  .pe-recs{margin-top:4px;}
+  .pe-chips{display:flex;flex-wrap:wrap;gap:5px;}
+  .pe-chip{border:1px solid #CFDDF3;background:#fff;color:#5C6F8E;border-radius:999px;padding:4px 10px;font-size:12px;cursor:pointer;font-family:inherit;}
+  .pe-chip.sug{border:1.5px dashed #E0A84A;background:#FFF9EC;color:#9A6A12;}
+  .pe-chip.on{background:#3E5A86;border-color:#3E5A86;color:#fff;font-weight:700;}
+  .goal-ask{position:fixed;left:10px;right:10px;z-index:116;background:#fff;border:2px solid #9FB7DC;border-radius:16px;padding:10px 12px;box-shadow:0 10px 30px rgba(40,60,100,.28);max-width:520px;margin:0 auto;box-sizing:border-box;}
+  .goal-ask-h{font-weight:800;font-size:13.5px;color:#3E5A86;line-height:1.45;}
+  .goal-ask-s{font-size:12px;color:#5C6F8E;margin:3px 0 7px;line-height:1.5;}
+  .goal-ask-chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:7px;}
+  .goal-ask-chips button{border:1px solid #9FB7DC;background:#EEF4FD;color:#3E5A86;border-radius:999px;padding:7px 11px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;}
+  .goal-ask-chips button.on{background:#3E5A86;color:#fff;}
+  .goal-ask textarea{width:100%;box-sizing:border-box;border:1px solid #CFDDF3;border-radius:10px;padding:7px 9px;font-size:14px;font-family:inherit;}
+  .goal-ask-x{position:absolute;top:6px;right:8px;border:0;background:none;font-size:16px;color:#8193B0;cursor:pointer;}
   .pe-sec b{display:block;font-size:12.5px;color:#3E5A86;margin-bottom:3px;}
   .pe-lab{font-size:11px;color:#6F87AD;margin:3px 0 2px;display:block;}
   .pe-badge{font-size:10.5px;font-weight:700;border-radius:6px;padding:1px 6px;}
@@ -1115,7 +1128,11 @@ function normName(s){return String(s||"").replace(/[\s　]/g,"").replace(/^[^぀
 const PLAN_KEYS=[{k:"adl",label:"日常生活動作訓練",sub:"食事・入浴・宿泊・整容等",tag:"日常生活動作"},{k:"app",label:"応用日常生活動作訓練",sub:"調理・洗濯・清掃等",tag:"応用日常生活動作"},{k:"env",label:"環境適応訓練",sub:"",tag:"環境適応"}];
 function planCreatedOf(text){ const m=String(text||"").match(/計画作成日\s*[：:]?\s*((?:令和|平成)\s*\d+\s*年\s*\d+\s*月\s*\d+\s*日)/); return m?m[1].replace(/\s+/g,""):""; }
 function planItemsEmpty(it){ return !it||!PLAN_KEYS.some(p=>it[p.k]&&(it[p.k].self||it[p.k].staff)); }
-function planItemsClean(o){ const out={}; PLAN_KEYS.forEach(p=>{ const x=(o&&o[p.k])||{}; out[p.k]={self:String(x.self||"").trim(),staff:String(x.staff||"").trim(),period:String(x.period||"").trim(),note:String(x.note||"").trim()}; }); return out; }
+function planItemsClean(o){ const out={}; PLAN_KEYS.forEach(p=>{ const x=(o&&o[p.k])||{}; out[p.k]={self:String(x.self||"").trim(),staff:String(x.staff||"").trim(),period:String(x.period||"").trim(),note:String(x.note||"").trim(),recs:Array.isArray(x.recs)?x.recs.filter(Boolean).map(String):[]}; }); return out; }
+const GOAL_SYN=[[/歯磨|口腔/,/歯磨|歯みがき|はみがき|口腔|うがい/],[/入浴|お湯張り|風呂/,/入浴|風呂|湯船|洗髪|お湯/],[/起床/,/起床|起き|アラーム|目覚/],[/就寝/,/就寝|寝る|眠|夜更かし/],[/ベッド|シーツ/,/シーツ|ベッド|布団/],[/調理/,/調理|料理|包丁|火を|盛り付け|炊飯|米/],[/食器|弁当箱|水筒/,/食器|洗い物|皿|弁当箱|水筒/],[/洗濯/,/洗濯/],[/清掃|掃除|拭き/,/掃除|清掃|片付|拭/],[/洗顔|髭/,/洗顔|髭|ひげ|整容|身だしなみ/],[/トイレ|排泄/,/トイレ|排泄|拭き取り|ふき取り|手洗/],[/食事/,/食事|食べ|早食い|完食|ご飯/],[/水分/,/水分|飲み物|水を飲/],[/内服|服薬/,/服薬|内服|薬/],[/更衣|着替/,/着替|更衣/],[/余暇|散歩|創作|おやつ/,/余暇|散歩|創作|おやつ|歌|楽しく/],[/談笑|交流/,/あいさつ|挨拶|会話|交流|慣れる/],[/準備/,/準備|身支度|持ち物/]];
+function goalRecSuggest(names,text){ const t=String(text||""); if(!t) return []; return (names||[]).filter(n=>{ const core=String(n).replace(/[（(].*$/,"").trim(); if(core.length>=2&&t.indexOf(core)>=0) return true; return GOAL_SYN.some(g=>g[0].test(n)&&g[1].test(t)); }); }
+function recItemNamesOf(data){ if(data&&data.recItems&&data.recItems.length) return data.recItems.map(x=>x&&x.name).filter(Boolean); const a=[]; REC_GROUPS.forEach(g=>g.items.forEach(n=>a.push(n))); ((data&&data.recordItems)||[]).forEach(n=>{ if(a.indexOf(n)<0) a.push(n); }); return a; }
+const GOAL_CHIPS=["自分でできた","声かけでできた","一緒にできた","今日はしなかった"];
 function parsePlanRows(rows){
   const s=(v)=>String(v==null?"":v).replace(/\r/g,"").trim();
   let h=-1,cItem=0,cSelf=-1,cStaff=-1,cPer=-1;
@@ -1162,6 +1179,7 @@ function PlanGoals({data,users,date,me,onWrite}){
           {it.self&&<div className="goal-row"><span className="goal-lab me">本人</span><div className="goal-tx">{it.self}</div></div>}
           {it.staff&&<div className="goal-row"><span className="goal-lab st">支援者</span><div className="goal-tx">{it.staff}</div></div>}
           {it.period&&<div className="goal-per">期間：{it.period}</div>}
+          {it.recs&&it.recs.length>0&&<div className="goal-per">🔗 記録ボタン：{it.recs.join("・")}（押すと様子の入力をおすすめします）</div>}
           <button className="goal-write" onClick={()=>{ setOpen(""); onWrite(u,k); }}>✏️ この目標の様子を書く</button>
         </div>; })}
         <div className="goal-foot">{p.created?("計画作成日 "+p.created):""}{p.yr?("（"+p.yr+"年度）"):""}</div>
@@ -1192,7 +1210,7 @@ function Nisshi({me,data,persist}){
   const openPlanEdit=(yr,nm,label)=>{ const cur=((data.planItems||{})[yr]||{})[nm]; const text=String(((data.trainingPlans||{})[yr]||{})[nm]||""); setPlanEdit({yr,nm,label,created:(cur&&cur.created)||planCreatedOf(text),items:planItemsClean(cur&&cur.items),src:(cur&&cur.src)||"manual"}); };
   const setPE=(k,f,v)=>setPlanEdit(p=>{ const items=Object.assign({},p.items); items[k]=Object.assign({},items[k],{[f]:v}); return Object.assign({},p,{items}); });
   const savePlanEdit=()=>{ const e=planEdit; if(!e) return; if(planItemsEmpty(e.items)&&!confirm("本人・支援者の欄がすべて空です。項目の整理を取り消しますか？")) return; savePlanItems(e.yr,e.nm,planItemsEmpty(e.items)?null:{name:e.label,created:String(e.created||"").trim(),items:planItemsClean(e.items),src:e.src==="ai"?"ai":(e.src||"manual"),checked:true,at:iso(new Date()),by:(me&&me.name)||""}); setPlanEdit(null); setPlanMsg("「"+e.label+"」さんの訓練目標の項目を保存しました。記録ページに表示されます。"); };
-  const aiRedoEdit=async()=>{ const e=planEdit; if(!e) return; if(!apiKey){ setPlanMsg("AIで整理するにはAPIキーの設定が必要です（AI相談タブの「AIの設定」）。"); return; } const text=String(((data.trainingPlans||{})[e.yr]||{})[e.nm]||""); setPlanAiBusy(e.nm); try{ const items=await aiSplitPlan(apiKey,text); setPlanEdit(p=>p&&p.nm===e.nm?Object.assign({},p,{items,src:"ai"}):p); setPlanMsg("AIで振り分けました。内容を確認して「保存」を押してください。"); }catch(err){ setPlanMsg("AIでの整理に失敗しました："+String(err&&err.message||err)); } setPlanAiBusy(""); };
+  const aiRedoEdit=async()=>{ const e=planEdit; if(!e) return; if(!apiKey){ setPlanMsg("AIで整理するにはAPIキーの設定が必要です（AI相談タブの「AIの設定」）。"); return; } const text=String(((data.trainingPlans||{})[e.yr]||{})[e.nm]||""); setPlanAiBusy(e.nm); try{ const items=await aiSplitPlan(apiKey,text); setPlanEdit(p=>{ if(!(p&&p.nm===e.nm)) return p; PLAN_KEYS.forEach(k=>{ if(p.items[k.k]&&p.items[k.k].recs) items[k.k].recs=p.items[k.k].recs; }); return Object.assign({},p,{items,src:"ai"}); }); setPlanMsg("AIで振り分けました。内容を確認して「保存」を押してください。"); }catch(err){ setPlanMsg("AIでの整理に失敗しました："+String(err&&err.message||err)); } setPlanAiBusy(""); };
   const aiSplitAll=async(yr,keys)=>{ if(!apiKey){ setPlanMsg("AIで整理するにはAPIキーの設定が必要です（AI相談タブの「AIの設定」）。"); return; } if(!confirm(keys.length+"名分の計画を、AIで「本人／支援者」の項目に振り分けます。\n（AIには計画の表の部分だけを送ります。お名前・診断名は送りません）\n\n終わったら、1名ずつ内容を確認してください。始めますか？")) return; let ok=0,ng=[]; for(let i=0;i<keys.length;i++){ const nm=keys[i]; const d=dLatest.current; const label=(((d.trainingPlansMeta||{})[yr]||{})[nm]||{}).name||nm; setPlanAiBusy("all"); setPlanMsg("AIで整理中… "+(i+1)+" / "+keys.length+"（"+label+"）　※この画面を開いたままお待ちください"); try{ const text=String(((d.trainingPlans||{})[yr]||{})[nm]||""); const items=await aiSplitPlan(apiKey,text); savePlanItems(yr,nm,piEntry(label,text,items,"ai",false)); ok++; await new Promise(r=>setTimeout(r,300)); }catch(err){ ng.push(label); } } setPlanAiBusy(""); setPlanMsg("AIでの整理が終わりました："+ok+"名"+(ng.length?("／できなかった方："+ng.join("・")+"（「項目」から手で入力できます）"):"")+"。「🤖 未確認」の方は「項目」を開いて内容を確認し、保存してください。"); };
   const savePlanText=()=>{ const who=planWho(); if(!normName(who)){ setPlanMsg("利用者を選んでください。"); return; } const t=String(planOneText||"").trim(); if(!t){ setPlanMsg("計画の内容を入力（貼り付け）してください。"); return; } const had=planStore(who,t.slice(0,4000),"text"); setPlanOneText(""); setPlanMsg("「"+who+"」の個別訓練計画を"+(had?"変更":"登録")+"しました（"+planYear+"年度）。記録ページに目標を出すには、下の③で「🎯 項目」から本人／支援者の欄を整理してください。"); };
   const delPlan=(nm,label)=>{ if(!confirm("「"+label+"」さんの "+planYear+"年度 の個別訓練計画を削除しますか？"))return; const yr=String(planYear); const ym=Object.assign({},(data.trainingPlans||{})[yr]||{}); delete ym[nm]; const mm=Object.assign({},(data.trainingPlansMeta||{})[yr]||{}); delete mm[nm]; const piY=Object.assign({},(data.planItems||{})[yr]||{}); delete piY[nm]; if(persist) persist(Object.assign({},data,{trainingPlans:Object.assign({},data.trainingPlans||{},{[yr]:ym}),trainingPlansMeta:Object.assign({},data.trainingPlansMeta||{},{[yr]:mm}),planItems:Object.assign({},data.planItems||{},{[yr]:piY})})); setPlanMsg("「"+label+"」さんの計画を削除しました。"); };
@@ -1538,7 +1556,13 @@ function Nisshi({me,data,persist}){
               <label className="pe-lab">訓練に向けて取り組むこと（本人）</label><textarea rows={3} value={it.self||""} onChange={e=>setPE(pk.k,"self",e.target.value)}/>
               <label className="pe-lab">具体的な訓練支援内容（支援者）</label><textarea rows={3} value={it.staff||""} onChange={e=>setPE(pk.k,"staff",e.target.value)}/>
               <label className="pe-lab">期間</label><input value={it.period||""} onChange={e=>setPE(pk.k,"period",e.target.value)} placeholder="例：令和9年3月31日"/>
+              {(it.self||it.staff)&&(()=>{ const names=recItemNamesOf(data); const cur=it.recs||[]; const sug=goalRecSuggest(names,(it.self||"")+"\n"+(it.staff||"")); const showAll=!!(planEdit.showAll&&planEdit.showAll[pk.k]); const shown=showAll?names:names.filter(n=>cur.indexOf(n)>=0||sug.indexOf(n)>=0); const tog=(n)=>setPE(pk.k,"recs",cur.indexOf(n)>=0?cur.filter(x=>x!==n):cur.concat(n)); const sugLeft=sug.filter(n=>cur.indexOf(n)<0); return <div className="pe-recs">
+                <label className="pe-lab">🔗 関係する記録ボタン（押したときに「様子もひと言」と案内します）</label>
+                <div className="pe-chips">{shown.map(n=><button key={n} type="button" className={"pe-chip"+(cur.indexOf(n)>=0?" on":"")+(sug.indexOf(n)>=0&&cur.indexOf(n)<0?" sug":"")} onClick={()=>tog(n)}>{cur.indexOf(n)>=0?"✓ ":(sug.indexOf(n)>=0?"★ ":"")}{n}</button>)}{!shown.length&&<span className="tiny">候補が見つかりませんでした。</span>}</div>
+                <div style={{display:"flex",gap:10,flexWrap:"wrap",marginTop:4}}>{sugLeft.length>0&&<button type="button" className="link-btn" onClick={()=>setPE(pk.k,"recs",cur.concat(sugLeft))}>★候補をすべて選ぶ</button>}<button type="button" className="link-btn" onClick={()=>setPlanEdit(p=>Object.assign({},p,{showAll:Object.assign({},p.showAll||{},{[pk.k]:!showAll})}))}>{showAll?"候補と選択中だけ表示":"ほかのボタンも表示"}</button></div>
+              </div>; })()}
             </div>; })}
+            <p className="tiny" style={{margin:"0 0 6px"}}>★はアプリが計画の文面から見つけた候補です（まだ選ばれていません）。タップで選ぶと ✓ になります。</p>
             <div className="row-end" style={{flexWrap:"wrap",gap:6}}><Btn kind="ghost2" onClick={aiRedoEdit}>{planAiBusy===k?"AIで振り分け中…":"🤖 AIで振り分け直す"}</Btn><Btn kind="ghost2" onClick={()=>setPlanEdit(null)}>やめる</Btn><Btn onClick={savePlanEdit}>保存</Btn></div>
             <p className="tiny" style={{margin:"4px 0 0"}}>元の計画の文章は「内容」で見られます。保存すると記録ページの「🎯 訓練目標」に反映されます。</p>
           </div>}
@@ -2130,7 +2154,11 @@ function Records({me,data,persist,reload}){
   const userColor=(u)=>{ let i=dayUsers.indexOf(u); if(i<0){ let h=0; const s=String(u); for(let k=0;k<s.length;k++) h=(h*31+s.charCodeAt(k))>>>0; i=h; } return USER_COLORS[((i%USER_COLORS.length)+USER_COLORS.length)%USER_COLORS.length]; };
   const [mealAsk,setMealAsk]=useState(null);
   useEffect(()=>{ if(!mealAsk) return; const t=setTimeout(()=>setMealAsk(null),30000); return ()=>clearTimeout(t); },[mealAsk]);
-  const pushRecords=async(item,extra,tsOverride)=>{ const ok=await pushRecords0(item,extra,tsOverride); if(ok&&/食事開始/.test(String(item||""))&&!(extra&&extra.photoId)) setMealAsk(Date.now()); return ok; };
+  const [goalAsk,setGoalAsk]=useState([]); const [gaChip,setGaChip]=useState(""); const [gaText,setGaText]=useState(""); const [gaBusy,setGaBusy]=useState(false);
+  const goalCheck=(item,ts)=>{ try{ const it=String(item||""); if(!it||/^【目標/.test(it)) return; const targets=sel.filter(u=>dayUsers.includes(u)); const bd=recBizDay(ts)||effDate; let asked={}; try{ asked=JSON.parse(localStorage.getItem("mizuho_goal_asked")||"{}")||{}; }catch(e){} const add=[]; targets.forEach(u=>{ const p=planItemsFor(data,u,bd); if(!p) return; PLAN_KEYS.forEach(pk=>{ const x=(p.items||{})[pk.k]; if(!x||!(x.recs||[]).length) return; const rn=(x.recs||[]).filter(n=>it===n||it.indexOf(n)===0).sort((a,b)=>b.length-a.length)[0]; if(!rn) return; const key=bd+"|"+u+"|"+pk.k+"|"+rn; if(asked[key]) return; asked[key]=Date.now(); add.push({u,pk,rn,self:x.self||"",item:it}); }); }); if(!add.length) return; const lim=Date.now()-3*86400000; Object.keys(asked).forEach(k=>{ if(asked[k]<lim) delete asked[k]; }); try{ localStorage.setItem("mizuho_goal_asked",JSON.stringify(asked)); }catch(e){} setGoalAsk(q=>{ if(!q.length){ setGaChip(""); setGaText(""); } return q.concat(add); }); }catch(e){} };
+  const goalNext=()=>{ setGaChip(""); setGaText(""); setGoalAsk(q=>q.slice(1)); };
+  const goalSave=async()=>{ const g=goalAsk[0]; if(!g) return; const body=[gaChip,gaText.trim()].filter(Boolean).join("　"); if(!body){ flash("選択肢を選ぶか、様子を入力してください"); return; } setGaBusy(true); try{ await recAdd(Object.assign({id:uid(),ts:new Date().toISOString(),user:g.u,item:"【目標："+g.pk.tag+"】"+g.rn+"："+body},(me&&me.name)?{by:me.name}:{})); await reload(); flash("✓ "+g.u+"さんの目標の様子を記録しました"); goalNext(); }catch(e){ flash("保存に失敗しました"); } setGaBusy(false); };
+  const pushRecords=async(item,extra,tsOverride)=>{ const ok=await pushRecords0(item,extra,tsOverride); if(ok&&/食事開始/.test(String(item||""))&&!(extra&&extra.photoId)) setMealAsk(Date.now()); if(ok&&!(extra&&extra.photoId)) goalCheck(item,tsOverride||new Date().toISOString()); return ok; };
   const pushRecords0=async(item,extra,tsOverride)=>{ if(sel.length===0){ flash("利用者を選んでください"); return false; } const ts=tsOverride||new Date().toISOString(); const targets=sel.filter(u=>dayUsers.includes(u)); if(!targets.length){ flash("利用者を選んでください"); return false; } const recs=targets.map(u=>Object.assign({id:uid(),ts,user:u,item},(me&&me.name)?{by:me.name}:{},extra||{})); try{ for(const rc of recs) await recAdd(rc); await reload(); return true; }catch(e){ flash("保存に失敗しました"); return false; } };
   const bizTs=()=>{ const bd=new Date(mDate+"T00:00:00"); const cal=(+mH>=15)?bd:addDays(bd,1); cal.setHours(+mH,+mM,0,0); return cal.toISOString(); };
   const tapItem=(it)=>{ if(!sel.filter(u=>dayUsers.includes(u)).length){ flash("⚠️ 先に『利用者』を選んでください（上のボタンから利用者を選択）"); return; } const nm=(typeof it==="string")?it:it.name; pushRecent(nm); const vars=(it&&it.variants)||[]; if(nm==="巡回") setSp({type:"patrol",checks:{},val:""}); else if(nm==="服薬") setSp({type:"med",checks:{},confirmer:me.name,reason:"",val:""}); else if(nm==="生理") setSp({type:"period",day:"1",note:""}); else if(nm==="食事") setSp({type:"meal",meal:"晩",mainLeft:"0",sideLeft:"0",memo:""}); else if(nm==="血糖値測定") setSp({type:"glu",checks:{},val:""}); else if(nm==="メニュー"){ const pl=(data.dayPlans||{})[date]||{}; setSp({type:"menu",dMenu:pl.menuD||"",bMenu:pl.menuB||""}); } else if(nm==="介助") setSp({type:"care",checks:{},level:"部分介助",val:""}); else if(vars.length){ setSp({type:"variant",name:nm,variants:vars,multi:!!(it&&it.multi),checks:{},val:""}); } else addRecord(nm); };
@@ -2451,6 +2479,15 @@ function Records({me,data,persist,reload}){
       <div className="row-between"><Btn kind="ghost2" disabled={busy} onClick={()=>setPvCrop(true)}>✂️ 切り取り・回転</Btn><Btn kind="ghost2" onClick={()=>delPhoto(pv.id)}>削除</Btn></div>
     </Modal>}
     {pvCrop&&pv&&<CropModal src={pv.image} onCancel={()=>setPvCrop(false)} onDone={savePvEdit}/>}
+    {goalAsk.length>0&&(()=>{ const g=goalAsk[0]; return <div className="goal-ask" role="dialog" aria-label="訓練目標の様子" style={{bottom:mealAsk?"calc(env(safe-area-inset-bottom,0px) + 82px)":"calc(env(safe-area-inset-bottom,0px) + 14px)"}}>
+      <button className="goal-ask-x" onClick={goalNext} aria-label="閉じる">✕</button>
+      <div className="goal-ask-h">🎯 「{g.rn}」は {g.u}さんの訓練目標です{goalAsk.length>1&&<span className="tiny">（ほか{goalAsk.length-1}件）</span>}</div>
+      {g.self&&<div className="goal-ask-s">本人：{String(g.self).replace(/\n/g," ").slice(0,80)}</div>}
+      <div className="goal-ask-s" style={{marginTop:0}}>記録しました。様子をひと言どうぞ（日誌まとめで目標に沿った内容になります）</div>
+      <div className="goal-ask-chips">{GOAL_CHIPS.map(c=><button key={c} className={gaChip===c?"on":""} onClick={()=>setGaChip(gaChip===c?"":c)}>{c}</button>)}</div>
+      <textarea rows={2} value={gaText} onChange={e=>setGaText(e.target.value)} placeholder="例：鏡を見ながら奥歯までみがけていた"/>
+      <div className="row-end" style={{marginTop:6}}><Btn kind="ghost2" onClick={goalNext}>あとで</Btn><Btn onClick={goalSave}>{gaBusy?"記録中…":"記録する"}</Btn></div>
+    </div>; })()}
     {mealAsk&&<div className="meal-ask"><span>🍽 食事開始を記録しました</span><Btn onClick={()=>{setMealAsk(null);startPhoto("食事メニュー");}}>📷 食事の写真を撮る</Btn><button className="meal-ask-x" onClick={()=>setMealAsk(null)} aria-label="閉じる">✕</button></div>}
     {mShare&&<Modal title={"📤 LINEなどに送る（"+(mShare.slot==="b"?"朝食":"夕食")+"）"} tint="#C9788F" onClose={()=>setMShare(null)}>
       {mShare.loading?<p className="tiny">写真を読み込んでいます…</p>:(mShare.src?<img className="canSave" src={mShare.src} style={{width:"100%",borderRadius:12}} alt="食事の写真"/>:<p className="tiny" style={{color:"#B07A2E"}}>この{mShare.slot==="b"?"朝食":"夕食"}の写真はありません。メニューの文だけを送れます（写真は食事記録カレンダーか、記録の「📷 食事」で登録できます）。</p>)}
@@ -2709,7 +2746,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.186〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.187〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
