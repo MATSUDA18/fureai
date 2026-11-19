@@ -2073,11 +2073,11 @@ function Records({me,data,persist,reload}){
   const [mcSlot,setMcSlot]=useState(""); const [mcBusy,setMcBusy]=useState(false); const mealCamRef=useRef(null); const mcTarget=useRef(null);
   const addMealImg=(ds,slot,img)=>{ const cur=mealNorm((data.mealLog||{})[ds]); const strip=(x)=>({menu:x.menu,cook1:x.cook1,cook2:x.cook2,imgs:(x.imgs||[]).slice()}); const d=strip(cur.dinner), b=strip(cur.breakfast); (slot==="b"?b:d).imgs.push(img); const pl=(data.dayPlans||{})[ds]||{}; if(!d.menu&&pl.menuD) d.menu=pl.menuD; if(!b.menu&&pl.menuB) b.menu=pl.menuB; persist(Object.assign({},data,{mealLog:Object.assign({},data.mealLog||{},{[ds]:{dinner:d,breakfast:b}})})); };
   const onMealCam=async(e)=>{ const f=e.target.files&&e.target.files[0]; e.target.value=""; const t=mcTarget.current; if(!f||!t) return; setMcBusy(true); try{ const img=await compressImage(f,640,0.6); addMealImg(t.ds,t.slot,img); flash("✓ "+(t.slot==="b"?"朝食":"夕食")+"の写真を保存しました"); }catch(err){ flash("写真を読み込めませんでした。もう一度お試しください"); } setMcBusy(false); };
-  const openSlotShare=async(ds,slot,ph)=>{ const v=mealView(ds)[slot==="b"?"breakfast":"dinner"]; const menu=(v&&v.menu)||mealMenuOf(data,ds,slot); const st={ds,slot,text:mealShareText(slot,menu),src:ph&&ph.src||"",loading:!!(ph&&ph.photoId)}; setMShare(st); if(ph&&ph.photoId){ let src=""; try{ const p=await sbPhotoFull(ph.photoId); src=(p&&p.image)||""; }catch(e){} setMShare(Object.assign({},st,{src:src||ph.thumb||"",loading:false})); } };
+  const openSlotShare=async(ds,slot,ph)=>{ const v=mealView(ds)[slot==="b"?"breakfast":"dinner"]; const menu=(v&&v.menu)||mealMenuOf(data,ds,slot); const st={ds,slot,text:mealShareText(slot,menu,mealStaffOf(data,ds,slot)),src:ph&&ph.src||"",loading:!!(ph&&ph.photoId)}; setMShare(st); if(ph&&ph.photoId){ let src=""; try{ const p=await sbPhotoFull(ph.photoId); src=(p&&p.image)||""; }catch(e){} setMShare(Object.assign({},st,{src:src||ph.thumb||"",loading:false})); } };
   const [mShare,setMShare]=useState(null);
   const isMealRec=(r)=>/^(メニュー（(晩|朝)）|食事|📷 写真（食事）|(夕食|朝食)[　 ]*(主食|副食|完食|開始|終了|[：:（(]))/.test(String(r&&r.item||""));
   const openMealShare=async(r)=>{ const it=String(r.item||""); let x=mealSlotOfTs(r.ts); if(!x) return; if(/^メニュー（晩）|^夕食[　 ]*(主食|副食|完食|開始|終了|[：:（(])/.test(it)) x={ds:recBizDay(r.ts)||x.ds,slot:"d"}; else if(/^メニュー（朝）|^朝食[　 ]*(主食|副食|完食|開始|終了|[：:（(])/.test(it)) x={ds:recBizDay(r.ts)||x.ds,slot:"b"};
-    const v=mealView(x.ds)[x.slot==="b"?"breakfast":"dinner"]; const menu=(v&&v.menu)||mealMenuOf(data,x.ds,x.slot); const st={ds:x.ds,slot:x.slot,text:mealShareText(x.slot,menu),src:"",loading:true}; setMShare(st);
+    const v=mealView(x.ds)[x.slot==="b"?"breakfast":"dinner"]; const menu=(v&&v.menu)||mealMenuOf(data,x.ds,x.slot); const st={ds:x.ds,slot:x.slot,text:mealShareText(x.slot,menu,mealStaffOf(data,x.ds,x.slot)),src:"",loading:true}; setMShare(st);
     let src=""; try{ if(r.photoId){ const p=await sbPhotoFull(r.photoId); src=(p&&p.image)||""; } if(!src&&v&&v.imgs&&v.imgs.length) src=v.imgs[0]; if(!src&&v&&v.rec&&v.rec.length){ const p=await sbPhotoFull(v.rec[0].id); src=(p&&p.image)||""; } }catch(e){}
     setMShare(Object.assign({},st,{src,loading:false})); };
   const mealView0=(ds)=>{ const v=mealNorm(mealLog[ds]); if(v.dinner.menu&&v.breakfast.menu) return v; const plan=(data.dayPlans||{})[ds]||{}; let dm=plan.menuD||"", bm=plan.menuB||""; if((!v.dinner.menu&&!dm)||(!v.breakfast.menu&&!bm)){ const au=mealAuto(ds); dm=dm||au.dMenu||""; bm=bm||au.bMenu||""; } return {dinner:Object.assign({},v.dinner,{menu:v.dinner.menu||dm}),breakfast:Object.assign({},v.breakfast,{menu:v.breakfast.menu||bm})}; };
@@ -2483,7 +2483,7 @@ function Records({me,data,persist,reload}){
     </Modal>}
     {pv&&<Modal title="記録写真" tint="#C9788F" onClose={()=>setPv(null)}>
       <img className="canSave" src={pv.image} style={{width:"100%",borderRadius:12}} alt="記録写真"/>
-      <PhotoShare src={pv.image} name={"写真_"+((pv.meta&&pv.meta.cat)||"記録")} text={(pv.meta&&/食事/.test(String(pv.meta.cat||"")))?(()=>{ const x=mealSlotOfTs((pv.meta&&pv.meta.ts)||pv.created); return x?mealShareText(x.slot,mealMenuOf(data,x.ds,x.slot)):""; })():""}/>
+      <PhotoShare src={pv.image} name={"写真_"+((pv.meta&&pv.meta.cat)||"記録")} text={(pv.meta&&/食事/.test(String(pv.meta.cat||"")))?(()=>{ const x=mealSlotOfTs((pv.meta&&pv.meta.ts)||pv.created); return x?mealShareText(x.slot,mealMenuOf(data,x.ds,x.slot),mealStaffOf(data,x.ds,x.slot)):""; })():""}/>
       <p className="hint" style={{marginTop:10}}>{pv.meta&&pv.meta.users?pv.meta.users.join("・"):""}　{pv.created?new Date(pv.created).toLocaleString():""}</p>
       <div className="row-between"><Btn kind="ghost2" disabled={busy} onClick={()=>setPvCrop(true)}>✂️ 切り取り・回転</Btn><Btn kind="ghost2" onClick={()=>delPhoto(pv.id)}>削除</Btn></div>
     </Modal>}
@@ -2502,7 +2502,7 @@ function Records({me,data,persist,reload}){
       {mShare.loading?<p className="tiny">写真を読み込んでいます…</p>:(mShare.src?<img className="canSave" src={mShare.src} style={{width:"100%",borderRadius:12}} alt="食事の写真"/>:<p className="tiny" style={{color:"#B07A2E"}}>この{mShare.slot==="b"?"朝食":"夕食"}の写真はありません。メニューの文だけを送れます（写真は食事記録カレンダーか、記録の「📷 食事」で登録できます）。</p>)}
       {!mShare.loading&&<PhotoShare src={mShare.src} name={mShare.slot==="b"?"朝食":"夕食"} text={mShare.text}/>}
     </Modal>}
-    {imgView&&<Modal title={imgView.slot==="b"?"朝食の写真":"夕食の写真"} tint="#C9788F" onClose={()=>setImgView(null)}><img className="canSave" src={imgView.src} style={{width:"100%",borderRadius:12}} alt="食事の写真"/><PhotoShare src={imgView.src} name={imgView.slot==="b"?"朝食":"夕食"} text={mealShareText(imgView.slot,(mealEdit&&mealEdit[imgView.slot==="b"?"bMenu":"dMenu"])||(mealEdit?mealMenuOf(data,mealEdit.date,imgView.slot):""))}/></Modal>}
+    {imgView&&<Modal title={imgView.slot==="b"?"朝食の写真":"夕食の写真"} tint="#C9788F" onClose={()=>setImgView(null)}><img className="canSave" src={imgView.src} style={{width:"100%",borderRadius:12}} alt="食事の写真"/><PhotoShare src={imgView.src} name={imgView.slot==="b"?"朝食":"夕食"} text={mealShareText(imgView.slot,(mealEdit&&mealEdit[imgView.slot==="b"?"bMenu":"dMenu"])||(mealEdit?mealMenuOf(data,mealEdit.date,imgView.slot):""),mealEdit?mealStaffOf(data,mealEdit.date,imgView.slot):"")}/></Modal>}
     {mealEdit&&<Modal title={(()=>{const d=new Date(mealEdit.date+"T00:00:00");return (d.getMonth()+1)+"月"+d.getDate()+"日（"+["日","月","火","水","木","金","土"][d.getDay()]+"）の食事記録";})()} tint="#C9788F" onClose={()=>setMealEdit(null)}>
       <div className="row-between" style={{marginBottom:6,flexWrap:"wrap",gap:6}}><button className="link-btn" onClick={()=>setMealBulkOpen(v=>!v)}>{mealBulkOpen?"▲ まとめ貼り付けを閉じる":"🍱 晩・朝まとめて貼り付け"}</button><button className="link-btn" onClick={mealReAuto}>⟳ シフト・配食メニューから自動反映</button></div>
       {mealBulkOpen&&<div className="nf" style={{background:"#FFF6F8",border:"1px solid #F0D3DB",borderRadius:10,padding:"8px 10px",marginBottom:8}}><label>メニューをコピーして貼り付け（晩・朝を自動で分けます）</label><textarea rows={5} value={mealBulk} onChange={e=>onMealBulk(e.target.value)} placeholder={"例：\n11/4夜\n・豚肉ときのこのカレー\n11/5 朝\n・ブロッコリーのおかか和え"}/><p className="hint" style={{margin:"4px 0 0"}}>※「→」で始まる内訳の行（例：→ブロッコリー60g）は自動で除きます。下の各欄で手直しできます。</p></div>}
@@ -2755,7 +2755,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.188〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.189〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
@@ -2966,7 +2966,7 @@ function Album({me,data}){
     <div className="album">{results.map(p=>(<button key={p.id} className="thumb" onClick={()=>openFull(p.id)}><img className="noSave" draggable={false} onContextMenu={e=>e.preventDefault()} src={p.meta&&p.meta.thumb?p.meta.thumb:""} alt="写真"/><span>{((p.meta&&p.meta.users)||[]).join("・")||((p.meta&&p.meta.name)||"")} {p.created?(p.created.slice(0,10)+" "+hm(p.created)):""}</span></button>))}</div>
     {pv&&<Modal title="写真" tint="#C9788F" onClose={()=>setPv(null)}>
       <img className="canSave" src={pv.image} style={{width:"100%",borderRadius:12}} alt="写真"/>
-      <PhotoShare src={pv.image} name={"写真_"+((pv.meta&&pv.meta.cat)||"記録")} text={(pv.meta&&/食事/.test(String(pv.meta.cat||"")))?(()=>{ const x=mealSlotOfTs((pv.meta&&pv.meta.ts)||pv.created); return x?mealShareText(x.slot,mealMenuOf(data,x.ds,x.slot)):""; })():""}/>
+      <PhotoShare src={pv.image} name={"写真_"+((pv.meta&&pv.meta.cat)||"記録")} text={(pv.meta&&/食事/.test(String(pv.meta.cat||"")))?(()=>{ const x=mealSlotOfTs((pv.meta&&pv.meta.ts)||pv.created); return x?mealShareText(x.slot,mealMenuOf(data,x.ds,x.slot),mealStaffOf(data,x.ds,x.slot)):""; })():""}/>
       <p className="hint">{((pv.meta&&pv.meta.users)||[]).join("・")||((pv.meta&&pv.meta.name)||"")}　{pv.created?new Date(pv.created).toLocaleString():""}</p>
       <div className="row-between"><Btn kind="ghost2" disabled={busy} onClick={()=>setPvCrop(true)}>✂️ 切り取り・回転</Btn>{me.isAdmin&&<button className="link-btn" onClick={()=>delPhoto(pv.id)}>この写真を削除</button>}</div>
     </Modal>}
@@ -3853,7 +3853,8 @@ function CameraHost(){
 
 /* ===== 写真のコピー・共有（LINEなど） ===== */
 function _imgBlob(src,type){ return new Promise((res,rej)=>{ const im=new Image(); im.onload=()=>{ try{ const c=document.createElement("canvas"); c.width=im.naturalWidth||im.width; c.height=im.naturalHeight||im.height; c.getContext("2d").drawImage(im,0,0); c.toBlob(b=>b?res(b):rej(new Error("blob")),type,0.92); }catch(e){ rej(e); } }; im.onerror=()=>rej(new Error("img")); im.src=src; }); }
-function mealShareText(slot,menu){ const m=String(menu||"").trim(); return (slot==="b"?"朝食のメニューです":"夕食のメニューです")+(m?("\n"+m):""); }
+function mealStaffOf(data,ds,slot){ try{ const base=new Date(ds+"T00:00:00"); const ref=slot==="b"?(()=>{const d=addDays(base,1); d.setHours(7,30,0,0); return d;})():(()=>{const d=new Date(base); d.setHours(18,0,0,0); return d;})(); const at=(dt,hm)=>{ const m=String(hm||"").match(/^(\d{1,2}):(\d{2})/); if(!m) return null; const d=new Date(dt+"T00:00:00"); d.setHours(Number(m[1]),Number(m[2]),0,0); return d; }; const days=[iso(addDays(ref,-1)),iso(ref)]; const hit=(data&&data.shifts||[]).filter(sh=>sh&&sh.name&&days.indexOf(sh.date)>=0).map(sh=>{ const st=at(sh.date,sh.start); let en=at(sh.date,sh.end); if(!st||!en) return null; if(en<=st) en=addDays(en,1); return (st<=ref&&ref<=en)?{sh,st}:null; }).filter(Boolean).sort((a,b)=>a.st-b.st); const out=[]; hit.forEach(x=>{ const sn=String(x.sh.name).trim().split(/[\s　]+/)[0]; if(sn&&out.indexOf(sn)<0) out.push(sn); }); return out.join("・"); }catch(e){ return ""; } }
+function mealShareText(slot,menu,staff){ const m=String(menu||"").trim(); const st=String(staff||"").trim(); return (slot==="b"?"おはようございます。ふれあい朝食です":"お疲れ様です。ふれあい夕食です")+(m?("\n"+m):"")+(st?("\n"+st):""); }
 function mealMenuOf(data,ds,slot){ const ml=((data&&data.mealLog)||{})[ds]; const x=ml?(slot==="b"?ml.breakfast:ml.dinner):null; const m=x&&x.menu?String(x.menu):""; if(m.trim()) return m; const pl=((data&&data.dayPlans)||{})[ds]||{}; return (slot==="b"?pl.menuB:pl.menuD)||""; }
 function mealSlotOfTs(ts){ const t=new Date(ts); if(isNaN(t)) return null; const h=t.getHours(); const prev=new Date(t); prev.setDate(prev.getDate()-1); if(h>=15) return {ds:iso(t),slot:"d"}; if(h<4) return {ds:iso(prev),slot:"d"}; return {ds:iso(prev),slot:"b"}; }
 function PhotoShare({src,name,text}){
