@@ -2755,7 +2755,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.189〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.190〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
@@ -3854,7 +3854,7 @@ function CameraHost(){
 /* ===== 写真のコピー・共有（LINEなど） ===== */
 function _imgBlob(src,type){ return new Promise((res,rej)=>{ const im=new Image(); im.onload=()=>{ try{ const c=document.createElement("canvas"); c.width=im.naturalWidth||im.width; c.height=im.naturalHeight||im.height; c.getContext("2d").drawImage(im,0,0); c.toBlob(b=>b?res(b):rej(new Error("blob")),type,0.92); }catch(e){ rej(e); } }; im.onerror=()=>rej(new Error("img")); im.src=src; }); }
 function mealStaffOf(data,ds,slot){ try{ const base=new Date(ds+"T00:00:00"); const ref=slot==="b"?(()=>{const d=addDays(base,1); d.setHours(7,30,0,0); return d;})():(()=>{const d=new Date(base); d.setHours(18,0,0,0); return d;})(); const at=(dt,hm)=>{ const m=String(hm||"").match(/^(\d{1,2}):(\d{2})/); if(!m) return null; const d=new Date(dt+"T00:00:00"); d.setHours(Number(m[1]),Number(m[2]),0,0); return d; }; const days=[iso(addDays(ref,-1)),iso(ref)]; const hit=(data&&data.shifts||[]).filter(sh=>sh&&sh.name&&days.indexOf(sh.date)>=0).map(sh=>{ const st=at(sh.date,sh.start); let en=at(sh.date,sh.end); if(!st||!en) return null; if(en<=st) en=addDays(en,1); return (st<=ref&&ref<=en)?{sh,st}:null; }).filter(Boolean).sort((a,b)=>a.st-b.st); const out=[]; hit.forEach(x=>{ const sn=String(x.sh.name).trim().split(/[\s　]+/)[0]; if(sn&&out.indexOf(sn)<0) out.push(sn); }); return out.join("・"); }catch(e){ return ""; } }
-function mealShareText(slot,menu,staff){ const m=String(menu||"").trim(); const st=String(staff||"").trim(); return (slot==="b"?"おはようございます。ふれあい朝食です":"お疲れ様です。ふれあい夕食です")+(m?("\n"+m):"")+(st?("\n"+st):""); }
+function mealShareText(slot,menu,staff){ const m=String(menu||"").trim(); const st=String(staff||"").trim(); return (slot==="b"?"おはようございます。\nふれあい朝食です":"お疲れ様です。\nふれあい夕食です")+(m?("\n"+m):"")+(st?("\n"+st):""); }
 function mealMenuOf(data,ds,slot){ const ml=((data&&data.mealLog)||{})[ds]; const x=ml?(slot==="b"?ml.breakfast:ml.dinner):null; const m=x&&x.menu?String(x.menu):""; if(m.trim()) return m; const pl=((data&&data.dayPlans)||{})[ds]||{}; return (slot==="b"?pl.menuB:pl.menuD)||""; }
 function mealSlotOfTs(ts){ const t=new Date(ts); if(isNaN(t)) return null; const h=t.getHours(); const prev=new Date(t); prev.setDate(prev.getDate()-1); if(h>=15) return {ds:iso(t),slot:"d"}; if(h<4) return {ds:iso(prev),slot:"d"}; return {ds:iso(prev),slot:"b"}; }
 function PhotoShare({src,name,text}){
