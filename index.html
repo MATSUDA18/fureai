@@ -1300,7 +1300,7 @@ function Nisshi({me,data,persist}){
   const recs=(data.records||[]).filter(r=>r.user===user && new Date(r.ts)>=start && new Date(r.ts)<end).sort((a,b)=>String(a.ts||"").localeCompare(String(b.ts||"")));
   const isPhotoRec=(r)=>!!(r&&(r.photoId||/^\s*📷/.test(String(r.item||""))));
   const recText=recs.filter(r=>!isPhotoRec(r)).map(r=>hm(r.ts)+" "+r.item).join("\n");
-  const progText=recs.filter(r=>(r.item||"").indexOf("🩺")!==0&&!isPhotoRec(r)).map(r=>hm(r.ts)+" "+r.item).join("\n");
+  const progText=recs.filter(r=>(r.item||"").indexOf("🩺")!==0&&!isPhotoRec(r)&&!/^メニュー（[朝晩]）/.test(String(r.item||""))).map(r=>hm(r.ts)+" "+r.item).join("\n");
   const nplan=(data.dayPlans||{})[date]||{}; const dayUsers=(nplan.users&&nplan.users.length)?nplan.users:USERS4;
   const _vitRecs=recs.filter(r=>(r.item||"").indexOf("🩺")===0);
   const _pV=(r)=>{const s=r.item||"";const bp=s.match(/(\d{2,3})\s*mmHg\s*[\/／]\s*(\d{2,3})/)||s.match(/(\d{2,3})\s*[\/／]\s*(\d{2,3})/);const hr=s.match(/(\d{2,3})\s*回/);const tp=s.match(/体温\s*([\d.]+)/);return {time:hm(r.ts),bp:bp?(bp[1]+"/"+bp[2]):"",pulse:hr?hr[1]:"",temp:tp?tp[1]:""};};
@@ -1311,10 +1311,10 @@ function Nisshi({me,data,persist}){
   const _mealRec=(which)=>{ for(let i=recs.length-1;i>=0;i--){ if(recs[i].meal===which) return recs[i]; } return null; };
   const _dnR=_mealRec("晩"); const _brR=_mealRec("朝");
   const _lv=(r,k)=>(r&&r[k]!=null)?r[k]:"";
-  const buildInitial=(obj)=>Object.assign({name:user,period:fmtDate(date)+" 16:00 〜 翌朝",writer:me.name,v1:_V1,v2:_V2,vitals1:_vtext(_V1),vitals2:_vtext(_V2),urine:_findT(/排\s*尿/),stool:_findT(/排\s*便/),medication:"",staff:[nplan.s1,nplan.s2].filter(Boolean).join("・"),program:progText,dinnerMenu:"",dinnerAmount:"",dinnerMainLeft:_lv(_dnR,"mainLeft"),dinnerSideLeft:_lv(_dnR,"sideLeft"),breakfastMenu:"",breakfastAmount:"",breakfastMainLeft:_lv(_brR,"mainLeft"),breakfastSideLeft:_lv(_brR,"sideLeft"),appearance:"",special:"",nextRequest:"",nextVisitDate:""}, obj||{}, {name:user,period:fmtDate(date)+" 16:00 〜 翌朝"});
+  const buildInitial=(obj)=>Object.assign({name:user,period:fmtDate(date)+" 16:00 〜 翌朝",writer:me.name,v1:_V1,v2:_V2,vitals1:_vtext(_V1),vitals2:_vtext(_V2),urine:_findT(/排\s*尿/),stool:_findT(/排\s*便/),medication:"",staff:[nplan.s1,nplan.s2].filter(Boolean).join("・"),program:progText,dinnerMenu:menuSourceOf(data,date,"d"),dinnerAmount:"",dinnerMainLeft:_lv(_dnR,"mainLeft"),dinnerSideLeft:_lv(_dnR,"sideLeft"),breakfastMenu:menuSourceOf(data,date,"b"),breakfastAmount:"",breakfastMainLeft:_lv(_brR,"mainLeft"),breakfastSideLeft:_lv(_brR,"sideLeft"),appearance:"",special:"",nextRequest:"",nextVisitDate:""}, obj||{}, {name:user,period:fmtDate(date)+" 16:00 〜 翌朝"});
   const emptyForm=()=>{ setErr(""); setF(buildInitial({program:progText})); };
   const markKw=(ff)=> ff.status==="submitted"?("#SUB:"+(ff.submittedBy||"")+"#"):ff.status==="reviewed"?("#REV:"+(ff.reviewedBy||"")+"#"):"";
-  const persistNs=async(st,extra,msg)=>{ if(!f)return; if(!SB_ON){flash2("共有DBが必要です");return;} try{ const status=st||f.status||"draft"; const ff=Object.assign({},f,{status},extra||{}); const id="ns_"+(ff.name||"user")+"_"+date; const kw=[ff.name,ff.appearance,ff.special,ff.program,ff.staff,ff.dinnerMenu,ff.breakfastMenu,ff.vitals1,markKw(ff),(ff.styleRef?"#STYLEREF#":"")].filter(Boolean).join(" "); await nsSave({id,user_name:ff.name||"",biz_date:date,sex:(resSex[ff.name]||""),keywords:kw,data:ff,created:new Date().toISOString()}); setF(ff); flash2(msg||"保存しました"); }catch(e){ setErr("保存に失敗（nisshi表の設定をご確認ください）"); } };
+  const persistNs=async(st,extra,msg)=>{ if(!f)return; if(!SB_ON){flash2("共有DBが必要です");return;} try{ const status=st||f.status||"draft"; const ff=Object.assign({},f,{status,dinnerMenu:menuShown("d"),breakfastMenu:menuShown("b")},extra||{}); const id="ns_"+(ff.name||"user")+"_"+date; const kw=[ff.name,ff.appearance,ff.special,ff.program,ff.staff,ff.dinnerMenu,ff.breakfastMenu,ff.vitals1,markKw(ff),(ff.styleRef?"#STYLEREF#":"")].filter(Boolean).join(" "); await nsSave({id,user_name:ff.name||"",biz_date:date,sex:(resSex[ff.name]||""),keywords:kw,data:ff,created:new Date().toISOString()}); setF(ff); flash2(msg||"保存しました"); }catch(e){ setErr("保存に失敗（nisshi表の設定をご確認ください）"); } };
   const saveNisshi=()=>persistNs(f&&f.status||"draft",null,"日誌を保存しました（下書き）");
   const submitNisshi=async()=>{ if(!f)return; if(!(f.appearance||"").trim()){ if(!confirm("「利用のご様子」が空のようです。このまま提出しますか？"))return; } await persistNs("submitted",{submittedBy:me.name,submittedAt:new Date().toISOString()},"提出しました（管理者の確認待ち）"); };
   const markReviewed=async()=>{ await persistNs("reviewed",{reviewedBy:me.name,reviewedAt:new Date().toISOString()},"確認済みにしました"); if(subRows!==null) loadSubmitted(); };
@@ -1374,12 +1374,16 @@ function Nisshi({me,data,persist}){
   const dayPhotos=recs.filter(r=>r&&r.photoId).reduce((a,r)=>{ if(!a.some(x=>x.id===r.photoId)) a.push({id:r.photoId,thumb:r.thumb||"",ts:r.ts,cat:r.cat||""}); return a; },[]);
   const [ns2,setNs2]=useState(null); useEffect(()=>{ let live=true; if(SB_ON) ns2Status().then(x=>{ if(live) setNs2(x); }); return ()=>{ live=false; }; },[]);
   const [lastOut,setLastOut]=useState("");
+  const [menuEd,setMenuEd]=useState({});
+  useEffect(()=>{ setMenuEd({}); },[date,user]);
+  const menuShown=(sl)=>{ if(menuEd[sl]!=null) return menuEd[sl]; const k=sl==="b"?"breakfastMenu":"dinnerMenu"; const src=menuSourceOf(data,date,sl); return src||String((f&&f[k])||""); };
+  const commitMenu=(sl)=>{ const v=menuEd[sl]; if(v==null) return; const k=sl==="b"?"breakfastMenu":"dinnerMenu"; setField(k,v); setMenuEd(p=>{ const n=Object.assign({},p); delete n[sl]; return n; }); if(String(v).trim()!==String(menuSourceOf(data,date,sl)||"").trim()&&persist){ persist(Object.assign({},data,mealMenuPatch(data,date,sl,String(v).trim()))); flash2("メニューを保存しました（食事記録・記録ページ・LINEの文面にも反映されます）"); } };
   const fetchNisshiBuf=async()=>{
     const _next=[f.nextRequest,...activeNotices(date)].filter(x=>x&&String(x).trim()).join("\n");
-    const body=Object.assign({},f,{date,nextRequest:_next,program:stripPhotoLines(f.program),dayPhoto:f.dayPhotoId?{photoId:f.dayPhotoId}:null,dinnerPhoto:mealPhotoPick(mCands.d,f.dinnerPhotoSel||"auto"),breakfastPhoto:mealPhotoPick(mCands.b,f.breakfastPhotoSel||"auto")});
+    const body=Object.assign({},f,{date,nextRequest:_next,program:stripMenuLines(stripPhotoLines(f.program)),dinnerMenu:menuShown("d"),breakfastMenu:menuShown("b"),dayPhoto:f.dayPhotoId?{photoId:f.dayPhotoId}:null,dinnerPhoto:mealPhotoPick(mCands.d,f.dinnerPhotoSel||"auto"),breakfastPhoto:mealPhotoPick(mCands.b,f.breakfastPhotoSel||"auto")});
     try{ const r2=await ns2Call(body); if(r2.ok){ setLastOut("v2"); return await r2.arrayBuffer(); } if(r2.status!==409){ let m=""; try{ m=(await r2.json()).error||""; }catch(e){} setErr("新しいひな形での作成に失敗したため、従来の形式で作成しました（"+r2.status+" "+m+"）。管理者にお知らせください。"); } }catch(e){ setErr("新しいひな形での作成に失敗したため、従来の形式で作成しました。"); }
     setLastOut("legacy");
-    const res=await authFetch(SUPABASE_URL+"/functions/v1/nisshi-excel",{method:"POST",body:JSON.stringify(Object.assign({},f,{date,nextRequest:_next,program:stripPhotoLines(f.program)}))});
+    const res=await authFetch(SUPABASE_URL+"/functions/v1/nisshi-excel",{method:"POST",body:JSON.stringify(Object.assign({},f,{date,nextRequest:_next,program:stripMenuLines(stripPhotoLines(f.program)),dinnerMenu:menuShown("d"),breakfastMenu:menuShown("b")}))});
     if(!res.ok){ let m=""; try{ m=(await res.json()).error||""; }catch(e){} throw new Error("func "+res.status+" "+m); }
     return await res.arrayBuffer();
   };
@@ -1410,11 +1414,11 @@ function Nisshi({me,data,persist}){
     const hours=["16:00","17:00","18:00","19:00","20:00","21:00","22:00","23:00","0:00","1:00","2:00","3:00","4:00","5:00","6:00","7:00","8:00","9:00"];
     const hourRow={16:17,17:18,18:19,19:20,20:21,21:22,22:23,23:24,0:25,1:26,2:27,3:28,4:29,5:30,6:31,7:32,8:33,9:34};
     hours.forEach((h,i)=>S("B"+(17+i),h));
-    const prog={}; stripPhotoLines(f.program).split("\n").forEach(l=>{ l=l.trim(); if(!l)return; const m=l.match(/^(\d{1,2})[:：]/); const h=m?parseInt(m[1],10):null; if(h!=null&&hourRow[h]!=null){ prog[h]=(prog[h]?prog[h]+" / ":"")+l; } else { prog._=(prog._?prog._+" / ":"")+l; } });
+    const prog={}; stripMenuLines(stripPhotoLines(f.program)).split("\n").forEach(l=>{ l=l.trim(); if(!l)return; const m=l.match(/^(\d{1,2})[:：]/); const h=m?parseInt(m[1],10):null; if(h!=null&&hourRow[h]!=null){ prog[h]=(prog[h]?prog[h]+" / ":"")+l; } else { prog._=(prog._?prog._+" / ":"")+l; } });
     if(prog._){ prog[16]=(prog[16]?prog[16]+" / ":"")+prog._; }
     Object.keys(hourRow).forEach(h=>{ if(prog[h]) S("C"+hourRow[h], prog[h]); });
-    S("F17","【夕食】"+(f.dinnerMenu||"")+(f.dinnerAmount?"（"+f.dinnerAmount+"）":""));
-    S("F18","【朝食】"+(f.breakfastMenu||"")+(f.breakfastAmount?"（"+f.breakfastAmount+"）":""));
+    S("F17","【夕食】"+(menuShown("d")||"")+(f.dinnerAmount?"（"+f.dinnerAmount+"）":""));
+    S("F18","【朝食】"+(menuShown("b")||"")+(f.breakfastAmount?"（"+f.breakfastAmount+"）":""));
     S("F19","【特記】"+(f.special||""));
     S("B36","【利用のご様子】"); S("B37",f.appearance||"");
     S("B43","【次回へのお願い】"); S("D43",[f.nextRequest,...activeNotices(date)].filter(x=>x&&String(x).trim()).join("\n"));
@@ -1607,10 +1611,10 @@ function Nisshi({me,data,persist}){
         </div>
       </div>
       <div className="nf"><label>プログラム（時間ごとの行動）</label><textarea rows={6} value={f.program} onChange={e=>setField("program",e.target.value)}/></div>
-      <div className="nf"><label>夕食メニュー</label><input value={f.dinnerMenu} onChange={e=>setField("dinnerMenu",e.target.value)}/></div>
+      <div className="nf"><label>夕食メニュー</label><input value={menuShown("d")} onChange={e=>{ const v=e.target.value; setMenuEd(p=>Object.assign({},p,{d:v})); }} onBlur={()=>commitMenu("d")}/><p className="tiny" style={{margin:"3px 0 0"}}>🔗 食事記録カレンダー・記録ページのメニューと共通です。ここで直すと、すべて（LINEの文面・Excelも）同じ内容になります。</p></div>
       <div className="nf2"><div className="nf"><label>夕食 主食の残量</label><select value={f.dinnerMainLeft==null?"":f.dinnerMainLeft} onChange={e=>setField("dinnerMainLeft",e.target.value)}><option value="">—（未記入）</option>{[0,1,2,3,4,5,6,7,8,9,10].map(n=><option key={n} value={n}>{n===0?"完食":n+"割残し"}</option>)}</select></div>
         <div className="nf"><label>夕食 副食の残量</label><select value={f.dinnerSideLeft==null?"":f.dinnerSideLeft} onChange={e=>setField("dinnerSideLeft",e.target.value)}><option value="">—（未記入）</option>{[0,1,2,3,4,5,6,7,8,9,10].map(n=><option key={n} value={n}>{n===0?"完食":n+"割残し"}</option>)}</select></div></div>
-      <div className="nf"><label>朝食メニュー</label><input value={f.breakfastMenu} onChange={e=>setField("breakfastMenu",e.target.value)}/></div>
+      <div className="nf"><label>朝食メニュー</label><input value={menuShown("b")} onChange={e=>{ const v=e.target.value; setMenuEd(p=>Object.assign({},p,{b:v})); }} onBlur={()=>commitMenu("b")}/></div>
       <div className="nf2"><div className="nf"><label>朝食 主食の残量</label><select value={f.breakfastMainLeft==null?"":f.breakfastMainLeft} onChange={e=>setField("breakfastMainLeft",e.target.value)}><option value="">—（未記入）</option>{[0,1,2,3,4,5,6,7,8,9,10].map(n=><option key={n} value={n}>{n===0?"完食":n+"割残し"}</option>)}</select></div>
         <div className="nf"><label>朝食 副食の残量</label><select value={f.breakfastSideLeft==null?"":f.breakfastSideLeft} onChange={e=>setField("breakfastSideLeft",e.target.value)}><option value="">—（未記入）</option>{[0,1,2,3,4,5,6,7,8,9,10].map(n=><option key={n} value={n}>{n===0?"完食":n+"割残し"}</option>)}</select></div></div>
       <div className="nf"><label>【利用のご様子】</label><textarea rows={10} value={f.appearance} onChange={e=>setField("appearance",e.target.value)}/>
@@ -2755,7 +2759,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.190〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.191〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
@@ -3856,6 +3860,11 @@ function _imgBlob(src,type){ return new Promise((res,rej)=>{ const im=new Image(
 function mealStaffOf(data,ds,slot){ try{ const base=new Date(ds+"T00:00:00"); const ref=slot==="b"?(()=>{const d=addDays(base,1); d.setHours(7,30,0,0); return d;})():(()=>{const d=new Date(base); d.setHours(18,0,0,0); return d;})(); const at=(dt,hm)=>{ const m=String(hm||"").match(/^(\d{1,2}):(\d{2})/); if(!m) return null; const d=new Date(dt+"T00:00:00"); d.setHours(Number(m[1]),Number(m[2]),0,0); return d; }; const days=[iso(addDays(ref,-1)),iso(ref)]; const hit=(data&&data.shifts||[]).filter(sh=>sh&&sh.name&&days.indexOf(sh.date)>=0).map(sh=>{ const st=at(sh.date,sh.start); let en=at(sh.date,sh.end); if(!st||!en) return null; if(en<=st) en=addDays(en,1); return (st<=ref&&ref<=en)?{sh,st}:null; }).filter(Boolean).sort((a,b)=>a.st-b.st); const out=[]; hit.forEach(x=>{ const sn=String(x.sh.name).trim().split(/[\s　]+/)[0]; if(sn&&out.indexOf(sn)<0) out.push(sn); }); return out.join("・"); }catch(e){ return ""; } }
 function mealShareText(slot,menu,staff){ const m=String(menu||"").trim(); const st=String(staff||"").trim(); return (slot==="b"?"おはようございます。\nふれあい朝食です":"お疲れ様です。\nふれあい夕食です")+(m?("\n"+m):"")+(st?("\n"+st):""); }
 function mealMenuOf(data,ds,slot){ const ml=((data&&data.mealLog)||{})[ds]; const x=ml?(slot==="b"?ml.breakfast:ml.dinner):null; const m=x&&x.menu?String(x.menu):""; if(m.trim()) return m; const pl=((data&&data.dayPlans)||{})[ds]||{}; return (slot==="b"?pl.menuB:pl.menuD)||""; }
+// メニューの元は1か所（食事記録カレンダー／日々の予定のメニュー）。無ければ記録の「メニュー（朝・晩）」。
+function menuSourceOf(data,ds,slot){ const m=mealMenuOf(data,ds,slot); if(String(m||"").trim()) return String(m); try{ const w=bizWindow(ds); const re=slot==="b"?/^メニュー（朝）/:/^メニュー（晩）/; const hits=((data&&data.records)||[]).filter(r=>{ const t=new Date(r.ts); return t>=w[0]&&t<w[1]&&re.test(String(r.item||"")); }).sort((a,b)=>String(b.ts).localeCompare(String(a.ts))); return hits[0]?String(hits[0].item).replace(/^(メニュー（[朝晩]）[：:]?\s*)+/,"").trim():""; }catch(e){ return ""; } }
+function mealMenuPatch(data,ds,slot,text){ const plans=Object.assign({},(data&&data.dayPlans)||{}); const cur=Object.assign({},plans[ds]||{}); if(slot==="b") cur.menuB=text; else cur.menuD=text; plans[ds]=cur; const patch={dayPlans:plans}; const ml=((data&&data.mealLog)||{})[ds]; if(ml){ let v=ml; if(!(v.dinner||v.breakfast)) v={dinner:Object.assign({},v),breakfast:{}}; const key=slot==="b"?"breakfast":"dinner"; patch.mealLog=Object.assign({},data.mealLog||{},{[ds]:Object.assign({},v,{[key]:Object.assign({},v[key]||{},{menu:text})})}); } return patch; }
+// 活動記録から「メニュー（朝・晩）」の記録（続きの行も）を外す。メニューはメニュー欄に出すため。
+function stripMenuLines(program){ const out=[]; let skip=false; String(program||"").split("\n").forEach(l=>{ const t=l.trim(); const m=t.match(/^\d{1,2}[:：]\d{2}\s*(.*)$/); if(m){ skip=/^メニュー（[朝晩]）/.test(m[1]); if(!skip) out.push(l); } else if(!skip) out.push(l); }); return out.join("\n"); }
 function mealSlotOfTs(ts){ const t=new Date(ts); if(isNaN(t)) return null; const h=t.getHours(); const prev=new Date(t); prev.setDate(prev.getDate()-1); if(h>=15) return {ds:iso(t),slot:"d"}; if(h<4) return {ds:iso(prev),slot:"d"}; return {ds:iso(prev),slot:"b"}; }
 function PhotoShare({src,name,text}){
   const [msg,setMsg]=useState(""); const fileRef=useRef(null);
