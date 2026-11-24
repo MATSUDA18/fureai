@@ -2759,7 +2759,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.191〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.192〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
@@ -3801,7 +3801,7 @@ function XlRealView({m}){
     <div ref={wrapRef} className="xpv-wrap" style={{overflow:fit?"hidden":"auto"}}>
       <div style={{width:totW*sc,height:totH*sc,position:"relative"}}>
         <div className="xpv-paper xr" style={{width:totW,position:"absolute",left:0,top:0,transform:"scale("+sc+")",transformOrigin:"top left",padding:8}}>
-          <table className="xr-t"><colgroup>{m.cols.map((w,i)=><col key={i} style={{width:w}}/>)}</colgroup><tbody>{trs}</tbody></table>
+          <table className="xr-t" style={{width:m.cols.reduce((a,b)=>a+b,0)}}><colgroup>{m.cols.map((w,i)=><col key={i} style={{width:w}}/>)}</colgroup><tbody>{trs}</tbody></table>
           {(m.images||[]).map((im,i)=><img key={i} src={im.url} alt="" style={{position:"absolute",left:8+im.x,top:8+im.y,width:im.w,height:im.h,objectFit:"fill"}}/>)}
         </div>
       </div>
@@ -3913,7 +3913,7 @@ function XlPreview({lay}){
     <div ref={wrapRef} className="xpv-wrap" style={{overflowX:fit?"hidden":"auto"}}>
       <div style={{width:totW*sc,height:"auto"}}>
         <div className="xpv-paper" style={{width:totW,transform:"scale("+sc+")",transformOrigin:"top left",marginBottom:fit?("calc(-1 * "+(1-sc)+" * var(--xpvh,1300px))"):0}} ref={el=>{ if(el){ const h=el.offsetHeight; if(h) el.style.setProperty("--xpvh",h+"px"); } }}>
-          <table className="xpv"><colgroup>{pxW.map((w,i)=><col key={i} style={{width:w}}/>)}</colgroup><tbody>{trs}</tbody></table>
+          <table className="xpv" style={{width:pxW.reduce((a,b)=>a+b,0)}}><colgroup>{pxW.map((w,i)=><col key={i} style={{width:w}}/>)}</colgroup><tbody>{trs}</tbody></table>
         </div>
       </div>
     </div>
