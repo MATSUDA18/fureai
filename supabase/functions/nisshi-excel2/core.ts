@@ -32,6 +32,29 @@ export function detectTitles(text: string): string[] {
   }
   return [...new Set(hits)];
 }
+// 1件の記録の分類（かっこ内の補足は見ない：例「巡回（就寝中）」を就寝と数えない）
+function entryCat(body: string): string { const t = detectTitles(body.replace(/[（(][^）)]*[）)]/g, "")); return t[0] || ""; }
+// 見出し列と同じ言葉が記録の頭にあれば外す（例：見出し「巡回」→「24時巡回(巡視)（就寝中）」は「（就寝中）」）
+function stripLead(body: string, label: string): string {
+  const ent = CATS.find((c) => c[0] === label || (label === "帰宅" || label === "出勤") && c[0] === "出勤or帰宅"); if (!ent) return body;
+  const kws = ent[1].slice().sort((a, b) => b.length - a.length);
+  for (const k of kws) {
+    const m = body.match(new RegExp("^(\\d{1,2}時)?" + k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "(?=$|[\\s　（(：:、。])"));
+    if (m) { let rest = body.slice(m[0].length); rest = rest.replace(/^(\(巡視\)|（巡視）)/, "").replace(/^[\s　：:、。]+/, ""); const pm = rest.match(/^[（(]([^（）()]*)[）)]$/); return pm ? pm[1] : rest; }
+  }
+  return body;
+}
+// 時間の行に入れる文：「5分 来所」のように分だけにし、同じ時間の記録は続けて書く
+export function hourCell(lines: string[], hour?: number): { content: string; title: string } {
+  const morning = hour != null && hour >= 4 && hour <= 11;
+  const items = lines.map((l, i) => { const m = l.match(/^(\d{1,2})[:：](\d{2})\s*([\s\S]*)$/); return m ? { i, t: parseInt(m[1], 10) * 60 + parseInt(m[2], 10), mm: parseInt(m[2], 10), body: m[3].trim() } : { i, t: null as number | null, mm: -1, body: l.trim() }; })
+    .sort((a, b) => (Number(a.t == null) - Number(b.t == null)) || ((a.t ?? 0) - (b.t ?? 0)) || (a.i - b.i));
+  const cats: string[] = []; for (const it of items) { const c = entryCat(it.body); if (c && !cats.includes(c)) cats.push(c); }
+  const title = cats.map((c) => c === "出勤or帰宅" ? "帰宅" : (morning && c === "夕食準備（調理）") ? "朝食準備（調理）" : c).join("・");
+  const single = cats.length === 1 ? cats[0] : "";
+  const parts = items.map((it) => { let body = it.body; if (single && entryCat(body) === single) body = stripLead(body, single); const head = it.mm < 0 ? "" : (it.mm === 0 ? "00分" : it.mm + "分"); return (head + (body ? (head ? " " : "") + body : "")).trim(); }).filter(Boolean);
+  return { content: parts.join("　/　"), title };
+}
 export function dispLen(s: string): number { let n = 0; for (const ch of s) n += /[\x00-\xff｡-ﾟ]/.test(ch) ? 0.5 : 1; return n; }
 export function wrapLines(text: string, widthUnits: number, fontSize: number, div: number): number {
   const perLine = Math.max(4, (widthUnits / div) * (11 / fontSize));
@@ -144,8 +167,8 @@ export function fillMarked(wb: any, ws: any, f: any, imgs: { day?: string | null
     const act = first.match(/^活動(\d{1,2})$/);
     if (act && only) {
       const h = String(parseInt(act[1], 10)); const arr = bucket[h] || []; const r = it.r;
-      const sorted = arr.map((l, i) => ({ l, i, t: parseTime(l) })).sort((a, b) => (Number(a.t == null) - Number(b.t == null)) || ((a.t ?? 0) - (b.t ?? 0)) || (a.i - b.i)).map((x) => x.l);
-      const content = sorted.join(" / "); const titleStr = content ? detectTitles(content).join("・") : "";
+      const hc = arr.length ? hourCell(arr, parseInt(h, 10)) : { content: "", title: "" };
+      const content = hc.content; const titleStr = hc.title;
       cell.value = titleStr || null;
       const cg = rngOf(r, it.c + 1); const dCell = ws.getCell(cg.r1, cg.c1);
       if (content) { dCell.value = content; const da = dCell.alignment || {}; dCell.alignment = { wrapText: true, vertical: "top", horizontal: da.horizontal || "left" }; }
