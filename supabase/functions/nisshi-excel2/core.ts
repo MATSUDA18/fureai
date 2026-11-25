@@ -59,6 +59,19 @@ export function hourCell(lines: string[], hour?: number, level = 0): { content: 
   const parts = items.filter((it) => !(level >= 1 && DUP_RE.test(it.body.replace(/\s/g, "")))).map((it) => { let body = it.body; if (single && entryCat(body) === single) body = stripLead(body, single); if (MAXL && body) body = shorten(body, MAXL); const head = it.mm < 0 ? "" : (it.mm === 0 ? "00分" : it.mm + "分"); return (head + (body ? (head ? " " : "") + body : "")).trim(); }).filter(Boolean);
   return { content: parts.join("　/　"), title };
 }
+// 目印 {{活動記録}}：1つの欄に、上から順に「16:05 来所 / 16:22 …」と書き、時間（時）が変わるところで改行する
+const HOUR_ORDER = ["16","17","18","19","20","21","22","23","0","1","2","3","4","5","6","7","8","9"];
+export function activityBlock(bucket: Record<string, string[]>, level = 0): string {
+  const out: string[] = [];
+  for (const h of HOUR_ORDER) {
+    const arr = bucket[h] || []; if (!arr.length) continue;
+    const items = arr.map((l, i) => { const m = l.match(/^(\d{1,2})[:：](\d{2})\s*([\s\S]*)$/); return m ? { i, t: parseInt(m[1], 10) * 60 + parseInt(m[2], 10), text: parseInt(m[1], 10) + ":" + m[2] + " " + m[3].trim(), body: m[3].trim() } : { i, t: null as number | null, text: l.trim(), body: l.trim() }; })
+      .sort((a, b) => (Number(a.t == null) - Number(b.t == null)) || ((a.t ?? 0) - (b.t ?? 0)) || (a.i - b.i))
+      .filter((it) => !(level >= 1 && DUP_RE.test(it.body.replace(/\s/g, ""))));
+    if (items.length) out.push(items.map((it) => it.text.trim()).join(" / "));
+  }
+  return out.join("\n");
+}
 export function dispLen(s: string): number { let n = 0; for (const ch of s) n += /[\x00-\xff｡-ﾟ]/.test(ch) ? 0.5 : 1; return n; }
 export function wrapLines(text: string, widthUnits: number, fontSize: number, div: number): number {
   const perLine = Math.max(4, (widthUnits / div) * (11 / fontSize));
@@ -81,7 +94,7 @@ export function colNum(s: string): number { let n = 0; for (const ch of s) n = n
 export const MK = /\{\{([^{}|]+?)(?:\|([^{}]*))?\}\}/g;
 export const KNOWN_MARKERS = ["利用者名", "利用日時", "測定時間1", "体温1", "血圧1", "脈拍1", "測定時間2", "体温2", "血圧2", "脈拍2", "排尿", "排便", "投薬", "担当職員", "他利用者",
   "活動16", "活動17", "活動18", "活動19", "活動20", "活動21", "活動22", "活動23", "活動0", "活動1", "活動2", "活動3", "活動4", "活動5", "活動6", "活動7", "活動8", "活動9",
-  "夕食メニュー", "朝食メニュー", "夕食写真", "朝食写真", "ご様子", "次回利用予定日", "次回へのお願い", "写真", "記録者", "日付"];
+  "活動記録", "夕食メニュー", "朝食メニュー", "夕食写真", "朝食写真", "ご様子", "次回利用予定日", "次回へのお願い", "写真", "記録者", "日付"];
 const DIV_NARROW = 1.75, DIV_WIDE = 1.9, DIV_MATOME = 1.9, LH = 1.9;
 type Rng = { r1: number; c1: number; r2: number; c2: number };
 export function cellText(v: any): string {
@@ -170,9 +183,20 @@ export function fillMarked(wb: any, ws: any, f: any, imgs: { day?: string | null
   const menuJobs: { cell: any; g: Rng; label: string; body: string; eat: string; inBox: boolean; photoW: number; textUnits: number; base: number; nm: string; color: any }[] = [];
   const imgJobs: { g: Rng; data: string; kind: "full" | "right" | "belowLabel"; w?: number }[] = [];
   let matome: { g: Rng; cell: any } | null = null;
+  const blockMode = names.has("活動記録"); let block: { g: Rng; cell: any } | null = null;
+  const titleJobs: { r: number; cell: any; titleW: number; titleStr: string; base: number }[] = [];
   for (const it of cells.values()) {
     const cell = ws.getCell(it.r, it.c); const first = it.names[0].name; const only = it.names.length === 1 && it.raw.trim() === it.raw.match(/\{\{[^{}]*\}\}/)![0];
+    if (first === "活動記録" && only) { block = { g: rngOf(it.r, it.c), cell }; continue; }
     const act = first.match(/^活動(\d{1,2})$/);
+    if (act && only && blockMode) {
+      // 時間・見出しの列だけ埋める（内容は {{活動記録}} の欄にまとめて入れる）
+      const h = String(parseInt(act[1], 10)); const arr = bucket[h] || []; const r = it.r;
+      const titleStr = arr.length ? hourCell(arr, parseInt(h, 10), 0).title : "";
+      cell.value = titleStr || null; if (titleStr) cell.alignment = { wrapText: true, vertical: "top", horizontal: "left" };
+      tH(r); titleJobs.push({ r, cell, titleW: colW(it.c), titleStr, base: (cell.font && cell.font.size) || 12 });
+      continue;
+    }
     if (act && only) {
       const h = String(parseInt(act[1], 10)); const arr = bucket[h] || []; const r = it.r;
       const hc = arr.length ? hourCell(arr, parseInt(h, 10), 0) : { content: "", title: "" };
@@ -213,7 +237,9 @@ export function fillMarked(wb: any, ws: any, f: any, imgs: { day?: string | null
   }
   // ===== 高さの調整：A4の幅いっぱいで1ページに収まるよう、まず文字を少し小さくしてから行を広げる =====
   if (matome) { const mc = matome.cell; mc.value = appear || null; if (appear) { const aa = mc.alignment || {}; mc.alignment = { wrapText: true, vertical: "top", horizontal: aa.horizontal || "left" }; } for (let r = matome.g.r1; r <= matome.g.r2; r++) tH(r); }
-  const actBase = Math.max(refFs || 0, actJobs.length ? Math.max(...actJobs.map((j) => j.base)) : 12);
+  if (block) for (let r = block.g.r1; r <= block.g.r2; r++) tH(r);
+  const blockBase = block && block.cell.font && block.cell.font.size ? block.cell.font.size : 12;
+  const actBase = Math.max(refFs || 0, blockMode ? blockBase : (actJobs.length ? Math.max(...actJobs.map((j) => j.base)) : 12));
   const mtBase = Math.max(refFs || 0, matome && matome.cell.font && matome.cell.font.size ? matome.cell.font.size : 14);
   const floorFs = refFs || 9;
   const { budget, pr } = pageBudget(ws, colW);
@@ -224,6 +250,17 @@ export function fillMarked(wb: any, ws: any, f: any, imgs: { day?: string | null
       if (!j.content) { H[j.r] = Math.max(H[j.r] || 0, tH(j.r)); continue; }
       const dLines = wrapLines(j.content, j.dW, aFs, j.nar ? DIV_NARROW : DIV_WIDE); const cLines = j.titleStr ? wrapLines(j.titleStr, j.titleW, aFs, DIV_NARROW) : 1;
       H[j.r] = Math.max(H[j.r] || 0, tH(j.r), Math.round(Math.max(dLines, cLines) * aFs * LH + 4));
+    }
+    let blockText = "";
+    if (blockMode) {
+      for (const t of titleJobs) H[t.r] = Math.max(H[t.r] || 0, tH(t.r), t.titleStr ? Math.round(wrapLines(t.titleStr, t.titleW, aFs, DIV_NARROW) * aFs * LH + 4) : 0);
+      if (block) {
+        blockText = activityBlock(bucket, Math.min(level, 1));
+        const g = block.g; const rows: number[] = []; for (let r = g.r1; r <= g.r2; r++) rows.push(r);
+        const box = rows.reduce((s, r) => s + (H[r] || tH(r)), 0);
+        const need = blockText ? wrapLines(blockText, widthOf(g), aFs, DIV_WIDE) * aFs * LH + 8 : 0;
+        if (need > box) { const add = (need - box) / rows.length; rows.forEach((r) => { H[r] = (H[r] || tH(r)) + add; }); }
+      }
     }
     const menuFs: number[] = [];
     for (const mj of menuJobs) {
@@ -241,15 +278,20 @@ export function fillMarked(wb: any, ws: any, f: any, imgs: { day?: string | null
       if (needH > box) { const per = Math.round(needH / nrows); for (let r = g.r1; r <= g.r2; r++) H[r] = Math.max(H[r] || tH(r), per); }
     }
     let total = 0; for (let r = pr.r1; r <= pr.r2; r++) total += Math.min(240, H[r] ?? (ws.getRow(r).height || 15));
-    return { H, menuFs, mFs, total };
+    return { H, menuFs, mFs, total, blockText };
   };
   let aFs = actBase, mMin = refFs ? mtBase : Math.min(mtBase, 12); let lv = 0; let L = layout(aFs, mMin, lv);
   const aMin = refFs ? refFs : Math.max(9, actBase - 3);
   while (L.total > budget && aFs > aMin) { aFs--; L = layout(aFs, mMin, lv); }
   if (L.total > budget && !refFs && mMin > 10) { mMin = Math.max(10, mtBase - 4); L = layout(aFs, mMin, lv); }
-  if (L.total > budget) { let fit = -1; for (let k = 1; k <= 4; k++) { const T = layout(aFs, mMin, k); if (T.total <= budget) { fit = k; L = T; lv = k; break; } } if (fit < 0) { lv = 3; L = layout(aFs, mMin, 3); } }
+  if (L.total > budget && blockMode) { lv = 1; L = layout(aFs, mMin, 1); }
+  else if (L.total > budget) { let fit = -1; for (let k = 1; k <= 4; k++) { const T = layout(aFs, mMin, k); if (T.total <= budget) { fit = k; L = T; lv = k; break; } } if (fit < 0) { lv = 3; L = layout(aFs, mMin, 3); } }
   Object.keys(L.H).forEach((k) => { const r = Number(k); ws.getRow(r).height = Math.min(240, Math.round(L.H[r] * 10) / 10); });
   for (const j of actJobs) { j.cell.value = j.titleStr || null; if (j.lines.length) j.dCell.value = j.content || null; const df = j.dCell.font || {}; if (j.content) j.dCell.font = Object.assign({}, df, { name: df.name || "游ゴシック", size: aFs }); if (j.titleStr) { const bf = j.cell.font || {}; j.cell.font = { name: bf.name || "游ゴシック", size: aFs, bold: bf.bold, italic: bf.italic, underline: bf.underline, color: bf.color }; } }
+  if (blockMode) {
+    for (const t of titleJobs) if (t.titleStr) { const bf = t.cell.font || {}; t.cell.font = { name: bf.name || "游ゴシック", size: aFs, bold: bf.bold, italic: bf.italic, underline: bf.underline, color: bf.color }; }
+    if (block) { const bc = block.cell; bc.value = L.blockText || null; const bf = bc.font || {}; bc.font = Object.assign({}, bf, { name: bf.name || "游ゴシック", size: aFs }); bc.alignment = { wrapText: true, vertical: "top", horizontal: "left" }; }
+  }
   menuJobs.forEach((mj, i) => {
     const fs = L.menuFs[i]; const bodyW = mj.inBox && mj.body.trim() ? hardWrap(mj.body, mj.textUnits, fs, DIV_WIDE) : mj.body;
     const lf = refFs ? Math.max(refFs, fs - 1) : fs - 1, ef = refFs ? Math.max(refFs, fs - 2) : fs - 2;
