@@ -45,14 +45,18 @@ function stripLead(body: string, label: string): string {
   return body;
 }
 // 時間の行に入れる文：「5分 来所」のように分だけにし、同じ時間の記録は続けて書く
-export function hourCell(lines: string[], hour?: number): { content: string; title: string } {
-  const morning = hour != null && hour >= 4 && hour <= 11;
+// 1ページに収まらないときは、記録を段階的に短くする（0：そのまま、1：排泄・内服・水分など別の欄にある記録を省く、2〜4：1件を短く）
+const DUP_RE = /^(トイレ（[小大]）|内服（済み）|内服[：:]?\s*済み|水分摂取(（[^）]*）)?)$/;
+function firstSentence(t: string): string { let d = 0; for (let i = 0; i < t.length; i++) { const ch = t[i]; if (ch === "（" || ch === "(" || ch === "「" || ch === "｢") d++; else if (ch === "）" || ch === ")" || ch === "」" || ch === "｣") d = Math.max(0, d - 1); else if (ch === "。" && d === 0) return t.slice(0, i); } return t; }
+function shorten(body: string, max: number): string { let b = firstSentence(body).trim(); if (max <= 18) b = b.replace(/[（(][^（）()]{7,}[）)]/g, "").replace(/\s{2,}/g, " ").trim(); if (dispLen(b) <= max) return b; let out = "", n = 0; for (const ch of b) { const w = dispLen(ch); if (n + w > max) break; out += ch; n += w; } return out + "…"; }
+export function hourCell(lines: string[], hour?: number, level = 0): { content: string; title: string } {
+  const morning = hour != null && hour >= 4 && hour <= 11; const MAXL = [0, 0, 28, 18, 12][Math.min(4, level)] || 0;
   const items = lines.map((l, i) => { const m = l.match(/^(\d{1,2})[:：](\d{2})\s*([\s\S]*)$/); return m ? { i, t: parseInt(m[1], 10) * 60 + parseInt(m[2], 10), mm: parseInt(m[2], 10), body: m[3].trim() } : { i, t: null as number | null, mm: -1, body: l.trim() }; })
     .sort((a, b) => (Number(a.t == null) - Number(b.t == null)) || ((a.t ?? 0) - (b.t ?? 0)) || (a.i - b.i));
   const cats: string[] = []; for (const it of items) { const c = entryCat(it.body); if (c && !cats.includes(c)) cats.push(c); }
   const title = cats.map((c) => c === "出勤or帰宅" ? "帰宅" : (morning && c === "夕食準備（調理）") ? "朝食準備（調理）" : c).join("・");
   const single = cats.length === 1 ? cats[0] : "";
-  const parts = items.map((it) => { let body = it.body; if (single && entryCat(body) === single) body = stripLead(body, single); const head = it.mm < 0 ? "" : (it.mm === 0 ? "00分" : it.mm + "分"); return (head + (body ? (head ? " " : "") + body : "")).trim(); }).filter(Boolean);
+  const parts = items.filter((it) => !(level >= 1 && DUP_RE.test(it.body.replace(/\s/g, "")))).map((it) => { let body = it.body; if (single && entryCat(body) === single) body = stripLead(body, single); if (MAXL && body) body = shorten(body, MAXL); const head = it.mm < 0 ? "" : (it.mm === 0 ? "00分" : it.mm + "分"); return (head + (body ? (head ? " " : "") + body : "")).trim(); }).filter(Boolean);
   return { content: parts.join("　/　"), title };
 }
 export function dispLen(s: string): number { let n = 0; for (const ch of s) n += /[\x00-\xff｡-ﾟ]/.test(ch) ? 0.5 : 1; return n; }
@@ -152,13 +156,17 @@ export function fillMarked(wb: any, ws: any, f: any, imgs: { day?: string | null
     "次回へのお願い": f.nextRequest || "", "記録者": f.writer || "", "日付": f.date || "", "ご様子": appear,
   };
   const names = new Set(marks.map((m) => m.name));
+  // いちばん小さい文字の大きさ＝バイタル記録の欄の文字の大きさ（これより小さくしない）
+  const refMark = marks.find((m) => m.name === "体温1") || marks.find((m) => m.name === "測定時間1") || marks.find((m) => m.name === "血圧1");
+  const refFs = (refMark && ws.getCell(refMark.r, refMark.c).font && ws.getCell(refMark.r, refMark.c).font.size) || 0;
+  const nameMark = marks.find((m) => m.name === "利用者名");
   const cells = new Map<string, { r: number; c: number; raw: string; names: { name: string; def: string }[] }>();
   for (const m of marks) { const k = m.r + "_" + m.c; if (!cells.has(k)) cells.set(k, { r: m.r, c: m.c, raw: m.raw, names: [] }); cells.get(k)!.names.push({ name: m.name, def: m.def }); }
   const hourRow: Record<string, boolean> = {}; for (const h of ["16","17","18","19","20","21","22","23","0","1","2","3","4","5","6","7","8","9"]) hourRow[h] = true;
   const bucket: Record<string, string[]> = {};
   programEntries(f.program).forEach((e) => { const key = hourRow[e.h] ? e.h : "16"; (bucket[key] = bucket[key] || []).push(e.line); });
   const baseH: Record<number, number> = {}; const tH = (r: number) => (baseH[r] ?? (baseH[r] = ws.getRow(r).height || 18));
-  const actJobs: { r: number; cell: any; titleW: number; dCell: any; dW: number; nar: boolean; content: string; titleStr: string; base: number }[] = [];
+  const actJobs: { r: number; cell: any; titleW: number; dCell: any; dW: number; nar: boolean; content: string; titleStr: string; base: number; lines: string[]; hour: number }[] = [];
   const menuJobs: { cell: any; g: Rng; label: string; body: string; eat: string; inBox: boolean; photoW: number; textUnits: number; base: number; nm: string; color: any }[] = [];
   const imgJobs: { g: Rng; data: string; kind: "full" | "right" | "belowLabel"; w?: number }[] = [];
   let matome: { g: Rng; cell: any } | null = null;
@@ -167,14 +175,14 @@ export function fillMarked(wb: any, ws: any, f: any, imgs: { day?: string | null
     const act = first.match(/^活動(\d{1,2})$/);
     if (act && only) {
       const h = String(parseInt(act[1], 10)); const arr = bucket[h] || []; const r = it.r;
-      const hc = arr.length ? hourCell(arr, parseInt(h, 10)) : { content: "", title: "" };
+      const hc = arr.length ? hourCell(arr, parseInt(h, 10), 0) : { content: "", title: "" };
       const content = hc.content; const titleStr = hc.title;
       cell.value = titleStr || null;
       const cg = rngOf(r, it.c + 1); const dCell = ws.getCell(cg.r1, cg.c1);
       if (content) { dCell.value = content; const da = dCell.alignment || {}; dCell.alignment = { wrapText: true, vertical: "top", horizontal: da.horizontal || "left" }; }
       const dFont = (dCell.font && dCell.font.size) ? dCell.font.size : 12;
       if (titleStr) { cell.alignment = { wrapText: true, vertical: "top", horizontal: "left" }; }
-      tH(r); actJobs.push({ r, cell, titleW: colW(it.c), dCell, dW: widthOf(cg), nar: cg.c2 < 11, content, titleStr, base: dFont });
+      tH(r); actJobs.push({ r, cell, titleW: colW(it.c), dCell, dW: widthOf(cg), nar: cg.c2 < 11, content, titleStr, base: dFont, lines: arr, hour: parseInt(h, 10) });
       continue;
     }
     if ((first === "夕食メニュー" || first === "朝食メニュー") && only) {
@@ -185,7 +193,7 @@ export function fillMarked(wb: any, ws: any, f: any, imgs: { day?: string | null
       const inBox = !!photo && !sepMarker; const boxPx = widthOf(g) * 7 + 5 * (g.c2 - g.c1 + 1);
       const photoW = inBox ? Math.round(Math.min(boxPx * 0.42, 210)) : 0; const textUnits = widthOf(g) - (inBox ? (photoW + 10) / 7 : 0);
       const label = isD ? "夕食メニュー" : "朝食メニュー"; const bf = cell.font || {}; const nm = bf.name || "游ゴシック";
-      const mBase = (bf.size && bf.size <= 13) ? bf.size : 13; // 旧ひな形（18pt）は従来どおり13ptを基準にする
+      const mBase = Math.max(refFs || 0, (bf.size && bf.size <= 13) ? bf.size : 13); // 旧ひな形（18pt）は従来どおり13ptを基準にする
       for (let r = g.r1; r <= g.r2; r++) tH(r);
       menuJobs.push({ cell, g, label, body, eat, inBox, photoW, textUnits, base: mBase, nm, color: bf.color });
       if (inBox) imgJobs.push({ g, data: photo!, kind: "right", w: photoW });
@@ -205,12 +213,14 @@ export function fillMarked(wb: any, ws: any, f: any, imgs: { day?: string | null
   }
   // ===== 高さの調整：A4の幅いっぱいで1ページに収まるよう、まず文字を少し小さくしてから行を広げる =====
   if (matome) { const mc = matome.cell; mc.value = appear || null; if (appear) { const aa = mc.alignment || {}; mc.alignment = { wrapText: true, vertical: "top", horizontal: aa.horizontal || "left" }; } for (let r = matome.g.r1; r <= matome.g.r2; r++) tH(r); }
-  const actBase = actJobs.length ? Math.max(...actJobs.map((j) => j.base)) : 12;
-  const mtBase = matome && matome.cell.font && matome.cell.font.size ? matome.cell.font.size : 14;
+  const actBase = Math.max(refFs || 0, actJobs.length ? Math.max(...actJobs.map((j) => j.base)) : 12);
+  const mtBase = Math.max(refFs || 0, matome && matome.cell.font && matome.cell.font.size ? matome.cell.font.size : 14);
+  const floorFs = refFs || 9;
   const { budget, pr } = pageBudget(ws, colW);
-  const layout = (aFs: number, mMin: number) => {
+  const layout = (aFs: number, mMin: number, level = 0) => {
     const H: Record<number, number> = {};
     for (const j of actJobs) {
+      if (j.lines.length) { const hc = hourCell(j.lines, j.hour, level); j.content = hc.content; j.titleStr = hc.title; }
       if (!j.content) { H[j.r] = Math.max(H[j.r] || 0, tH(j.r)); continue; }
       const dLines = wrapLines(j.content, j.dW, aFs, j.nar ? DIV_NARROW : DIV_WIDE); const cLines = j.titleStr ? wrapLines(j.titleStr, j.titleW, aFs, DIV_NARROW) : 1;
       H[j.r] = Math.max(H[j.r] || 0, tH(j.r), Math.round(Math.max(dLines, cLines) * aFs * LH + 4));
@@ -220,7 +230,7 @@ export function fillMarked(wb: any, ws: any, f: any, imgs: { day?: string | null
       const rows: number[] = []; for (let r = mj.g.r1; r <= mj.g.r2; r++) rows.push(r);
       const box = rows.reduce((s, r) => s + (H[r] || tH(r)), 0);
       const need = (fs: number) => { const bl = mj.body.trim() ? wrapLines(mj.inBox ? hardWrap(mj.body, mj.textUnits, fs, DIV_WIDE) : mj.body, mj.textUnits, fs, DIV_WIDE) : 0; let n = (fs - 1) * LH + bl * fs * LH + (mj.eat ? (fs - 2) * LH : 0) + 8; if (mj.inBox) n = Math.max(n, 82); return n; };
-      let fs = mj.base; while (fs > Math.max(9, mj.base - 4) && need(fs) > box) fs--;
+      let fs = mj.base; while (fs > Math.max(floorFs, 9, mj.base - 4) && need(fs) > box) fs--;
       menuFs.push(fs); const n = need(fs); if (n > box) { const add = (n - box) / rows.length; rows.forEach((r) => { H[r] = (H[r] || tH(r)) + add; }); }
     }
     let mFs = mtBase;
@@ -233,20 +243,23 @@ export function fillMarked(wb: any, ws: any, f: any, imgs: { day?: string | null
     let total = 0; for (let r = pr.r1; r <= pr.r2; r++) total += Math.min(240, H[r] ?? (ws.getRow(r).height || 15));
     return { H, menuFs, mFs, total };
   };
-  let aFs = actBase, mMin = Math.min(mtBase, 12); let L = layout(aFs, mMin);
-  const aMin = Math.max(9, actBase - 3);
-  while (L.total > budget && aFs > aMin) { aFs--; L = layout(aFs, mMin); }
-  if (L.total > budget && mMin > 10) { mMin = Math.max(10, mtBase - 4); L = layout(aFs, mMin); }
+  let aFs = actBase, mMin = refFs ? mtBase : Math.min(mtBase, 12); let lv = 0; let L = layout(aFs, mMin, lv);
+  const aMin = refFs ? refFs : Math.max(9, actBase - 3);
+  while (L.total > budget && aFs > aMin) { aFs--; L = layout(aFs, mMin, lv); }
+  if (L.total > budget && !refFs && mMin > 10) { mMin = Math.max(10, mtBase - 4); L = layout(aFs, mMin, lv); }
+  if (L.total > budget) { let fit = -1; for (let k = 1; k <= 4; k++) { const T = layout(aFs, mMin, k); if (T.total <= budget) { fit = k; L = T; lv = k; break; } } if (fit < 0) { lv = 3; L = layout(aFs, mMin, 3); } }
   Object.keys(L.H).forEach((k) => { const r = Number(k); ws.getRow(r).height = Math.min(240, Math.round(L.H[r] * 10) / 10); });
-  for (const j of actJobs) { const df = j.dCell.font || {}; if (j.content) j.dCell.font = Object.assign({}, df, { name: df.name || "游ゴシック", size: aFs }); if (j.titleStr) { const bf = j.cell.font || {}; j.cell.font = { name: bf.name || "游ゴシック", size: aFs, bold: bf.bold, italic: bf.italic, underline: bf.underline, color: bf.color }; } }
+  for (const j of actJobs) { j.cell.value = j.titleStr || null; if (j.lines.length) j.dCell.value = j.content || null; const df = j.dCell.font || {}; if (j.content) j.dCell.font = Object.assign({}, df, { name: df.name || "游ゴシック", size: aFs }); if (j.titleStr) { const bf = j.cell.font || {}; j.cell.font = { name: bf.name || "游ゴシック", size: aFs, bold: bf.bold, italic: bf.italic, underline: bf.underline, color: bf.color }; } }
   menuJobs.forEach((mj, i) => {
     const fs = L.menuFs[i]; const bodyW = mj.inBox && mj.body.trim() ? hardWrap(mj.body, mj.textUnits, fs, DIV_WIDE) : mj.body;
-    const runs: any[] = [{ text: mj.label + (bodyW || mj.eat ? "\n" : ""), font: { name: mj.nm, size: fs - 1, bold: true, underline: true, color: mj.color } }];
+    const lf = refFs ? Math.max(refFs, fs - 1) : fs - 1, ef = refFs ? Math.max(refFs, fs - 2) : fs - 2;
+    const runs: any[] = [{ text: mj.label + (bodyW || mj.eat ? "\n" : ""), font: { name: mj.nm, size: lf, bold: true, underline: true, color: mj.color } }];
     if (bodyW.trim()) runs.push({ text: bodyW + (mj.eat ? "\n" : ""), font: { name: mj.nm, size: fs, bold: false, underline: false, color: mj.color } });
-    if (mj.eat) runs.push({ text: mj.eat, font: { name: mj.nm, size: fs - 2, bold: false, underline: false, color: mj.color } });
+    if (mj.eat) runs.push({ text: mj.eat, font: { name: mj.nm, size: ef, bold: false, underline: false, color: mj.color } });
     mj.cell.value = { richText: runs }; const a = mj.cell.alignment || {}; mj.cell.alignment = { wrapText: true, vertical: "top", horizontal: a.horizontal || "left" };
   });
   if (matome && appear) matome.cell.font = Object.assign({}, matome.cell.font || {}, { size: L.mFs });
+  if (nameMark && refFs) { const nc = ws.getCell(nameMark.r, nameMark.c); const nf = nc.font || {}; const want = Math.round(refFs * 1.2); if (!nf.size || nf.size < want) nc.font = Object.assign({}, nf, { size: want }); }
   const cpx = (c: number) => Math.round(colW(c) * 7 + 5); const rpx = (r: number) => (ws.getRow(r).height || 15) * 4 / 3;
   const placed: any[] = [];
   for (const job of imgJobs) {
@@ -262,5 +275,5 @@ export function fillMarked(wb: any, ws: any, f: any, imgs: { day?: string | null
     const id = wb.addImage({ base64: job.data, extension: ext });
     const tl = anchor(x, y), br = anchor(x + dw, y + dh); ws.addImage(id, { tl, br, editAs: "oneCell" }); placed.push({ kind: job.kind, tl, br });
   }
-  return { markers: [...names], placed, fit: { budget: Math.round(budget), total: Math.round(L.total), actFont: aFs, matomeFont: L.mFs, menuFont: L.menuFs } };
+  return { markers: [...names], placed, fit: { budget: Math.round(budget), total: Math.round(L.total), level: lv, refFs, actFont: aFs, matomeFont: L.mFs, menuFont: L.menuFs } };
 }
