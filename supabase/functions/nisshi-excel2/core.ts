@@ -68,7 +68,7 @@ export function activityBlock(bucket: Record<string, string[]>, level = 0): stri
     const items = arr.map((l, i) => { const m = l.match(/^(\d{1,2})[:：](\d{2})\s*([\s\S]*)$/); return m ? { i, t: parseInt(m[1], 10) * 60 + parseInt(m[2], 10), text: parseInt(m[1], 10) + ":" + m[2] + " " + m[3].trim(), body: m[3].trim() } : { i, t: null as number | null, text: l.trim(), body: l.trim() }; })
       .sort((a, b) => (Number(a.t == null) - Number(b.t == null)) || ((a.t ?? 0) - (b.t ?? 0)) || (a.i - b.i))
       .filter((it) => !(level >= 1 && DUP_RE.test(it.body.replace(/\s/g, ""))));
-    if (items.length) out.push(items.map((it) => it.text.trim()).join(" / "));
+    if (items.length) out.push(items.map((it) => { if (level < 2 || it.t == null) return it.text.trim(); const sp = it.text.indexOf(" "); const head = it.text.slice(0, sp + 1); return (head + firstSentence(it.text.slice(sp + 1)).trim()).trim(); }).join(" / "));
   }
   return out.join("\n");
 }
@@ -96,6 +96,7 @@ export const KNOWN_MARKERS = ["利用者名", "利用日時", "測定時間1", "
   "活動16", "活動17", "活動18", "活動19", "活動20", "活動21", "活動22", "活動23", "活動0", "活動1", "活動2", "活動3", "活動4", "活動5", "活動6", "活動7", "活動8", "活動9",
   "活動記録", "夕食メニュー", "朝食メニュー", "夕食写真", "朝食写真", "ご様子", "次回利用予定日", "次回へのお願い", "写真", "記録者", "日付"];
 const DIV_NARROW = 1.75, DIV_WIDE = 1.9, DIV_MATOME = 1.9, LH = 1.9;
+const LH_BLOCK = 1.8; // 1つにまとめた活動記録の欄は行数が多いので、游ゴシックの実際の行間（約1.7倍）に近い値で見積もる
 type Rng = { r1: number; c1: number; r2: number; c2: number };
 export function cellText(v: any): string {
   if (v == null) return ""; if (typeof v === "string") return v; if (typeof v === "number") return String(v);
@@ -192,7 +193,9 @@ export function fillMarked(wb: any, ws: any, f: any, imgs: { day?: string | null
     if (act && only && blockMode) {
       // 時間・見出しの列だけ埋める（内容は {{活動記録}} の欄にまとめて入れる）
       const h = String(parseInt(act[1], 10)); const arr = bucket[h] || []; const r = it.r;
-      const titleStr = arr.length ? hourCell(arr, parseInt(h, 10), 0).title : "";
+      // 見出しは短く（かっこの中は省き、2つまで。3つ以上は「他」）：細い列で行が高くならないように
+      const tl = arr.length ? hourCell(arr, parseInt(h, 10), 0).title.split("・").filter(Boolean).map((x) => x.replace(/（[^）]*）/g, "")) : [];
+      const titleStr = tl.length > 2 ? tl.slice(0, 2).join("・") + "他" : tl.join("・");
       cell.value = titleStr || null; if (titleStr) cell.alignment = { wrapText: true, vertical: "top", horizontal: "left" };
       tH(r); titleJobs.push({ r, cell, titleW: colW(it.c), titleStr, base: (cell.font && cell.font.size) || 12 });
       continue;
@@ -253,12 +256,12 @@ export function fillMarked(wb: any, ws: any, f: any, imgs: { day?: string | null
     }
     let blockText = "";
     if (blockMode) {
-      for (const t of titleJobs) H[t.r] = Math.max(H[t.r] || 0, tH(t.r), t.titleStr ? Math.round(wrapLines(t.titleStr, t.titleW, aFs, DIV_NARROW) * aFs * LH + 4) : 0);
+      for (const t of titleJobs) { const n = t.titleStr ? wrapLines(t.titleStr, t.titleW, aFs, DIV_NARROW) : 0; H[t.r] = Math.max(H[t.r] || 0, tH(t.r), n === 0 ? 0 : n === 1 ? Math.round(aFs * 1.75) : Math.round(n * aFs * LH + 4)); }
       if (block) {
-        blockText = activityBlock(bucket, Math.min(level, 1));
+        blockText = activityBlock(bucket, Math.min(level, 2));
         const g = block.g; const rows: number[] = []; for (let r = g.r1; r <= g.r2; r++) rows.push(r);
         const box = rows.reduce((s, r) => s + (H[r] || tH(r)), 0);
-        const need = blockText ? wrapLines(blockText, widthOf(g), aFs, DIV_WIDE) * aFs * LH + 8 : 0;
+        const need = blockText ? wrapLines(blockText, widthOf(g), aFs, DIV_WIDE) * aFs * LH_BLOCK + 8 : 0;
         if (need > box) { const add = (need - box) / rows.length; rows.forEach((r) => { H[r] = (H[r] || tH(r)) + add; }); }
       }
     }
@@ -284,8 +287,16 @@ export function fillMarked(wb: any, ws: any, f: any, imgs: { day?: string | null
   const aMin = refFs ? refFs : Math.max(9, actBase - 3);
   while (L.total > budget && aFs > aMin) { aFs--; L = layout(aFs, mMin, lv); }
   if (L.total > budget && !refFs && mMin > 10) { mMin = Math.max(10, mtBase - 4); L = layout(aFs, mMin, lv); }
-  if (L.total > budget && blockMode) { lv = 1; L = layout(aFs, mMin, 1); }
+  if (L.total > budget && blockMode) { lv = 1; L = layout(aFs, mMin, 1); if (L.total > budget) { lv = 2; L = layout(aFs, mMin, 2); } }
   else if (L.total > budget) { let fit = -1; for (let k = 1; k <= 4; k++) { const T = layout(aFs, mMin, k); if (T.total <= budget) { fit = k; L = T; lv = k; break; } } if (fit < 0) { lv = 3; L = layout(aFs, mMin, 3); } }
+  // まだ1ページに収まらないときは、ご様子まとめの欄の空いている分を詰める（文章が入る高さは残す）
+  if (L.total > budget && matome) {
+    const g = matome.g; const rows: number[] = []; for (let r = g.r1; r <= g.r2; r++) rows.push(r);
+    const box = rows.reduce((s2, r) => s2 + (L.H[r] ?? tH(r)), 0);
+    const need = appear ? wrapLines(appear, widthOf(g), L.mFs, DIV_MATOME) * L.mFs * LH + 8 : 2 * mtBase * LH;
+    const cut = Math.min(L.total - budget, box - Math.max(need, 2 * L.mFs * LH + 8));
+    if (cut > 0) { rows.forEach((r) => { const h = L.H[r] ?? tH(r); L.H[r] = Math.max(8, h - cut * h / box); }); L.total -= cut; }
+  }
   Object.keys(L.H).forEach((k) => { const r = Number(k); ws.getRow(r).height = Math.min(240, Math.round(L.H[r] * 10) / 10); });
   for (const j of actJobs) { j.cell.value = j.titleStr || null; if (j.lines.length) j.dCell.value = j.content || null; const df = j.dCell.font || {}; if (j.content) j.dCell.font = Object.assign({}, df, { name: df.name || "游ゴシック", size: aFs }); if (j.titleStr) { const bf = j.cell.font || {}; j.cell.font = { name: bf.name || "游ゴシック", size: aFs, bold: bf.bold, italic: bf.italic, underline: bf.underline, color: bf.color }; } }
   if (blockMode) {

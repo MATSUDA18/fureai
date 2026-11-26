@@ -94,7 +94,7 @@ serve(async (req) => {
     const wb = new ExcelJS.Workbook(); await wb.xlsx.load(tb); const ws = wb.worksheets[0];
     const imgs = { day: await resolveImg(f.dayPhoto), dinner: await resolveImg(f.dinnerPhoto), breakfast: await resolveImg(f.breakfastPhoto) };
     fillMarked(wb, ws, f, imgs);
-    ws.pageSetup = { ...(ws.pageSetup || {}), orientation: "portrait", paperSize: 9, fitToPage: true, fitToWidth: 1, fitToHeight: 1, horizontalCentered: true } as any;
+    ws.pageSetup = { ...(ws.pageSetup || {}), orientation: "portrait", paperSize: 9, fitToPage: true, fitToWidth: 1, fitToHeight: 0, horizontalCentered: true } as any;
     const out = await wb.xlsx.writeBuffer();
     return new Response(out, { headers: { ...cors, "Content-Type": XLSX_TYPE } });
   } catch (e) {
