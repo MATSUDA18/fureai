@@ -492,11 +492,12 @@
   .menu-band-t{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .menu-band.exp .menu-band-t{white-space:normal;overflow:visible;}
   .menu-band .mc-tag{font-size:11px;padding:1px 7px;margin-top:2px;flex:none;}
-  .rec-row{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #F0D3DB;border-radius:10px;padding:8px 10px;}
+  .rec-row{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;background:#fff;border:1px solid #F0D3DB;border-radius:10px;padding:8px 10px;}
   .rec-by{flex:none;font-size:10.5px;line-height:1.25;color:#A8959B;text-align:right;white-space:nowrap;}
   .rec-ed{color:#B07A2E;}
   .rec-time{font-weight:700;color:#C9788F;font-variant-numeric:tabular-nums;}
-  .rec-item{flex:1;font-size:14px;}
+  .rec-item{flex:1 1 7em;min-width:0;font-size:14px;overflow-wrap:break-word;word-break:normal;line-height:1.5;}
+.rec-acts{display:flex;align-items:center;gap:8px;margin-left:auto;flex:none;}
   .toast{position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 72px);transform:translateX(-50%);background:#3F3237;color:#fff;padding:12px 20px;border-radius:16px;font-size:14.5px;font-weight:700;line-height:1.5;z-index:120;box-shadow:0 8px 26px rgba(0,0,0,.32);max-width:calc(100vw - 32px);width:max-content;text-align:center;animation:toastin .22s ease;}
   @keyframes toastin{0%{opacity:0;transform:translate(-50%,-10px);}100%{opacity:1;transform:translate(-50%,0);}}
   .album{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
@@ -2433,8 +2434,8 @@ function Records({me,data,persist,reload}){
         <span className="rec-time">{hm(r.ts)}</span><span className="chip" style={{background:uc.bg,color:uc.fg}}>{r.user}</span>
         {r.thumb&&<img className="rec-thumb noSave" draggable={false} onContextMenu={e=>e.preventDefault()} src={r.thumb} alt="写真" onClick={()=>openFull(r.photoId)}/>}
         <span className={"rec-item"+(r.abn?" abn":"")}>{r.item}</span>
-        {(r.by||r.edBy)&&<span className="rec-by" title={(r.by?("入力："+r.by):"")+(r.edBy?("　修正補足："+r.edBy):"")}>{r.by?shortBy(r.by):""}{r.edBy&&<span className="rec-ed">{r.by?<br/>:null}修正補足:{shortBy(r.edBy)}</span>}</span>}
-        {isMealRec(r)&&<button className="mini-key" title="LINEなどに送る" onClick={()=>openMealShare(r)}>📤</button>}<button className="mini-key" onClick={()=>openEditRec(r)}>✏️</button><button className="mini-del" onClick={()=>delRec(r.id)}>🗑</button></div>;})}</div>
+        <span className="rec-acts">{(r.by||r.edBy)&&<span className="rec-by" title={(r.by?("入力："+r.by):"")+(r.edBy?("　修正補足："+r.edBy):"")}>{r.by?shortBy(r.by):""}{r.edBy&&<span className="rec-ed">{r.by?<br/>:null}修正補足:{shortBy(r.edBy)}</span>}</span>}
+        {isMealRec(r)&&<button className="mini-key" title="LINEなどに送る" onClick={()=>openMealShare(r)}>📤</button>}<button className="mini-key" onClick={()=>openEditRec(r)}>✏️</button><button className="mini-del" onClick={()=>delRec(r.id)}>🗑</button></span></div>;})}</div>
     </>}
     <input ref={fileRef} data-cam="1" type="file" accept="image/*" onChange={onFile} style={{display:"none"}}/>
     {photoPick&&<Modal title="📷 どの写真ですか？" tint="#C9788F" onClose={()=>setPhotoPick(false)}>
@@ -2801,7 +2802,7 @@ function Top({data,season,onPick,onAdminReg,onHotaru,onSbLogout}){
       <button className="foot-btn" onClick={onAdminReg}>🛡 管理者を登録</button>
       <button className="foot-btn hotaru" onClick={onHotaru}>✨ ほたる理念</button>
     </div>
-    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.196〉</p>
+    <p className="footer-note">※ 試作版です。個人情報の取り扱いについては別途ご案内をご確認ください。 〈ver.197〉</p>
     <div style={{textAlign:"center",marginTop:8}}><button className="link-btn" onClick={onSbLogout}>施設ログアウト（共用端末を離れる時）</button></div>
   </div>;
 }
