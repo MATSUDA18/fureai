@@ -949,7 +949,8 @@ async function sha256(t){
     return Array.from(new Uint8Array(b)).map(x=>x.toString(16).padStart(2,"0")).join(""); }
   catch{ let h=0; for(let i=0;i<t.length;i++) h=(h*31+t.charCodeAt(i))|0; return "x"+(h>>>0).toString(16); }
 }
-const uid=()=>Math.random().toString(36).slice(2,9);
+/* ver.196: 時刻＋乱数で、複数のスマホが同時に記録してもidが重ならない */
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,8);
 function ageFrom(b){ if(!b) return ""; const d=new Date(b); if(isNaN(d.getTime())) return ""; const t=new Date(); let a=t.getFullYear()-d.getFullYear(); const m=t.getMonth()-d.getMonth(); if(m<0||(m===0&&t.getDate()<d.getDate())) a--; return a<0?"":a; }
 const today=()=>{const d=new Date();return `${d.getFullYear()}.${d.getMonth()+1}.${d.getDate()}`;};
 const SEED_STAFF=[
